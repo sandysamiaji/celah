@@ -216,24 +216,7 @@ task.spawn(function()
             end
         end
         
-        -- Fallback Remote Auto Delivery
-        if _G_State.AutoDelivery then
-            -- Coba klik ProximityPrompt "Jual" jika ada di dekat player
-            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                for _, prompt in ipairs(workspace:GetDescendants()) do
-                    if prompt:IsA("ProximityPrompt") and string.find(string.lower(prompt.ActionText or ""), "jual") then
-                        pcall(function()
-                            prompt.RequiresLineOfSight = false
-                            if fireproximityprompt then fireproximityprompt(prompt) end
-                        end)
-                    end
-                end
-            end
-            
-            local sellRemote = RS:FindFirstChild("RequestSendDelivery")
-            if sellRemote then pcall(function() sellRemote:InvokeServer() end) end
-        end
+        -- Fallback Remote Auto Delivery (Dihapus karena sudah digabung ke Patroli Fisik)
     end
 end)
 
@@ -244,6 +227,55 @@ task.spawn(function()
     while task.wait(0.5) do
         local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if not hrp then continue end
+        
+        -- ============================================================
+        -- RUTE PATROLI (Keliling ke Pabrik & Pengiriman setiap 15 Detik)
+        -- ============================================================
+        if not _G_State.PatrolTick then _G_State.PatrolTick = tick() end
+        if tick() - _G_State.PatrolTick > 15 then
+            _G_State.PatrolTick = tick()
+            
+            -- 1. Kunjungi Pabrik (Jika Aktif)
+            if _G_State.AutoFactory then
+                for _, prompt in ipairs(workspace:GetDescendants()) do
+                    if prompt:IsA("ProximityPrompt") and (prompt.Parent.Position - hrp.Position).Magnitude < 200 then
+                        local act = string.lower(prompt.ActionText or "")
+                        local obj = string.lower(prompt.ObjectText or "")
+                        -- Mencari menu "Kelola" atau "Pabrik"
+                        if string.find(act, "kelola") or string.find(obj, "pabrik") or string.find(act, "produksi") or string.find(act, "buka") then
+                            pcall(function()
+                                hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
+                                prompt.RequiresLineOfSight = false
+                                if fireproximityprompt then fireproximityprompt(prompt) end
+                                task.wait(2) -- Berdiam diri 2 detik agar UI Clicker sempat menekan tombol Produksi & Ambil
+                            end)
+                            logAction("Patroli Mesin", true, "Berjalan ke Pabrik untuk Produksi/Ambil!")
+                        end
+                    end
+                end
+            end
+            
+            -- 2. Kunjungi Pengiriman (Jika Aktif)
+            if _G_State.AutoDelivery then
+                for _, prompt in ipairs(workspace:GetDescendants()) do
+                    if prompt:IsA("ProximityPrompt") and (prompt.Parent.Position - hrp.Position).Magnitude < 200 then
+                        local act = string.lower(prompt.ActionText or "")
+                        if string.find(act, "jual") or string.find(act, "kirim") or string.find(string.lower(prompt.Parent.Name), "jual") then
+                            pcall(function()
+                                hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
+                                prompt.RequiresLineOfSight = false
+                                if fireproximityprompt then fireproximityprompt(prompt) end
+                                task.wait(4) -- Berdiam 4 detik agar UI Clicker sempat menggilir Tab Olahan & Mentah
+                            end)
+                            logAction("Patroli Penjualan", true, "Berjalan ke Truk Pengiriman untuk Dijual!")
+                        end
+                    end
+                end
+            end
+            
+            -- Kembalikan posisi awal atau lanjut mungut agar tidak bengong
+            task.wait(0.5)
+        end
         
         -- Z. Anti Monster (Werewolf Aura Kill)
         if _G_State.AntiMonster then
@@ -586,7 +618,14 @@ TabLogs:Toggle({
     Title = "Aktifkan Pencatatan Log",
     Desc = "Mencatat riwayat aktivitas secara real-time (bisa dimatikan jika terlalu spam)",
     Default = true,
-    Callback = function(state) _G_State.LogEnabled = state end
+    Callback = function(state) 
+        _G_State.LogEnabled = state 
+        if not state then
+            if _G_State.UpdateUIDisplay then _G_State.UpdateUIDisplay("🚫 Pencatatan Log Dinonaktifkan") end
+        else
+            if _G_State.UpdateUIDisplay then _G_State.UpdateUIDisplay("✅ Pencatatan Log Diaktifkan") end
+        end
+    end
 })
 
 local LogDisplay = TabLogs:Button({
