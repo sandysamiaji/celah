@@ -54,7 +54,7 @@ bRow.BackgroundTransparency=1; bRow.Parent=f
 local bL = Instance.new("UIListLayout"); bL.FillDirection=Enum.FillDirection.Horizontal; bL.Padding=UDim.new(0,2); bL.Parent=bRow
 
 local function mkB(txt,col)
-    local b=Instance.new("TextButton"); b.Size=UDim2.new(0.24,0,1,0); b.BackgroundColor3=col; b.TextColor3=Color3.fromHex("#ffffff")
+    local b=Instance.new("TextButton"); b.Size=UDim2.new(0.19,0,1,0); b.BackgroundColor3=col; b.TextColor3=Color3.fromHex("#ffffff")
     b.Font=Enum.Font.GothamBold; b.TextSize=10; b.Text=txt; b.BorderSizePixel=0; b.Parent=bRow
     Instance.new("UICorner",b).CornerRadius=UDim.new(0,5); return b
 end
@@ -62,6 +62,7 @@ local btnCpy = mkB("Copy", Color3.fromHex("#ff3333"))
 local btnClr = mkB("Clr", Color3.fromHex("#cc0000"))
 local btnPse = mkB("Pse", Color3.fromHex("#9e0000"))
 local btnSav = mkB("Save", Color3.fromHex("#ff0000"))
+local btnTest = mkB("Test", Color3.fromHex("#cc6600"))
 
 local minimized = false
 mb.MouseButton1Click:Connect(function()
@@ -281,4 +282,21 @@ btnSav.MouseButton1Click:Connect(function()
         if pcall(writefile,p,txt) then btnSav.Text="OK "..p:match("([^/]+)$"); break end 
     end
     task.delay(2,function() btnSav.Text="Save" end)
+end)
+
+btnTest.MouseButton1Click:Connect(function()
+    addL("System", "INFO", {"Memulai Auto-Test " .. tostring(#_G.FoundRemoteInstances) .. " Remote..."}, Color3.fromRGB(200,150,50))
+    for _, r in ipairs(_G.FoundRemoteInstances) do
+        task.spawn(function()
+            if r:IsA("RemoteEvent") then
+                pcall(function() r:FireServer() end)
+                addL(r.Name, "TEST", {"FireServer()"}, Color3.fromHex("#ffcc00"))
+            elseif r:IsA("RemoteFunction") then
+                pcall(function() 
+                    local res = r:InvokeServer() 
+                    addL(r.Name, "TEST", {"InvokeServer() ->", res}, Color3.fromHex("#ffcc00"))
+                end)
+            end
+        end)
+    end
 end)
