@@ -44,64 +44,6 @@ local function getTool(name)
 end
 
 -- ============================================================
--- MR. PANDA LIVE LOG UI (Visual Overlay)
--- ============================================================
-local CoreGui = game:GetService("CoreGui")
-local oldGui = CoreGui:FindFirstChild("MrPandaLiveLogs")
-if oldGui then oldGui:Destroy() end
-
-local LogGui = Instance.new("ScreenGui")
-LogGui.Name = "MrPandaLiveLogs"
-LogGui.Parent = CoreGui
-
-local LogFrame = Instance.new("Frame")
-LogFrame.Size = UDim2.new(0, 320, 0, 200)
-LogFrame.Position = UDim2.new(1, -330, 1, -210)
-LogFrame.BackgroundColor3 = Color3.fromHex("#4a0000") -- Dark Red Theme
-LogFrame.BorderSizePixel = 0
-LogFrame.Parent = LogGui
-Instance.new("UICorner", LogFrame).CornerRadius = UDim.new(0, 8)
-
-local LogTitle = Instance.new("TextLabel")
-LogTitle.Size = UDim2.new(1, -10, 0, 25)
-LogTitle.Position = UDim2.new(0, 10, 0, 0)
-LogTitle.BackgroundTransparency = 1
-LogTitle.Text = "📜 Live System Logs (Real-time)"
-LogTitle.TextColor3 = Color3.new(1,1,1)
-LogTitle.Font = Enum.Font.GothamBold
-LogTitle.TextSize = 12
-LogTitle.TextXAlignment = Enum.TextXAlignment.Left
-LogTitle.Parent = LogFrame
-
-local LogScroll = Instance.new("ScrollingFrame")
-LogScroll.Size = UDim2.new(1, -10, 1, -30)
-LogScroll.Position = UDim2.new(0, 5, 0, 25)
-LogScroll.BackgroundTransparency = 1
-LogScroll.ScrollBarThickness = 2
-LogScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-LogScroll.CanvasSize = UDim2.new(0,0,0,0)
-LogScroll.Parent = LogFrame
-
-local LogLayout = Instance.new("UIListLayout")
-LogLayout.SortOrder = Enum.SortOrder.LayoutOrder
-LogLayout.Parent = LogScroll
-
-local function addVisualLog(txt, isSuccess)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -4, 0, 14)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = txt
-    lbl.TextColor3 = isSuccess and Color3.fromHex("#50dc50") or Color3.fromHex("#ff6666")
-    lbl.Font = Enum.Font.Code
-    lbl.TextSize = 10
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.TextWrapped = true
-    lbl.AutomaticSize = Enum.AutomaticSize.Y
-    lbl.Parent = LogScroll
-    task.defer(function() LogScroll.CanvasPosition = Vector2.new(0, 99999) end)
-end
-
--- ============================================================
 -- SYSTEM LOGGING (Memory-based)
 -- ============================================================
 local lastLogs = {}
@@ -120,8 +62,10 @@ local function logAction(action, isSuccess, detail)
     -- Tulis ke memori (Tanpa pakai file .txt yang ribet di Android)
     _G_State.LiveLogs = _G_State.LiveLogs .. fullMsg .. "\n"
     
-    -- Tampilkan di Layar (Visual UI)
-    pcall(function() addVisualLog(msg, isSuccess) end)
+    -- Coba update UI utama jika function tersedia
+    if _G_State.UpdateUIDisplay then
+        pcall(function() _G_State.UpdateUIDisplay(msg) end)
+    end
     
     -- Batasi memori agar tidak bocor (max 50000 karakter)
     if #_G_State.LiveLogs > 50000 then
@@ -353,27 +297,43 @@ TabUpgrade:Toggle({
 })
 
 -- === TAB LOGS ===
+local LogDisplay = TabLogs:Button({
+    Title = "Aktivitas Terakhir:",
+    Desc = "Belum ada aktivitas...",
+    Callback = function() end
+})
+
+-- Hubungkan fungsi update ke UI
+_G_State.UpdateUIDisplay = function(newMsg)
+    if LogDisplay and LogDisplay.Set then
+        LogDisplay:Set({Desc = newMsg})
+    elseif LogDisplay and LogDisplay.SetDesc then
+        LogDisplay:SetDesc(newMsg)
+    end
+end
+
 TabLogs:Button({
-    Title = "1. Salin (Copy) Log ke Clipboard",
-    Desc = "Klik ini lalu Paste (Tempel) di chat untuk melihat sukses/gagalnya",
+    Title = "Salin (Copy) Log",
+    Desc = "Salin semua log memori ke Clipboard",
     Callback = function()
         setclipboard(_G_State.LiveLogs)
-        windui:Notify({Title="Berhasil Disalin!", Content="Log sudah di-copy. Silakan Paste sekarang!", Duration=4})
+        windui:Notify({Title="Berhasil Disalin!", Content="Log sudah di-copy. Silakan Paste sekarang!", Duration=3})
     end
 })
 
 TabLogs:Button({
-    Title = "2. Hapus Log (Clear)",
-    Desc = "Membersihkan memori log agar tidak kepenuhan",
+    Title = "Hapus Log (Clear)",
+    Desc = "Bersihkan memori log",
     Callback = function()
         _G_State.LiveLogs = "=== PANDA INDUSTRI LIVE LOGS ===\n"
         lastLogs = {}
-        for _, c in ipairs(LogScroll:GetChildren()) do
-            if c:IsA("TextLabel") then c:Destroy() end
-        end
+        if _G_State.UpdateUIDisplay then _G_State.UpdateUIDisplay("Belum ada aktivitas...") end
         windui:Notify({Title="Dibersihkan!", Content="Log memori sudah dihapus.", Duration=3})
     end
 })
+
+-- Matikan UI overlay jika masih nyala dari script sebelumnya
+pcall(function() game:GetService("CoreGui").MrPandaLiveLogs:Destroy() end)
 
 windui:Notify({
     Title = "Mr. Panda Loaded!",
