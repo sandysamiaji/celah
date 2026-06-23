@@ -167,23 +167,41 @@ task.spawn(function()
         setreadonly(mt, true)
     end)
     
-    pcall(function()
-        local re = Instance.new("RemoteEvent")
-        local oldFS
-        oldFS = hookfunction(re.FireServer, newcclosure(function(self, ...)
-            if typeof(self) == "Instance" then logC2S(self.Name, ...) end
-            return oldFS(self, ...)
-        end))
-    end)
+    local hookedFS = {}
+    local hookedIS = {}
+    local function hookSpecific(r)
+        if r:IsA("RemoteEvent") then
+            pcall(function()
+                local fs = r.FireServer
+                if not hookedFS[fs] then
+                    hookedFS[fs] = true
+                    local oldFS
+                    oldFS = hookfunction(fs, newcclosure(function(self, ...)
+                        if typeof(self) == "Instance" then logC2S(self.Name, ...) end
+                        return oldFS(self, ...)
+                    end))
+                end
+            end)
+        elseif r:IsA("RemoteFunction") then
+            pcall(function()
+                local is = r.InvokeServer
+                if not hookedIS[is] then
+                    hookedIS[is] = true
+                    local oldIS
+                    oldIS = hookfunction(is, newcclosure(function(self, ...)
+                        if typeof(self) == "Instance" then logC2S(self.Name, ...) end
+                        return oldIS(self, ...)
+                    end))
+                end
+            end)
+        end
+    end
 
-    pcall(function()
-        local rf = Instance.new("RemoteFunction")
-        local oldIS
-        oldIS = hookfunction(rf.InvokeServer, newcclosure(function(self, ...)
-            if typeof(self) == "Instance" then logC2S(self.Name, ...) end
-            return oldIS(self, ...)
-        end))
-    end)
+    pcall(function() hookSpecific(Instance.new("RemoteEvent")) end)
+    pcall(function() hookSpecific(Instance.new("RemoteFunction")) end)
+    
+    for _, r in ipairs(_G.FoundRemoteInstances) do pcall(hookSpecific, r) end
+    game.DescendantAdded:Connect(function(d) pcall(hookSpecific, d) end)
 
     local services = {
         "ReplicatedStorage","ReplicatedFirst","Players","Workspace",
