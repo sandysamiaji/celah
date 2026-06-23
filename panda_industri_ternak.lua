@@ -57,7 +57,7 @@ local function logAction(action, isSuccess, detail)
     if lastLogs[action] == msg then return end
     lastLogs[action] = msg
 
-    local fullMsg = os.date("%H:%M:%S") .. " " .. msg
+    local fullMsg = os.date("%Y-%m-%d %H:%M:%S") .. " " .. msg
     
     -- Tulis ke memori (Tanpa pakai file .txt yang ribet di Android)
     _G_State.LiveLogs = _G_State.LiveLogs .. fullMsg .. "\n"
@@ -92,20 +92,14 @@ end
 -- SMART DELIVERY HOOK (Jual HANYA saat tas penuh)
 -- ============================================================
 task.spawn(function()
-    local notifyRemote = RS:WaitForChild("NotifyClientEvent", 10)
-    if notifyRemote then
-        notifyRemote.OnClientEvent:Connect(function(msg, msgType)
-            if _G_State.AutoDelivery and type(msg) == "string" then
-                -- Jika ada notifikasi penuh dan BUKAN penuh air
-                if string.find(string.lower(msg), "penuh") and not string.find(string.lower(msg), "gembor") and not string.find(string.lower(msg), "air") then
-                    local sellRemote = RS:FindFirstChild("RequestSendDelivery")
-                    if sellRemote then
-                        logAction("Auto Delivery -> RequestSendDelivery", true, "Mencoba Menjual Karena Tas Penuh")
-                        safeInvoke(sellRemote, "Auto Delivery")
-                    end
-                end
+    while task.wait(1) do
+        if _G_State.AutoDelivery then
+            -- Coba bypass langsung panggil RequestSendDelivery tiap detik (karena nunggu notifikasi kadang gagal)
+            local sellRemote = RS:FindFirstChild("RequestSendDelivery")
+            if sellRemote then
+                pcall(function() sellRemote:InvokeServer() end)
             end
-        end)
+        end
     end
 end)
 
@@ -114,14 +108,57 @@ end)
 -- ============================================================
 task.spawn(function()
     while task.wait(0.5) do
-        -- 1. Auto Refill Air
+        -- 1. Auto Refill Air & 6. Auto Collect (Menggunakan ProximityPrompt)
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            for _, prompt in ipairs(workspace:GetDescendants()) do
+                if prompt:IsA("ProximityPrompt") then
+                    local act = prompt.ActionText or ""
+                    local obj = prompt.ObjectText or ""
+                    
+                    -- Deteksi Sumur (Isi Air)
+                    if _G_State.AutoRefill and (string.find(obj, "Isi Air") or string.find(act, "Isi Air") or (string.find(act, "Ambil") and string.find(prompt.Parent.Name, "Sumur"))) then
+                        pcall(function()
+                            -- Teleport player ke sumur jika jaraknya jauh
+                            if prompt.Parent and prompt.Parent:IsA("BasePart") then
+                                if (hrp.Position - prompt.Parent.Position).Magnitude > 10 then
+                                    local pos = prompt.Parent.Position
+                                    hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
+                                    task.wait(0.2)
+                                    logAction("Auto Refill -> Teleport", true, string.format("Bergerak ke Sumur di koordinat X:%.0f, Y:%.0f, Z:%.0f", pos.X, pos.Y, pos.Z))
+                                end
+                            end
+                            prompt.RequiresLineOfSight = false
+                            if fireproximityprompt then fireproximityprompt(prompt) end
+                            logAction("Auto Refill -> ProximityPrompt", true, "Berhasil klik Sumur!")
+                        end)
+                    end
+                    
+                    -- Deteksi Barang Jatuh (Telur, Susu, Wol, dll)
+                    if _G_State.AutoCollect and act == "Ambil" and not string.find(obj, "Isi Air") then
+                        local part = prompt.Parent
+                        if part and part:IsA("BasePart") then
+                            pcall(function()
+                                local pos = part.Position
+                                -- GAME ANTI-MAGNET: Teleport PLAYER ke barang (bukan barang ke player)
+                                hrp.CFrame = part.CFrame + Vector3.new(0, 1.5, 0) -- Berdiri pas di atas barang
+                                task.wait(0.2) -- Jeda sedikit agar server mendaftarkan posisi baru
+                                
+                                prompt.RequiresLineOfSight = false
+                                if fireproximityprompt then fireproximityprompt(prompt) end
+                                logAction("Auto Collect -> ProximityPrompt", true, string.format("Berhasil mengambil %s di koordinat X:%.0f, Y:%.0f, Z:%.0f", obj, pos.X, pos.Y, pos.Z))
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+        
+        -- Deteksi WaterRemote cadangan
         if _G_State.AutoRefill then
             local tool = getTool("Watering Can")
             if tool and tool:FindFirstChild("WaterRemote") then
                 pcall(function() tool.WaterRemote:FireServer() end)
-                logAction("Auto Refill -> WaterRemote", true, "Menembak FireServer()")
-            else
-                logAction("Auto Refill -> ???", false, "Alat 'Watering Can' tidak ditemukan di tas atau tangan!")
             end
         end
         
@@ -165,7 +202,11 @@ task.spawn(function()
         end
         if _G_State.AutoBuyMastery then
             local remote = RS:FindFirstChild("RequestBuyFarmMastery")
-            if remote then task.spawn(function() safeInvoke(remote, "Up_Mastery") end)
+            if remote then 
+                local masteries = {"Tanam", "Hewan", "Pabrik", "Farming", "Animal", "Factory", "Watering"}
+                for _, m in ipairs(masteries) do
+                    task.spawn(function() pcall(function() remote:InvokeServer(m) end) end)
+                end
             else logAction("Auto Mastery", false, "Remote RequestBuyFarmMastery tidak ditemukan!") end
         end
         if _G_State.AutoUpgradeFactory then
@@ -184,32 +225,7 @@ task.spawn(function()
             end
         end
         
-        -- 6. Auto Collect (Magnet) berjalan tiap ~1 detik
-        tickCollect = tickCollect + 0.5
-        if _G_State.AutoCollect and tickCollect >= 1.5 then
-            tickCollect = 0
-            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local collected = 0
-                for _, v in ipairs(workspace:GetDescendants()) do
-                    if v:IsA("BasePart") and v:FindFirstChild("TouchInterest") then
-                        if not v.Parent:FindFirstChild("Humanoid") then
-                            pcall(function()
-                                v.CFrame = hrp.CFrame
-                                if firetouchinterest then
-                                    firetouchinterest(hrp, v, 0)
-                                    firetouchinterest(hrp, v, 1)
-                                end
-                            end)
-                            collected = collected + 1
-                        end
-                    end
-                end
-                if collected > 0 then
-                    logAction("Auto Collect -> firetouchinterest", true, "Menarik " .. tostring(collected) .. " barang!")
-                end
-            end
-        end
+        -- (Auto Collect Magnet part lama sudah digabung ke sistem ProximityPrompt di atas)
     end
 end)
 
@@ -237,21 +253,21 @@ TabFarm:Toggle({
     Title = "Auto Refill Water",
     Desc = "Otomatis mengisi air di Gembor",
     Default = false,
-    Callback = function(state) _G_State.AutoRefill = state end
+    Callback = function(state) _G_State.AutoRefill = state; logAction("Menu -> Auto Refill Water", true, state and "AKTIF" or "MATI") end
 })
 
 TabFarm:Toggle({
     Title = "Auto Jual Pintar (Smart Delivery)",
     Desc = "Menjual HANYA saat tas kepenuhan, agar mesin sempat menyedot bahan",
     Default = false,
-    Callback = function(state) _G_State.AutoDelivery = state end
+    Callback = function(state) _G_State.AutoDelivery = state; logAction("Menu -> Smart Delivery", true, state and "AKTIF" or "MATI") end
 })
 
 TabFarm:Toggle({
     Title = "Auto Collect Barang (Magnet)",
     Desc = "Menarik Telur, Wol, Susu, dll ke badan",
     Default = false,
-    Callback = function(state) _G_State.AutoCollect = state end
+    Callback = function(state) _G_State.AutoCollect = state; logAction("Menu -> Auto Collect", true, state and "AKTIF" or "MATI") end
 })
 
 -- === TAB FACTORY ===
@@ -259,7 +275,7 @@ TabFactory:Toggle({
     Title = "Auto Proses SEMUA Mesin!",
     Desc = "Otomatis memproses & mengambil hasil dari SEMUA mesin sekaligus",
     Default = false,
-    Callback = function(state) _G_State.AutoFactory = state end
+    Callback = function(state) _G_State.AutoFactory = state; logAction("Menu -> Auto Factory", true, state and "AKTIF" or "MATI") end
 })
 
 -- === TAB ANIMAL ===
@@ -267,33 +283,33 @@ TabAnimal:Toggle({
     Title = "Aktifkan Auto Beli",
     Desc = "Mulai membeli hewan yang dicentang di bawah",
     Default = false,
-    Callback = function(state) _G_State.AutoBuyAnimal = state end
+    Callback = function(state) _G_State.AutoBuyAnimal = state; logAction("Menu -> Auto Buy Animal", true, state and "AKTIF" or "MATI") end
 })
-TabAnimal:Toggle({ Title = "Beli Ayam", Default = false, Callback = function(state) _G_State.BuyAyam = state end })
-TabAnimal:Toggle({ Title = "Beli Sapi", Default = false, Callback = function(state) _G_State.BuySapi = state end })
-TabAnimal:Toggle({ Title = "Beli Domba", Default = false, Callback = function(state) _G_State.BuyDomba = state end })
-TabAnimal:Toggle({ Title = "Beli Babi", Default = false, Callback = function(state) _G_State.BuyBabi = state end })
+TabAnimal:Toggle({ Title = "Beli Ayam", Default = false, Callback = function(state) _G_State.BuyAyam = state; logAction("Menu -> Beli Ayam", true, state and "AKTIF" or "MATI") end })
+TabAnimal:Toggle({ Title = "Beli Sapi", Default = false, Callback = function(state) _G_State.BuySapi = state; logAction("Menu -> Beli Sapi", true, state and "AKTIF" or "MATI") end })
+TabAnimal:Toggle({ Title = "Beli Domba", Default = false, Callback = function(state) _G_State.BuyDomba = state; logAction("Menu -> Beli Domba", true, state and "AKTIF" or "MATI") end })
+TabAnimal:Toggle({ Title = "Beli Babi", Default = false, Callback = function(state) _G_State.BuyBabi = state; logAction("Menu -> Beli Babi", true, state and "AKTIF" or "MATI") end })
 
 -- === TAB UPGRADE ===
 TabUpgrade:Toggle({
     Title = "Auto Universal Upgrade",
     Desc = "Otomatis membeli upgrade seperti Tas, Kecepatan, Air",
     Default = false,
-    Callback = function(state) _G_State.AutoUpgradeUniversal = state end
+    Callback = function(state) _G_State.AutoUpgradeUniversal = state; logAction("Menu -> Universal Upgrade", true, state and "AKTIF" or "MATI") end
 })
 
 TabUpgrade:Toggle({
     Title = "Auto Upgrade & Unlock Pabrik",
     Desc = "Membuka mesin baru dan meng-upgrade semua mesin",
     Default = false,
-    Callback = function(state) _G_State.AutoUpgradeFactory = state end
+    Callback = function(state) _G_State.AutoUpgradeFactory = state; logAction("Menu -> Factory Upgrade", true, state and "AKTIF" or "MATI") end
 })
 
 TabUpgrade:Toggle({
     Title = "Auto Farm Mastery",
     Desc = "Otomatis level up Mastery / Skill memanen",
     Default = false,
-    Callback = function(state) _G_State.AutoBuyMastery = state end
+    Callback = function(state) _G_State.AutoBuyMastery = state; logAction("Menu -> Auto Farm Mastery", true, state and "AKTIF" or "MATI") end
 })
 
 -- === TAB LOGS ===
