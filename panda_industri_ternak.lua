@@ -11,6 +11,7 @@ local LocalPlayer = Players.LocalPlayer
 local _G_State = {}
 _G_State.AutoRefill = false
 _G_State.AutoDelivery = false
+_G_State.DeliveryMode = "Mati"
 _G_State.AutoFactory = false
 _G_State.AutoBuyAnimal = false
 _G_State.AutoCollect = false
@@ -134,16 +135,23 @@ task.spawn(function()
         local myMoney = getPlayerMoney()
         
         -- Siklus Tab Delivery (Smart Sales)
-        local tabs = {"olahan"}
-        -- Jika pabrik mati, jual mentah juga. Jika nyala, biarkan mentah di tas untuk diolah pabrik!
-        if not _G_State.AutoFactory then table.insert(tabs, "mentah") end
+        local tabs = {}
+        if _G_State.DeliveryMode == "Jual Mentah Saja" then
+            tabs = {"mentah"}
+        elseif _G_State.DeliveryMode == "Jual Olahan Saja" then
+            tabs = {"olahan"}
+        elseif _G_State.DeliveryMode == "Jual Semua (Mentah & Olahan)" then
+            tabs = {"mentah", "olahan"}
+        else
+            tabs = {"olahan"} -- Fallback
+        end
         
         if not _G_State.DelivCycle then _G_State.DelivCycle = 0 end
         if _G_State.AutoDelivery then
             _G_State.DelivCycle = _G_State.DelivCycle + 1
             if _G_State.DelivCycle > #tabs then _G_State.DelivCycle = 1 end
         end
-        local activeTab = tabs[_G_State.DelivCycle]
+        local activeTab = tabs[_G_State.DelivCycle] or tabs[1]
 
         -- UI CLICKER UNIVERSAL (Bypass tanpa harus buka menu)
         local pGui = LocalPlayer:FindFirstChild("PlayerGui")
@@ -158,25 +166,23 @@ task.spawn(function()
                         end
                     end
                     
-                    -- 1. Auto Delivery (Jual Cerdas Berdasarkan Tab)
+                    -- 1. Auto Delivery (Jual Cerdas)
                     if _G_State.AutoDelivery then
                         local isTab = (txt == activeTab)
                         local isAdd = string.find(txt, ">>") or string.find(txt, "max")
-                        local isSend = string.find(txt, "kirim")
+                        local isSend = string.find(txt, "kirim") or string.find(txt, "jual")
                         
-                        if isTab or isAdd or isSend then
-                            local hasStock = true
-                            if isAdd and v.Parent then
-                                -- Cek apakah stok 0 (jangan di-klik agar tidak lag)
-                                for _, sib in ipairs(v.Parent:GetDescendants()) do
-                                    if sib:IsA("TextLabel") and string.find(string.lower(sib.Text), "stok: 0") then
-                                        hasStock = false
-                                        break
-                                    end
-                                end
-                            end
-                            
-                            if hasStock then clickGuiButton(v) end
+                        -- Cari tombol barang dengan mendeteksi teks "stok:"
+                        local isItem = string.find(txt, "stok:")
+                        local hasStock = isItem and not string.find(txt, "stok: 0")
+                        
+                        if isTab then
+                            clickGuiButton(v)
+                        elseif isItem and hasStock then
+                            -- KLIK BARANG YANG ADA STOKNYA!
+                            clickGuiButton(v)
+                        elseif isAdd or isSend then
+                            clickGuiButton(v)
                         end
                     end
                     
@@ -550,11 +556,16 @@ TabFarm:Toggle({
     Callback = function(state) _G_State.AutoRefill = state; logAction("Menu -> Auto Refill Water", true, state and "AKTIF" or "MATI") end
 })
 
-TabFarm:Toggle({
-    Title = "Auto Jual Pintar (Smart Delivery)",
-    Desc = "Menjual HANYA saat tas kepenuhan, agar mesin sempat menyedot bahan",
-    Default = false,
-    Callback = function(state) _G_State.AutoDelivery = state; logAction("Menu -> Smart Delivery", true, state and "AKTIF" or "MATI") end
+TabFarm:Dropdown({
+    Title = "Mode Penjualan (Truk Jual)",
+    Desc = "Pilih kategori barang yang ingin dijual",
+    Options = {"Mati", "Jual Semua (Mentah & Olahan)", "Jual Mentah Saja", "Jual Olahan Saja"},
+    Default = "Mati",
+    Callback = function(val)
+        _G_State.DeliveryMode = val
+        _G_State.AutoDelivery = (val ~= "Mati")
+        logAction("Menu -> Mode Penjualan", true, val)
+    end
 })
 
 TabFarm:Toggle({
