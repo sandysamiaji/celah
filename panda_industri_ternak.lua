@@ -17,6 +17,7 @@ _G_State.AutoCollect = false
 _G_State.AutoUpgradeUniversal = false
 _G_State.AutoUpgradeFactory = false
 _G_State.AutoBuyMastery = false
+_G_State.LiveLogs = "=== PANDA INDUSTRI LIVE LOGS ===\n"
 
 -- Animal toggles
 _G_State.BuyAyam = false
@@ -43,7 +44,65 @@ local function getTool(name)
 end
 
 -- ============================================================
--- SYSTEM LOGGING (Anti-Spam & Auto-Save ke .txt)
+-- MR. PANDA LIVE LOG UI (Visual Overlay)
+-- ============================================================
+local CoreGui = game:GetService("CoreGui")
+local oldGui = CoreGui:FindFirstChild("MrPandaLiveLogs")
+if oldGui then oldGui:Destroy() end
+
+local LogGui = Instance.new("ScreenGui")
+LogGui.Name = "MrPandaLiveLogs"
+LogGui.Parent = CoreGui
+
+local LogFrame = Instance.new("Frame")
+LogFrame.Size = UDim2.new(0, 320, 0, 200)
+LogFrame.Position = UDim2.new(1, -330, 1, -210)
+LogFrame.BackgroundColor3 = Color3.fromHex("#4a0000") -- Dark Red Theme
+LogFrame.BorderSizePixel = 0
+LogFrame.Parent = LogGui
+Instance.new("UICorner", LogFrame).CornerRadius = UDim.new(0, 8)
+
+local LogTitle = Instance.new("TextLabel")
+LogTitle.Size = UDim2.new(1, -10, 0, 25)
+LogTitle.Position = UDim2.new(0, 10, 0, 0)
+LogTitle.BackgroundTransparency = 1
+LogTitle.Text = "📜 Live System Logs (Real-time)"
+LogTitle.TextColor3 = Color3.new(1,1,1)
+LogTitle.Font = Enum.Font.GothamBold
+LogTitle.TextSize = 12
+LogTitle.TextXAlignment = Enum.TextXAlignment.Left
+LogTitle.Parent = LogFrame
+
+local LogScroll = Instance.new("ScrollingFrame")
+LogScroll.Size = UDim2.new(1, -10, 1, -30)
+LogScroll.Position = UDim2.new(0, 5, 0, 25)
+LogScroll.BackgroundTransparency = 1
+LogScroll.ScrollBarThickness = 2
+LogScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+LogScroll.CanvasSize = UDim2.new(0,0,0,0)
+LogScroll.Parent = LogFrame
+
+local LogLayout = Instance.new("UIListLayout")
+LogLayout.SortOrder = Enum.SortOrder.LayoutOrder
+LogLayout.Parent = LogScroll
+
+local function addVisualLog(txt, isSuccess)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -4, 0, 14)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = txt
+    lbl.TextColor3 = isSuccess and Color3.fromHex("#50dc50") or Color3.fromHex("#ff6666")
+    lbl.Font = Enum.Font.Code
+    lbl.TextSize = 10
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextWrapped = true
+    lbl.AutomaticSize = Enum.AutomaticSize.Y
+    lbl.Parent = LogScroll
+    task.defer(function() LogScroll.CanvasPosition = Vector2.new(0, 99999) end)
+end
+
+-- ============================================================
+-- SYSTEM LOGGING (Memory-based)
 -- ============================================================
 local lastLogs = {}
 local function logAction(action, isSuccess, detail)
@@ -58,37 +117,30 @@ local function logAction(action, isSuccess, detail)
 
     local fullMsg = os.date("%H:%M:%S") .. " " .. msg
     
-    -- Tulis ke file secara terus menerus
-    pcall(function()
-        local paths = {
-            "/sdcard/Download/Panda_Log.txt", 
-            "/sdcard/Android/data/com.roblox.client/files/Panda_Log.txt",
-            "/sdcard/Android/data/com.roblox.client/files/workspace/Panda_Log.txt",
-            "Panda_Log.txt"
-        }
-        for _, path in ipairs(paths) do
-            local success = pcall(function()
-                if not isfile(path) then
-                    writefile(path, "=== PANDA INDUSTRI LOGS ===\n")
-                end
-                appendfile(path, fullMsg .. "\n")
-            end)
-            if success then break end
-        end
-    end)
+    -- Tulis ke memori (Tanpa pakai file .txt yang ribet di Android)
+    _G_State.LiveLogs = _G_State.LiveLogs .. fullMsg .. "\n"
+    
+    -- Tampilkan di Layar (Visual UI)
+    pcall(function() addVisualLog(msg, isSuccess) end)
+    
+    -- Batasi memori agar tidak bocor (max 50000 karakter)
+    if #_G_State.LiveLogs > 50000 then
+        _G_State.LiveLogs = string.sub(_G_State.LiveLogs, -40000)
+    end
 end
 
 local function safeInvoke(remote, actionName, ...)
+    local remoteName = remote and remote.Name or "UnknownRemote"
+    local fullAction = actionName .. " -> " .. remoteName
     local s, r = pcall(function(...) return remote:InvokeServer(...) end, ...)
     if s then
-        -- Anggap gagal jika server mengembalikan false, nil, atau pesan error umum
         if r == false or r == nil or r == "Error" or r == "AlreadyFull" then
-            -- logAction(actionName, false, r or "Ditolak Server") -- (Opsional: Matikan jika tidak mau log GAGAL penuh)
+            -- logAction(fullAction, false, r or "Ditolak Server")
         else
-            logAction(actionName, true, r)
+            logAction(fullAction, true, r)
         end
     else
-        logAction(actionName, false, "ERROR SCRIPT: " .. tostring(r))
+        logAction(fullAction, false, "ERROR SCRIPT: " .. tostring(r))
     end
 end
 
@@ -104,8 +156,8 @@ task.spawn(function()
                 if string.find(string.lower(msg), "penuh") and not string.find(string.lower(msg), "gembor") and not string.find(string.lower(msg), "air") then
                     local sellRemote = RS:FindFirstChild("RequestSendDelivery")
                     if sellRemote then
-                        logAction("Auto Delivery", true, "Mencoba Menjual Karena Tas Penuh")
-                        safeInvoke(sellRemote, "RequestSendDelivery")
+                        logAction("Auto Delivery -> RequestSendDelivery", true, "Mencoba Menjual Karena Tas Penuh")
+                        safeInvoke(sellRemote, "Auto Delivery")
                     end
                 end
             end
@@ -123,6 +175,9 @@ task.spawn(function()
             local tool = getTool("Watering Can")
             if tool and tool:FindFirstChild("WaterRemote") then
                 pcall(function() tool.WaterRemote:FireServer() end)
+                logAction("Auto Refill -> WaterRemote", true, "Menembak FireServer()")
+            else
+                logAction("Auto Refill -> ???", false, "Alat 'Watering Can' tidak ditemukan di tas atau tangan!")
             end
         end
         
@@ -132,10 +187,16 @@ task.spawn(function()
             if remotes then
                 local startR = remotes:FindFirstChild("RequestStartProduction")
                 local claimR = remotes:FindFirstChild("RequestClaimProduction")
-                for _, recipe in ipairs(AllRecipes) do
-                    if startR then task.spawn(function() safeInvoke(startR, "Pabrik_Start_"..recipe, recipe) end) end
-                    if claimR then task.spawn(function() safeInvoke(claimR, "Pabrik_Claim_"..recipe, recipe) end) end
+                if startR and claimR then
+                    for _, recipe in ipairs(AllRecipes) do
+                        task.spawn(function() safeInvoke(startR, "Pabrik_Start_"..recipe, recipe) end)
+                        task.spawn(function() safeInvoke(claimR, "Pabrik_Claim_"..recipe, recipe) end)
+                    end
+                else
+                    logAction("Auto Factory", false, "Remote RequestStartProduction tidak ditemukan!")
                 end
+            else
+                logAction("Auto Factory", false, "Folder ReplicatedStorage.Remotes tidak ditemukan!")
             end
         end
         
@@ -147,26 +208,34 @@ task.spawn(function()
                 if _G_State.BuySapi then task.spawn(function() safeInvoke(remote, "Beli_Sapi", "Sapi") end) end
                 if _G_State.BuyDomba then task.spawn(function() safeInvoke(remote, "Beli_Domba", "Domba") end) end
                 if _G_State.BuyBabi then task.spawn(function() safeInvoke(remote, "Beli_Babi", "Babi") end) end
+            else
+                logAction("Auto Buy Animal", false, "Remote RequestBuyAnimal tidak ditemukan!")
             end
         end
 
         -- 5. Auto Upgrades
         if _G_State.AutoUpgradeUniversal then
             local remote = RS:FindFirstChild("RequestUniversalUpgrade")
-            if remote then task.spawn(function() safeInvoke(remote, "Up_Universal") end) end
+            if remote then task.spawn(function() safeInvoke(remote, "Up_Universal") end) 
+            else logAction("Auto Upgrade", false, "Remote RequestUniversalUpgrade tidak ditemukan!") end
         end
         if _G_State.AutoBuyMastery then
             local remote = RS:FindFirstChild("RequestBuyFarmMastery")
-            if remote then task.spawn(function() safeInvoke(remote, "Up_Mastery") end) end
+            if remote then task.spawn(function() safeInvoke(remote, "Up_Mastery") end)
+            else logAction("Auto Mastery", false, "Remote RequestBuyFarmMastery tidak ditemukan!") end
         end
         if _G_State.AutoUpgradeFactory then
             local remotes = RS:FindFirstChild("Remotes")
             if remotes then
                 local uF = remotes:FindFirstChild("RequestUnlockFactory")
                 local upF = remotes:FindFirstChild("RequestFactoryUpgrade")
-                for _, recipe in ipairs(AllRecipes) do
-                    if uF then task.spawn(function() safeInvoke(uF, "UnlockPabrik_"..recipe, recipe) end) end
-                    if upF then task.spawn(function() safeInvoke(upF, "UpPabrik_"..recipe, recipe) end) end
+                if uF and upF then
+                    for _, recipe in ipairs(AllRecipes) do
+                        task.spawn(function() safeInvoke(uF, "UnlockPabrik_"..recipe, recipe) end)
+                        task.spawn(function() safeInvoke(upF, "UpPabrik_"..recipe, recipe) end)
+                    end
+                else
+                    logAction("Auto UpFactory", false, "Remote UnlockFactory/UpgradeFactory tidak ditemukan!")
                 end
             end
         end
@@ -177,6 +246,7 @@ task.spawn(function()
             tickCollect = 0
             local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
+                local collected = 0
                 for _, v in ipairs(workspace:GetDescendants()) do
                     if v:IsA("BasePart") and v:FindFirstChild("TouchInterest") then
                         if not v.Parent:FindFirstChild("Humanoid") then
@@ -187,8 +257,12 @@ task.spawn(function()
                                     firetouchinterest(hrp, v, 1)
                                 end
                             end)
+                            collected = collected + 1
                         end
                     end
+                end
+                if collected > 0 then
+                    logAction("Auto Collect -> firetouchinterest", true, "Menarik " .. tostring(collected) .. " barang!")
                 end
             end
         end
@@ -280,49 +354,29 @@ TabUpgrade:Toggle({
 
 -- === TAB LOGS ===
 TabLogs:Button({
-    Title = "Copy Semua Log ke Clipboard",
-    Desc = "Menyalin isi file Panda_Log.txt untuk di-paste",
+    Title = "1. Salin (Copy) Log ke Clipboard",
+    Desc = "Klik ini lalu Paste (Tempel) di chat untuk melihat sukses/gagalnya",
     Callback = function()
-        pcall(function()
-            local content = ""
-            local paths = {
-                "/sdcard/Download/Panda_Log.txt", 
-                "/sdcard/Android/data/com.roblox.client/files/Panda_Log.txt",
-                "/sdcard/Android/data/com.roblox.client/files/workspace/Panda_Log.txt",
-                "Panda_Log.txt"
-            }
-            for _, path in ipairs(paths) do
-                if isfile(path) then
-                    content = readfile(path)
-                    break
-                end
-            end
-            
-            if content ~= "" then
-                setclipboard(content)
-                windui:Notify({Title="Copied!", Content="Log berhasil disalin ke Clipboard!", Duration=3})
-            else
-                windui:Notify({Title="Kosong", Content="Belum ada log yang tersimpan.", Duration=3})
-            end
-        end)
+        setclipboard(_G_State.LiveLogs)
+        windui:Notify({Title="Berhasil Disalin!", Content="Log sudah di-copy. Silakan Paste sekarang!", Duration=4})
     end
 })
 
 TabLogs:Button({
-    Title = "Hapus Log (Clear)",
-    Desc = "Menghapus file log agar memori tidak penuh",
+    Title = "2. Hapus Log (Clear)",
+    Desc = "Membersihkan memori log agar tidak kepenuhan",
     Callback = function()
-        pcall(function() writefile("/sdcard/Download/Panda_Log.txt", "=== PANDA INDUSTRI LOGS ===\n") end)
-        pcall(function() writefile("/sdcard/Android/data/com.roblox.client/files/Panda_Log.txt", "=== PANDA INDUSTRI LOGS ===\n") end)
-        pcall(function() writefile("/sdcard/Android/data/com.roblox.client/files/workspace/Panda_Log.txt", "=== PANDA INDUSTRI LOGS ===\n") end)
-        pcall(function() writefile("Panda_Log.txt", "=== PANDA INDUSTRI LOGS ===\n") end)
+        _G_State.LiveLogs = "=== PANDA INDUSTRI LIVE LOGS ===\n"
         lastLogs = {}
-        windui:Notify({Title="Cleared!", Content="File log berhasil dibersihkan.", Duration=3})
+        for _, c in ipairs(LogScroll:GetChildren()) do
+            if c:IsA("TextLabel") then c:Destroy() end
+        end
+        windui:Notify({Title="Dibersihkan!", Content="Log memori sudah dihapus.", Duration=3})
     end
 })
 
 windui:Notify({
     Title = "Mr. Panda Loaded!",
-    Content = "Sistem Logging .txt Aktif!",
+    Content = "Sistem Live Log Memory Aktif!",
     Duration = 5
 })
