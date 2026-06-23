@@ -17,6 +17,7 @@ _G_State.AutoCollect = false
 _G_State.AutoUpgradeUniversal = false
 _G_State.AutoUpgradeFactory = false
 _G_State.AutoBuyMastery = false
+_G_State.LogEnabled = true
 _G_State.LiveLogs = "=== PANDA INDUSTRI LIVE LOGS ===\n"
 
 -- Animal toggles
@@ -48,6 +49,7 @@ end
 -- ============================================================
 local lastLogs = {}
 local function logAction(action, isSuccess, detail)
+    if not _G_State.LogEnabled then return end
     -- Ubah format data menjadi string yang mudah dibaca
     if type(detail) == "table" then detail = "Table/Array" end
     local status = isSuccess and "SUKSES" or "GAGAL"
@@ -91,14 +93,80 @@ end
 -- ============================================================
 -- SMART DELIVERY HOOK (Jual HANYA saat tas penuh)
 -- ============================================================
+local function clickGuiButton(btn)
+    pcall(function()
+        if getconnections then
+            for _, conn in pairs(getconnections(btn.MouseButton1Click)) do conn.Function() end
+            for _, conn in pairs(getconnections(btn.MouseButton1Down)) do conn.Function() end
+        end
+    end)
+end
+
 task.spawn(function()
-    while task.wait(1) do
-        if _G_State.AutoDelivery then
-            -- Coba bypass langsung panggil RequestSendDelivery tiap detik (karena nunggu notifikasi kadang gagal)
-            local sellRemote = RS:FindFirstChild("RequestSendDelivery")
-            if sellRemote then
-                pcall(function() sellRemote:InvokeServer() end)
+    while task.wait(2) do
+        -- UI CLICKER UNIVERSAL (Bypass tanpa harus buka menu)
+        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if pGui then
+            for _, v in ipairs(pGui:GetDescendants()) do
+                if v:IsA("GuiButton") then
+                    local txt = string.lower(v.Name)
+                    if v:IsA("TextButton") then txt = txt .. " " .. string.lower(v.Text) end
+                    for _, child in ipairs(v:GetChildren()) do
+                        if child:IsA("TextLabel") then txt = txt .. " " .. string.lower(child.Text) end
+                    end
+                    
+                    -- 1. Auto Delivery (Jual)
+                    if _G_State.AutoDelivery and (txt == ">>" or string.find(txt, "kirim") or string.find(txt, "max")) then
+                        clickGuiButton(v)
+                    end
+                    
+                    -- 2. Auto Factory (Produksi & Ambil Hasil)
+                    if _G_State.AutoFactory and (string.find(txt, "produksi") or string.find(txt, "ambil")) then
+                        clickGuiButton(v)
+                    end
+                    
+                    -- 3. Auto Upgrade Semua UI (Pabrik, Kandang, Sumur, Kendaraan & Hewan)
+                    if _G_State.AutoUpgradeUniversal or _G_State.AutoUpgradeFactory or _G_State.AutoBuyAnimal then
+                        if string.find(txt, "rp") then
+                            local isAyam = string.find(txt, "ayam")
+                            local isSapi = string.find(txt, "sapi")
+                            local isDomba = string.find(txt, "domba")
+                            local isBabi = string.find(txt, "babi")
+                            
+                            local shouldBuy = false
+                            if isAyam then shouldBuy = _G_State.BuyAyam
+                            elseif isSapi then shouldBuy = _G_State.BuySapi
+                            elseif isDomba then shouldBuy = _G_State.BuyDomba
+                            elseif isBabi then shouldBuy = _G_State.BuyBabi
+                            else
+                                -- Bukan hewan, berarti ini upgrade (Kandang, Sumur, Pabrik, Kendaraan)
+                                shouldBuy = (_G_State.AutoUpgradeUniversal or _G_State.AutoUpgradeFactory)
+                            end
+                            
+                            if shouldBuy then clickGuiButton(v) end
+                        end
+                    end
+                end
             end
+        end
+        
+        -- Fallback Remote Auto Delivery
+        if _G_State.AutoDelivery then
+            -- Coba klik ProximityPrompt "Jual" jika ada di dekat player
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for _, prompt in ipairs(workspace:GetDescendants()) do
+                    if prompt:IsA("ProximityPrompt") and string.find(string.lower(prompt.ActionText or ""), "jual") then
+                        pcall(function()
+                            prompt.RequiresLineOfSight = false
+                            if fireproximityprompt then fireproximityprompt(prompt) end
+                        end)
+                    end
+                end
+            end
+            
+            local sellRemote = RS:FindFirstChild("RequestSendDelivery")
+            if sellRemote then pcall(function() sellRemote:InvokeServer() end) end
         end
     end
 end)
@@ -171,11 +239,27 @@ task.spawn(function()
             end
         end
         
-        -- C. Auto Nyiram Tanaman
+        -- C. Auto Nyiram Tanaman (Pegang Gembor & Siram)
         if _G_State.AutoRefill then
-            local tool = getTool("Watering Can")
-            if tool and tool:FindFirstChild("WaterRemote") then
-                pcall(function() tool.WaterRemote:FireServer() end)
+            -- 1. Pindahkan dari tas ke tangan
+            local toolBag = LocalPlayer.Backpack:FindFirstChild("Watering Can")
+            if toolBag and hrp and hrp.Parent then
+                local hum = hrp.Parent:FindFirstChild("Humanoid")
+                if hum then
+                    pcall(function() hum:EquipTool(toolBag) end)
+                    task.wait(0.1)
+                end
+            end
+            
+            -- 2. Siram (Klik Kiri / Tembak Remote)
+            local toolHand = hrp and hrp.Parent and hrp.Parent:FindFirstChild("Watering Can")
+            if toolHand then
+                pcall(function()
+                    if toolHand:FindFirstChild("WaterRemote") then
+                        toolHand.WaterRemote:FireServer()
+                    end
+                    toolHand:Activate()
+                end)
             end
         end
         
@@ -219,12 +303,51 @@ task.spawn(function()
             end
         end
 
-        -- 5. Auto Upgrades
-        if _G_State.AutoUpgradeUniversal then
-            local remote = RS:FindFirstChild("RequestUniversalUpgrade")
-            if remote then task.spawn(function() safeInvoke(remote, "Up_Universal") end) 
-            else logAction("Auto Upgrade", false, "Remote RequestUniversalUpgrade tidak ditemukan!") end
+        -- E. Auto Upgrades & Auto Buy Animals (Via ProximityPrompt)
+        if _G_State.AutoUpgradeUniversal or _G_State.AutoBuyAnimal or _G_State.AutoUpgradeFactory or _G_State.AutoBuyMastery then
+            if not _G_State.UpgradeCooldowns then _G_State.UpgradeCooldowns = {} end
+            
+            for _, prompt in ipairs(workspace:GetDescendants()) do
+                if prompt:IsA("ProximityPrompt") then
+                    local act = string.lower(prompt.ActionText or "")
+                    local obj = string.lower(prompt.ObjectText or "")
+                    
+                    local isUpgrade = (_G_State.AutoUpgradeUniversal or _G_State.AutoUpgradeFactory) and (string.find(act, "tingkat") or string.find(act, "upgrade") or string.find(act, "buka"))
+                    local isBuyAyam = _G_State.AutoBuyAnimal and _G_State.BuyAyam and (string.find(obj, "ayam") or string.find(act, "ayam")) and string.find(act, "beli")
+                    local isBuySapi = _G_State.AutoBuyAnimal and _G_State.BuySapi and (string.find(obj, "sapi") or string.find(act, "sapi")) and string.find(act, "beli")
+                    local isBuyDomba = _G_State.AutoBuyAnimal and _G_State.BuyDomba and (string.find(obj, "domba") or string.find(act, "domba")) and string.find(act, "beli")
+                    local isBuyBabi = _G_State.AutoBuyAnimal and _G_State.BuyBabi and (string.find(obj, "babi") or string.find(act, "babi")) and string.find(act, "beli")
+                    
+                    if isUpgrade or isBuyAyam or isBuySapi or isBuyDomba or isBuyBabi then
+                        -- Cooldown 30 detik agar tidak nyangkut teleport ke tempat yang sama karena uang tidak cukup
+                        if not _G_State.UpgradeCooldowns[prompt] or tick() - _G_State.UpgradeCooldowns[prompt] > 30 then
+                            _G_State.UpgradeCooldowns[prompt] = tick()
+                            pcall(function()
+                                local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                if hrp and prompt.Parent and prompt.Parent:IsA("BasePart") then
+                                    local pos = prompt.Parent.Position
+                                    if (hrp.Position - pos).Magnitude > 15 then
+                                        hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
+                                        task.wait(0.4) -- Jeda aman teleport
+                                    end
+                                end
+                                prompt.RequiresLineOfSight = false
+                                if fireproximityprompt then fireproximityprompt(prompt) end
+                                logAction("Auto Shop", true, string.format("Mencoba %s %s", prompt.ActionText or "", prompt.ObjectText or ""))
+                            end)
+                            break -- Batasi 1 percobaan per loop (tiap setengah detik)
+                        end
+                    end
+                end
+            end
+            
+            -- Hapus cache untuk prompt yang sudah dihancurkan
+            for p, _ in pairs(_G_State.UpgradeCooldowns) do
+                if typeof(p) ~= "Instance" or not p.Parent then _G_State.UpgradeCooldowns[p] = nil end
+            end
         end
+        
+        -- Fallback Remote Asli (Jika gamenya mendukung tanpa jalan)
         if _G_State.AutoBuyMastery then
             local remote = RS:FindFirstChild("RequestBuyFarmMastery")
             if remote then 
@@ -232,25 +355,8 @@ task.spawn(function()
                 for _, m in ipairs(masteries) do
                     task.spawn(function() pcall(function() remote:InvokeServer(m) end) end)
                 end
-            else logAction("Auto Mastery", false, "Remote RequestBuyFarmMastery tidak ditemukan!") end
-        end
-        if _G_State.AutoUpgradeFactory then
-            local remotes = RS:FindFirstChild("Remotes")
-            if remotes then
-                local uF = remotes:FindFirstChild("RequestUnlockFactory")
-                local upF = remotes:FindFirstChild("RequestFactoryUpgrade")
-                if uF and upF then
-                    for _, recipe in ipairs(AllRecipes) do
-                        task.spawn(function() safeInvoke(uF, "UnlockPabrik_"..recipe, recipe) end)
-                        task.spawn(function() safeInvoke(upF, "UpPabrik_"..recipe, recipe) end)
-                    end
-                else
-                    logAction("Auto UpFactory", false, "Remote UnlockFactory/UpgradeFactory tidak ditemukan!")
-                end
             end
         end
-        
-        -- (Auto Collect Magnet part lama sudah digabung ke sistem ProximityPrompt di atas)
     end
 end)
 
@@ -338,6 +444,13 @@ TabUpgrade:Toggle({
 })
 
 -- === TAB LOGS ===
+TabLogs:Toggle({
+    Title = "Aktifkan Pencatatan Log",
+    Desc = "Mencatat riwayat aktivitas secara real-time (bisa dimatikan jika terlalu spam)",
+    Default = true,
+    Callback = function(state) _G_State.LogEnabled = state end
+})
+
 local LogDisplay = TabLogs:Button({
     Title = "Aktivitas Terakhir:",
     Desc = "Belum ada aktivitas...",
