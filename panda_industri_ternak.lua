@@ -17,6 +17,7 @@ _G_State.AutoCollect = false
 _G_State.AutoUpgradeUniversal = false
 _G_State.AutoUpgradeFactory = false
 _G_State.AutoBuyMastery = false
+_G_State.AntiMonster = true
 _G_State.LogEnabled = true
 _G_State.LiveLogs = "=== PANDA INDUSTRI LIVE LOGS ===\n"
 
@@ -91,21 +92,8 @@ local function safeInvoke(remote, actionName, ...)
 end
 
 -- ============================================================
--- SENSOR EKONOMI & STATE MACHINE
+-- SENSOR EKONOMI
 -- ============================================================
-local function getBagCapacity()
-    local pGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if pGui then
-        for _, v in ipairs(pGui:GetDescendants()) do
-            if v:IsA("TextLabel") and string.find(v.Text, "/") then
-                local cur, max = string.match(v.Text, "(%d+)%s*/%s*(%d+)")
-                if cur and max then return tonumber(cur), tonumber(max) end
-            end
-        end
-    end
-    return 0, 999 -- Fallback
-end
-
 local function getPlayerMoney()
     local pGui = LocalPlayer:FindFirstChild("PlayerGui")
     local money = -1
@@ -130,7 +118,7 @@ local function getPrice(txt)
 end
 
 -- ============================================================
--- SMART DELIVERY HOOK (Jual HANYA saat tas penuh)
+-- SMART DELIVERY HOOK
 -- ============================================================
 local function clickGuiButton(btn)
     pcall(function()
@@ -141,41 +129,17 @@ local function clickGuiButton(btn)
     end)
 end
 
-_G_State.CurrentPhase = "GATHER"
-
 task.spawn(function()
     while task.wait(2) do
-        local curBag, maxBag = getBagCapacity()
         local myMoney = getPlayerMoney()
-        
-        -- State Machine Logic
-        if curBag >= maxBag - 1 and maxBag > 0 then
-            if not _G_State.FullTick then 
-                _G_State.FullTick = tick() 
-                _G_State.CurrentPhase = "PRODUCE"
-                logAction("State Machine", true, string.format("Tas Penuh (%d/%d)! Beralih ke Produksi...", curBag, maxBag))
-            end
-            -- Jika sudah 5 detik tas tetap penuh (mesin tidak bisa nampung lagi), jual!
-            if tick() - _G_State.FullTick > 5 and _G_State.CurrentPhase ~= "SELL" then
-                _G_State.CurrentPhase = "SELL"
-                logAction("State Machine", true, "Mesin Penuh! Beralih ke Penjualan.")
-            end
-        else
-            if _G_State.CurrentPhase ~= "GATHER" then
-                logAction("State Machine", true, "Ruang Tas Tersedia! Kembali ke Memungut.")
-            end
-            _G_State.FullTick = nil
-            _G_State.CurrentPhase = "GATHER"
-        end
         
         -- Siklus Tab Delivery (Smart Sales)
         local tabs = {"olahan"}
-        -- Jika pabrik mati ATAU kita sedang dalam fase SELL (berarti mesin sudah full dan tas mentok), kita jual mentah juga!
-        if not _G_State.AutoFactory or _G_State.CurrentPhase == "SELL" then table.insert(tabs, "mentah") end
+        -- Jika pabrik mati, jual mentah juga. Jika nyala, biarkan mentah di tas untuk diolah pabrik!
+        if not _G_State.AutoFactory then table.insert(tabs, "mentah") end
         
         if not _G_State.DelivCycle then _G_State.DelivCycle = 0 end
-        -- Auto Delivery berjalan saat Fase SELL, ATAU jika pengguna tidak menggunakan AutoFactory
-        if _G_State.AutoDelivery and (_G_State.CurrentPhase == "SELL" or not _G_State.AutoFactory) then
+        if _G_State.AutoDelivery then
             _G_State.DelivCycle = _G_State.DelivCycle + 1
             if _G_State.DelivCycle > #tabs then _G_State.DelivCycle = 1 end
         end
@@ -194,8 +158,8 @@ task.spawn(function()
                         end
                     end
                     
-                    -- 1. Auto Delivery (Jual Cerdas Berdasarkan Tab & Fase)
-                    if _G_State.AutoDelivery and (_G_State.CurrentPhase == "SELL" or not _G_State.AutoFactory) then
+                    -- 1. Auto Delivery (Jual Cerdas Berdasarkan Tab)
+                    if _G_State.AutoDelivery then
                         local isTab = (txt == activeTab)
                         local isAdd = string.find(txt, ">>") or string.find(txt, "max")
                         local isSend = string.find(txt, "kirim")
@@ -252,8 +216,8 @@ task.spawn(function()
             end
         end
         
-        -- Fallback Remote Auto Delivery (Hanya dijalankan saat SELL)
-        if _G_State.AutoDelivery and _G_State.CurrentPhase == "SELL" then
+        -- Fallback Remote Auto Delivery
+        if _G_State.AutoDelivery then
             -- Coba klik ProximityPrompt "Jual" jika ada di dekat player
             local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
@@ -276,113 +240,98 @@ end)
 -- ============================================================
 -- MAIN LOOP (Jantung Script)
 -- ============================================================
--- Fungsi untuk mengunci markas pemain agar tidak mencuri sumur orang lain
-local function getBaseCenter(hrp)
-    if _G_State.BaseCenter then return _G_State.BaseCenter end
-    local closestWell = nil
-    local minDist = 9999
-    for _, p in ipairs(workspace:GetDescendants()) do
-        if p:IsA("ProximityPrompt") and (string.find(p.ObjectText or "", "Isi Air") or string.find(p.ActionText or "", "Isi Air")) then
-            local dist = (p.Parent.Position - hrp.Position).Magnitude
-            if dist < minDist then
-                minDist = dist
-                closestWell = p.Parent
-            end
-        end
-    end
-    if closestWell and minDist < 150 then
-        _G_State.BaseCenter = closestWell.Position
-        logAction("Sistem Keamanan", true, "Markas berhasil dikunci! Menghindari markas orang lain.")
-    end
-    return _G_State.BaseCenter or hrp.Position
-end
-
 task.spawn(function()
     while task.wait(0.5) do
         local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if not hrp then continue end
         
-        local baseCenter = getBaseCenter(hrp)
-        
         -- Z. Anti Monster (Werewolf Aura Kill)
-        for _, v in ipairs(workspace:GetDescendants()) do
-            if v:IsA("Model") and v:FindFirstChild("Humanoid") and v ~= LocalPlayer.Character then
-                local name = string.lower(v.Name)
-                if string.find(name, "wolf") or string.find(name, "werewolf") or string.find(name, "monster") then
-                    local mHrp = v:FindFirstChild("HumanoidRootPart")
-                    local mHum = v:FindFirstChild("Humanoid")
-                    
-                    if mHrp and mHum and mHum.Health > 0 and (mHrp.Position - hrp.Position).Magnitude < 150 then
-                        pcall(function()
-                            -- 1. Kuras HP (Bypass Client-Sided Damage)
-                            mHum.Health = 0 
-                            
-                            -- 2. Spam Senjata (Auto Swing Pedang/Tembak)
-                            local char = LocalPlayer.Character
-                            local bp = LocalPlayer:FindFirstChild("Backpack")
-                            if char and bp then
-                                for _, tool in ipairs(bp:GetChildren()) do
-                                    if tool:IsA("Tool") and not string.find(string.lower(tool.Name), "water") then
-                                        tool.Parent = char
+        if _G_State.AntiMonster then
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("Model") and v:FindFirstChild("Humanoid") and v ~= LocalPlayer.Character then
+                    local name = string.lower(v.Name)
+                    if string.find(name, "wolf") or string.find(name, "werewolf") or string.find(name, "monster") then
+                        local mHrp = v:FindFirstChild("HumanoidRootPart")
+                        local mHum = v:FindFirstChild("Humanoid")
+                        
+                        if mHrp and mHum and mHum.Health > 0 and (mHrp.Position - hrp.Position).Magnitude < 150 then
+                            pcall(function()
+                                -- 1. Kuras HP (Bypass Client-Sided Damage)
+                                mHum.Health = 0 
+                                
+                                -- 2. Spam Senjata (Auto Swing Pedang/Tembak)
+                                local char = LocalPlayer.Character
+                                local bp = LocalPlayer:FindFirstChild("Backpack")
+                                if char and bp then
+                                    for _, tool in ipairs(bp:GetChildren()) do
+                                        if tool:IsA("Tool") and not string.find(string.lower(tool.Name), "water") then
+                                            tool.Parent = char
+                                        end
+                                    end
+                                    for _, tool in ipairs(char:GetChildren()) do
+                                        if tool:IsA("Tool") and not string.find(string.lower(tool.Name), "water") then
+                                            tool:Activate()
+                                        end
                                     end
                                 end
-                                for _, tool in ipairs(char:GetChildren()) do
-                                    if tool:IsA("Tool") and not string.find(string.lower(tool.Name), "water") then
-                                        tool:Activate()
-                                    end
-                                end
-                            end
-                            
-                            -- 3. Lempar paksa ke Void agar mati dibunuh oleh Server (FallenPartsDestroyHeight)
-                            mHrp.CFrame = CFrame.new(mHrp.Position.X, -9999, mHrp.Position.Z)
-                            mHrp.Velocity = Vector3.new(0, -9999, 0)
-                        end)
-                        logAction("Anti-Monster", true, "Aura Damage: Menyerang Werewolf!")
+                                
+                                -- 3. Lempar paksa ke Void agar mati dibunuh oleh Server (FallenPartsDestroyHeight)
+                                mHrp.CFrame = CFrame.new(mHrp.Position.X, -9999, mHrp.Position.Z)
+                                mHrp.Velocity = Vector3.new(0, -9999, 0)
+                            end)
+                            logAction("Anti-Monster", true, "Aura Damage: Menyerang Werewolf!")
+                        end
                     end
                 end
             end
         end
 
-        -- 1. Auto Refill Air (Hanya di fase GATHER)
-        if hrp and _G_State.CurrentPhase == "GATHER" then
+        -- 1. Auto Refill Air
+        if hrp then
             if _G_State.AutoRefill and (not _G_State.LastRefill or tick() - _G_State.LastRefill > 2) then
-                local wellFound = false
+                local closestWell = nil
+                local minDist = 150 -- Radius cari sumur (Jangan nyolong sumur tetangga)
                 for _, prompt in ipairs(workspace:GetDescendants()) do
                     if prompt:IsA("ProximityPrompt") then
-                        -- PASTIKAN HANYA SUMUR DI MARKAS SENDIRI (Maksimal 350 stud dari pusat markas)
-                        if (prompt.Parent.Position - baseCenter).Magnitude > 350 then continue end
+                        local dist = (prompt.Parent.Position - hrp.Position).Magnitude
+                        if dist > 150 then continue end -- HANYA DI RADIUS PEMAIN
                         
                         local act = prompt.ActionText or ""
                         local obj = prompt.ObjectText or ""
                         if string.find(obj, "Isi Air") or string.find(act, "Isi Air") or (string.find(act, "Ambil") and string.find(prompt.Parent.Name, "Sumur")) then
-                            pcall(function()
-                                local pos = prompt.Parent.Position
-                                if (hrp.Position - pos).Magnitude > 10 then
-                                    hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
-                                    task.wait(0.5) -- Anti Error 277
-                                    logAction("Auto Refill -> Teleport", true, string.format("Ke Sumur di X:%.0f, Y:%.0f, Z:%.0f", pos.X, pos.Y, pos.Z))
-                                end
-                                prompt.RequiresLineOfSight = false
-                                if fireproximityprompt then fireproximityprompt(prompt) end
-                                logAction("Auto Refill -> ProximityPrompt", true, "Berhasil klik Sumur!")
-                            end)
-                            _G_State.LastRefill = tick()
-                            wellFound = true
-                            break -- HANYA 1 SUMUR! (Jangan loop ke sumur lain)
+                            if dist < minDist then
+                                minDist = dist
+                                closestWell = prompt
+                            end
                         end
                     end
                 end
-                if wellFound then task.wait(0.5) end -- Beri jeda sebelum collect barang
+                
+                if closestWell then
+                    pcall(function()
+                        local pos = closestWell.Parent.Position
+                        if (hrp.Position - pos).Magnitude > 10 then
+                            hrp.CFrame = closestWell.Parent.CFrame + Vector3.new(0, 3, 0)
+                            task.wait(0.5) -- Anti Error 277
+                            logAction("Auto Refill -> Teleport", true, string.format("Ke Sumur terdekat di X:%.0f", pos.X))
+                        end
+                        closestWell.RequiresLineOfSight = false
+                        if fireproximityprompt then fireproximityprompt(closestWell) end
+                        logAction("Auto Refill -> ProximityPrompt", true, "Berhasil klik Sumur!")
+                    end)
+                    _G_State.LastRefill = tick()
+                    task.wait(0.5) -- Beri jeda
+                end
             end
             
-            -- B. Auto Collect Barang (Hanya di fase GATHER)
-            if _G_State.AutoCollect and _G_State.CurrentPhase == "GATHER" then
+            -- B. Auto Collect Barang
+            if _G_State.AutoCollect then
                 if not _G_State.CollectedItems then _G_State.CollectedItems = {} end
                 
                 for _, prompt in ipairs(workspace:GetDescendants()) do
                     if prompt:IsA("ProximityPrompt") then
-                        -- PASTIKAN HANYA BARANG DI MARKAS SENDIRI
-                        if (prompt.Parent.Position - baseCenter).Magnitude > 350 then continue end
+                        -- PASTIKAN HANYA BARANG DI DEKAT PEMAIN (Radius 150)
+                        if (prompt.Parent.Position - hrp.Position).Magnitude > 150 then continue end
                         
                         local act = prompt.ActionText or ""
                         local obj = prompt.ObjectText or ""
@@ -480,8 +429,8 @@ task.spawn(function()
             
             for _, prompt in ipairs(workspace:GetDescendants()) do
                 if prompt:IsA("ProximityPrompt") then
-                    -- PASTIKAN HANYA UPGRADE DI MARKAS SENDIRI
-                    if (prompt.Parent.Position - baseCenter).Magnitude > 350 then continue end
+                    -- PASTIKAN HANYA UPGRADE DI DEKAT PEMAIN (Radius 150)
+                    if (prompt.Parent.Position - hrp.Position).Magnitude > 150 then continue end
                     
                     local act = string.lower(prompt.ActionText or "")
                     local obj = string.lower(prompt.ObjectText or "")
@@ -581,6 +530,13 @@ TabFarm:Toggle({
     Desc = "Menarik Telur, Wol, Susu, dll ke badan",
     Default = false,
     Callback = function(state) _G_State.AutoCollect = state; logAction("Menu -> Auto Collect", true, state and "AKTIF" or "MATI") end
+})
+
+TabFarm:Toggle({
+    Title = "Anti-Monster (Aura Kill)",
+    Desc = "Otomatis membunuh Werewolf yang mendekat dalam radius 150m",
+    Default = true,
+    Callback = function(state) _G_State.AntiMonster = state; logAction("Menu -> Anti-Monster", true, state and "AKTIF" or "MATI") end
 })
 
 -- === TAB FACTORY ===
