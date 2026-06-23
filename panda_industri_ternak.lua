@@ -91,6 +91,45 @@ local function safeInvoke(remote, actionName, ...)
 end
 
 -- ============================================================
+-- SENSOR EKONOMI & STATE MACHINE
+-- ============================================================
+local function getBagCapacity()
+    local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if pGui then
+        for _, v in ipairs(pGui:GetDescendants()) do
+            if v:IsA("TextLabel") and string.find(v.Text, "/") then
+                local cur, max = string.match(v.Text, "(%d+)%s*/%s*(%d+)")
+                if cur and max then return tonumber(cur), tonumber(max) end
+            end
+        end
+    end
+    return 0, 999 -- Fallback
+end
+
+local function getPlayerMoney()
+    local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+    local money = -1
+    if pGui then
+        for _, v in ipairs(pGui:GetDescendants()) do
+            if v:IsA("TextLabel") and string.find(v.Text, "Rp") and not v:FindFirstAncestorWhichIsA("GuiButton") then
+                local mStr = string.match(v.Text, "Rp%s*([%d%.]+)")
+                if mStr then
+                    local val = tonumber(string.gsub(mStr, "%.", ""))
+                    if val and val > money then money = val end
+                end
+            end
+        end
+    end
+    return money
+end
+
+local function getPrice(txt)
+    local mStr = string.match(txt, "Rp%s*([%d%.]+)")
+    if mStr then return tonumber(string.gsub(mStr, "%.", "")) end
+    return 0 -- Jika tidak ada harga (gratis)
+end
+
+-- ============================================================
 -- SMART DELIVERY HOOK (Jual HANYA saat tas penuh)
 -- ============================================================
 local function clickGuiButton(btn)
@@ -102,8 +141,46 @@ local function clickGuiButton(btn)
     end)
 end
 
+_G_State.CurrentPhase = "GATHER"
+
 task.spawn(function()
     while task.wait(2) do
+        local curBag, maxBag = getBagCapacity()
+        local myMoney = getPlayerMoney()
+        
+        -- State Machine Logic
+        if curBag >= maxBag - 1 and maxBag > 0 then
+            if not _G_State.FullTick then 
+                _G_State.FullTick = tick() 
+                _G_State.CurrentPhase = "PRODUCE"
+                logAction("State Machine", true, string.format("Tas Penuh (%d/%d)! Beralih ke Produksi...", curBag, maxBag))
+            end
+            -- Jika sudah 5 detik tas tetap penuh (mesin tidak bisa nampung lagi), jual!
+            if tick() - _G_State.FullTick > 5 and _G_State.CurrentPhase ~= "SELL" then
+                _G_State.CurrentPhase = "SELL"
+                logAction("State Machine", true, "Mesin Penuh! Beralih ke Penjualan.")
+            end
+        else
+            if _G_State.CurrentPhase ~= "GATHER" then
+                logAction("State Machine", true, "Ruang Tas Tersedia! Kembali ke Memungut.")
+            end
+            _G_State.FullTick = nil
+            _G_State.CurrentPhase = "GATHER"
+        end
+        
+        -- Siklus Tab Delivery (Smart Sales)
+        local tabs = {"olahan"}
+        -- Jika pabrik mati ATAU kita sedang dalam fase SELL (berarti mesin sudah full dan tas mentok), kita jual mentah juga!
+        if not _G_State.AutoFactory or _G_State.CurrentPhase == "SELL" then table.insert(tabs, "mentah") end
+        
+        if not _G_State.DelivCycle then _G_State.DelivCycle = 0 end
+        -- Auto Delivery berjalan saat Fase SELL, ATAU jika pengguna tidak menggunakan AutoFactory
+        if _G_State.AutoDelivery and (_G_State.CurrentPhase == "SELL" or not _G_State.AutoFactory) then
+            _G_State.DelivCycle = _G_State.DelivCycle + 1
+            if _G_State.DelivCycle > #tabs then _G_State.DelivCycle = 1 end
+        end
+        local activeTab = tabs[_G_State.DelivCycle]
+
         -- UI CLICKER UNIVERSAL (Bypass tanpa harus buka menu)
         local pGui = LocalPlayer:FindFirstChild("PlayerGui")
         if pGui then
@@ -111,13 +188,32 @@ task.spawn(function()
                 if v:IsA("GuiButton") then
                     local txt = string.lower(v.Name)
                     if v:IsA("TextButton") then txt = txt .. " " .. string.lower(v.Text) end
-                    for _, child in ipairs(v:GetChildren()) do
-                        if child:IsA("TextLabel") then txt = txt .. " " .. string.lower(child.Text) end
+                    for _, child in ipairs(v:GetDescendants()) do -- Ganti ke GetDescendants agar teks terdalam terbaca
+                        if child:IsA("TextLabel") or child:IsA("TextBox") then 
+                            txt = txt .. " " .. string.lower(child.Text) 
+                        end
                     end
                     
-                    -- 1. Auto Delivery (Jual)
-                    if _G_State.AutoDelivery and (txt == ">>" or string.find(txt, "kirim") or string.find(txt, "max")) then
-                        clickGuiButton(v)
+                    -- 1. Auto Delivery (Jual Cerdas Berdasarkan Tab & Fase)
+                    if _G_State.AutoDelivery and (_G_State.CurrentPhase == "SELL" or not _G_State.AutoFactory) then
+                        local isTab = (txt == activeTab)
+                        local isAdd = string.find(txt, ">>") or string.find(txt, "max")
+                        local isSend = string.find(txt, "kirim")
+                        
+                        if isTab or isAdd or isSend then
+                            local hasStock = true
+                            if isAdd and v.Parent then
+                                -- Cek apakah stok 0 (jangan di-klik agar tidak lag)
+                                for _, sib in ipairs(v.Parent:GetDescendants()) do
+                                    if sib:IsA("TextLabel") and string.find(string.lower(sib.Text), "stok: 0") then
+                                        hasStock = false
+                                        break
+                                    end
+                                end
+                            end
+                            
+                            if hasStock then clickGuiButton(v) end
+                        end
                     end
                     
                     -- 2. Auto Factory (Produksi & Ambil Hasil)
@@ -125,33 +221,39 @@ task.spawn(function()
                         clickGuiButton(v)
                     end
                     
-                    -- 3. Auto Upgrade Semua UI (Pabrik, Kandang, Sumur, Kendaraan & Hewan)
+                    -- 3. Auto Upgrade Semua UI (Berdasarkan Saldo Uang)
                     if _G_State.AutoUpgradeUniversal or _G_State.AutoUpgradeFactory or _G_State.AutoBuyAnimal then
                         if string.find(txt, "rp") then
-                            local isAyam = string.find(txt, "ayam")
-                            local isSapi = string.find(txt, "sapi")
-                            local isDomba = string.find(txt, "domba")
-                            local isBabi = string.find(txt, "babi")
-                            
-                            local shouldBuy = false
-                            if isAyam then shouldBuy = _G_State.BuyAyam
-                            elseif isSapi then shouldBuy = _G_State.BuySapi
-                            elseif isDomba then shouldBuy = _G_State.BuyDomba
-                            elseif isBabi then shouldBuy = _G_State.BuyBabi
-                            else
-                                -- Bukan hewan, berarti ini upgrade (Kandang, Sumur, Pabrik, Kendaraan)
-                                shouldBuy = (_G_State.AutoUpgradeUniversal or _G_State.AutoUpgradeFactory)
+                            local price = getPrice(txt)
+                            -- HANYA klik jika uang cukup!
+                            if myMoney >= price then
+                                local isAyam = string.find(txt, "ayam")
+                                local isSapi = string.find(txt, "sapi")
+                                local isDomba = string.find(txt, "domba")
+                                local isBabi = string.find(txt, "babi")
+                                
+                                local shouldBuy = false
+                                if isAyam then shouldBuy = _G_State.BuyAyam
+                                elseif isSapi then shouldBuy = _G_State.BuySapi
+                                elseif isDomba then shouldBuy = _G_State.BuyDomba
+                                elseif isBabi then shouldBuy = _G_State.BuyBabi
+                                else
+                                    shouldBuy = (_G_State.AutoUpgradeUniversal or _G_State.AutoUpgradeFactory)
+                                end
+                                
+                                if shouldBuy then 
+                                    clickGuiButton(v)
+                                    logAction("Auto Shop", true, string.format("Membeli Upgrade seharga Rp %d", price))
+                                end
                             end
-                            
-                            if shouldBuy then clickGuiButton(v) end
                         end
                     end
                 end
             end
         end
         
-        -- Fallback Remote Auto Delivery
-        if _G_State.AutoDelivery then
+        -- Fallback Remote Auto Delivery (Hanya dijalankan saat SELL)
+        if _G_State.AutoDelivery and _G_State.CurrentPhase == "SELL" then
             -- Coba klik ProximityPrompt "Jual" jika ada di dekat player
             local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
@@ -172,18 +274,84 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- Looping Utama (Berjalan di background)
+-- MAIN LOOP (Jantung Script)
 -- ============================================================
+-- Fungsi untuk mengunci markas pemain agar tidak mencuri sumur orang lain
+local function getBaseCenter(hrp)
+    if _G_State.BaseCenter then return _G_State.BaseCenter end
+    local closestWell = nil
+    local minDist = 9999
+    for _, p in ipairs(workspace:GetDescendants()) do
+        if p:IsA("ProximityPrompt") and (string.find(p.ObjectText or "", "Isi Air") or string.find(p.ActionText or "", "Isi Air")) then
+            local dist = (p.Parent.Position - hrp.Position).Magnitude
+            if dist < minDist then
+                minDist = dist
+                closestWell = p.Parent
+            end
+        end
+    end
+    if closestWell and minDist < 150 then
+        _G_State.BaseCenter = closestWell.Position
+        logAction("Sistem Keamanan", true, "Markas berhasil dikunci! Menghindari markas orang lain.")
+    end
+    return _G_State.BaseCenter or hrp.Position
+end
+
 task.spawn(function()
     while task.wait(0.5) do
-        -- 1. Auto Refill Air & 6. Auto Collect (Aman dari Error 277 / Disconnect)
         local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            -- A. Auto Refill Air (Cooldown 2 Detik agar sinkron dengan kecepatan ambil barang)
+        if not hrp then continue end
+        
+        local baseCenter = getBaseCenter(hrp)
+        
+        -- Z. Anti Monster (Werewolf Aura Kill)
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("Model") and v:FindFirstChild("Humanoid") and v ~= LocalPlayer.Character then
+                local name = string.lower(v.Name)
+                if string.find(name, "wolf") or string.find(name, "werewolf") or string.find(name, "monster") then
+                    local mHrp = v:FindFirstChild("HumanoidRootPart")
+                    local mHum = v:FindFirstChild("Humanoid")
+                    
+                    if mHrp and mHum and mHum.Health > 0 and (mHrp.Position - hrp.Position).Magnitude < 150 then
+                        pcall(function()
+                            -- 1. Kuras HP (Bypass Client-Sided Damage)
+                            mHum.Health = 0 
+                            
+                            -- 2. Spam Senjata (Auto Swing Pedang/Tembak)
+                            local char = LocalPlayer.Character
+                            local bp = LocalPlayer:FindFirstChild("Backpack")
+                            if char and bp then
+                                for _, tool in ipairs(bp:GetChildren()) do
+                                    if tool:IsA("Tool") and not string.find(string.lower(tool.Name), "water") then
+                                        tool.Parent = char
+                                    end
+                                end
+                                for _, tool in ipairs(char:GetChildren()) do
+                                    if tool:IsA("Tool") and not string.find(string.lower(tool.Name), "water") then
+                                        tool:Activate()
+                                    end
+                                end
+                            end
+                            
+                            -- 3. Lempar paksa ke Void agar mati dibunuh oleh Server (FallenPartsDestroyHeight)
+                            mHrp.CFrame = CFrame.new(mHrp.Position.X, -9999, mHrp.Position.Z)
+                            mHrp.Velocity = Vector3.new(0, -9999, 0)
+                        end)
+                        logAction("Anti-Monster", true, "Aura Damage: Menyerang Werewolf!")
+                    end
+                end
+            end
+        end
+
+        -- 1. Auto Refill Air (Hanya di fase GATHER)
+        if hrp and _G_State.CurrentPhase == "GATHER" then
             if _G_State.AutoRefill and (not _G_State.LastRefill or tick() - _G_State.LastRefill > 2) then
                 local wellFound = false
                 for _, prompt in ipairs(workspace:GetDescendants()) do
                     if prompt:IsA("ProximityPrompt") then
+                        -- PASTIKAN HANYA SUMUR DI MARKAS SENDIRI (Maksimal 350 stud dari pusat markas)
+                        if (prompt.Parent.Position - baseCenter).Magnitude > 350 then continue end
+                        
                         local act = prompt.ActionText or ""
                         local obj = prompt.ObjectText or ""
                         if string.find(obj, "Isi Air") or string.find(act, "Isi Air") or (string.find(act, "Ambil") and string.find(prompt.Parent.Name, "Sumur")) then
@@ -207,12 +375,15 @@ task.spawn(function()
                 if wellFound then task.wait(0.5) end -- Beri jeda sebelum collect barang
             end
             
-            -- B. Auto Collect Barang (Hanya ambil 1 barang per loop = Anti Spam)
-            if _G_State.AutoCollect then
+            -- B. Auto Collect Barang (Hanya di fase GATHER)
+            if _G_State.AutoCollect and _G_State.CurrentPhase == "GATHER" then
                 if not _G_State.CollectedItems then _G_State.CollectedItems = {} end
                 
                 for _, prompt in ipairs(workspace:GetDescendants()) do
                     if prompt:IsA("ProximityPrompt") then
+                        -- PASTIKAN HANYA BARANG DI MARKAS SENDIRI
+                        if (prompt.Parent.Position - baseCenter).Magnitude > 350 then continue end
+                        
                         local act = prompt.ActionText or ""
                         local obj = prompt.ObjectText or ""
                         if act == "Ambil" and not string.find(obj, "Isi Air") then
@@ -309,6 +480,9 @@ task.spawn(function()
             
             for _, prompt in ipairs(workspace:GetDescendants()) do
                 if prompt:IsA("ProximityPrompt") then
+                    -- PASTIKAN HANYA UPGRADE DI MARKAS SENDIRI
+                    if (prompt.Parent.Position - baseCenter).Magnitude > 350 then continue end
+                    
                     local act = string.lower(prompt.ActionText or "")
                     local obj = string.lower(prompt.ObjectText or "")
                     
@@ -319,7 +493,15 @@ task.spawn(function()
                     local isBuyBabi = _G_State.AutoBuyAnimal and _G_State.BuyBabi and (string.find(obj, "babi") or string.find(act, "babi")) and string.find(act, "beli")
                     
                     if isUpgrade or isBuyAyam or isBuySapi or isBuyDomba or isBuyBabi then
-                        -- Cooldown 30 detik agar tidak nyangkut teleport ke tempat yang sama karena uang tidak cukup
+                        local price = getPrice(act .. " " .. obj)
+                        local myMoney = getPlayerMoney()
+                        
+                        -- JIKA ADA HARGA DAN UANG KURANG, LEWATI!
+                        if price > 0 and myMoney > -1 and myMoney < price then
+                            continue
+                        end
+                        
+                        -- Cooldown 30 detik agar tidak nyangkut teleport ke tempat yang sama karena hal tak terduga
                         if not _G_State.UpgradeCooldowns[prompt] or tick() - _G_State.UpgradeCooldowns[prompt] > 30 then
                             _G_State.UpgradeCooldowns[prompt] = tick()
                             pcall(function()
