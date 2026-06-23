@@ -108,49 +108,74 @@ end)
 -- ============================================================
 task.spawn(function()
     while task.wait(0.5) do
-        -- 1. Auto Refill Air & 6. Auto Collect (Menggunakan ProximityPrompt)
+        -- 1. Auto Refill Air & 6. Auto Collect (Aman dari Error 277 / Disconnect)
         local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if hrp then
-            for _, prompt in ipairs(workspace:GetDescendants()) do
-                if prompt:IsA("ProximityPrompt") then
-                    local act = prompt.ActionText or ""
-                    local obj = prompt.ObjectText or ""
-                    
-                    -- Deteksi Sumur (Isi Air)
-                    if _G_State.AutoRefill and (string.find(obj, "Isi Air") or string.find(act, "Isi Air") or (string.find(act, "Ambil") and string.find(prompt.Parent.Name, "Sumur"))) then
-                        pcall(function()
-                            -- Teleport player ke sumur jika jaraknya jauh
-                            if prompt.Parent and prompt.Parent:IsA("BasePart") then
-                                if (hrp.Position - prompt.Parent.Position).Magnitude > 10 then
-                                    local pos = prompt.Parent.Position
-                                    hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
-                                    task.wait(0.2)
-                                    logAction("Auto Refill -> Teleport", true, string.format("Bergerak ke Sumur di koordinat X:%.0f, Y:%.0f, Z:%.0f", pos.X, pos.Y, pos.Z))
-                                end
-                            end
-                            prompt.RequiresLineOfSight = false
-                            if fireproximityprompt then fireproximityprompt(prompt) end
-                            logAction("Auto Refill -> ProximityPrompt", true, "Berhasil klik Sumur!")
-                        end)
-                    end
-                    
-                    -- Deteksi Barang Jatuh (Telur, Susu, Wol, dll)
-                    if _G_State.AutoCollect and act == "Ambil" and not string.find(obj, "Isi Air") then
-                        local part = prompt.Parent
-                        if part and part:IsA("BasePart") then
+            -- A. Auto Refill Air (Cooldown 2 Detik agar sinkron dengan kecepatan ambil barang)
+            if _G_State.AutoRefill and (not _G_State.LastRefill or tick() - _G_State.LastRefill > 2) then
+                local wellFound = false
+                for _, prompt in ipairs(workspace:GetDescendants()) do
+                    if prompt:IsA("ProximityPrompt") then
+                        local act = prompt.ActionText or ""
+                        local obj = prompt.ObjectText or ""
+                        if string.find(obj, "Isi Air") or string.find(act, "Isi Air") or (string.find(act, "Ambil") and string.find(prompt.Parent.Name, "Sumur")) then
                             pcall(function()
-                                local pos = part.Position
-                                -- GAME ANTI-MAGNET: Teleport PLAYER ke barang (bukan barang ke player)
-                                hrp.CFrame = part.CFrame + Vector3.new(0, 1.5, 0) -- Berdiri pas di atas barang
-                                task.wait(0.2) -- Jeda sedikit agar server mendaftarkan posisi baru
-                                
+                                local pos = prompt.Parent.Position
+                                if (hrp.Position - pos).Magnitude > 10 then
+                                    hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
+                                    task.wait(0.5) -- Anti Error 277
+                                    logAction("Auto Refill -> Teleport", true, string.format("Ke Sumur di X:%.0f, Y:%.0f, Z:%.0f", pos.X, pos.Y, pos.Z))
+                                end
                                 prompt.RequiresLineOfSight = false
                                 if fireproximityprompt then fireproximityprompt(prompt) end
-                                logAction("Auto Collect -> ProximityPrompt", true, string.format("Berhasil mengambil %s di koordinat X:%.0f, Y:%.0f, Z:%.0f", obj, pos.X, pos.Y, pos.Z))
+                                logAction("Auto Refill -> ProximityPrompt", true, "Berhasil klik Sumur!")
                             end)
+                            _G_State.LastRefill = tick()
+                            wellFound = true
+                            break -- HANYA 1 SUMUR! (Jangan loop ke sumur lain)
                         end
                     end
                 end
+                if wellFound then task.wait(0.5) end -- Beri jeda sebelum collect barang
+            end
+            
+            -- B. Auto Collect Barang (Hanya ambil 1 barang per loop = Anti Spam)
+            if _G_State.AutoCollect then
+                if not _G_State.CollectedItems then _G_State.CollectedItems = {} end
+                
+                for _, prompt in ipairs(workspace:GetDescendants()) do
+                    if prompt:IsA("ProximityPrompt") then
+                        local act = prompt.ActionText or ""
+                        local obj = prompt.ObjectText or ""
+                        if act == "Ambil" and not string.find(obj, "Isi Air") then
+                            if not _G_State.CollectedItems[prompt] then
+                                _G_State.CollectedItems[prompt] = true
+                                pcall(function()
+                                    local pos = prompt.Parent.Position
+                                    hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 1.5, 0)
+                                    task.wait(0.4) -- Jeda aman pendaftaran posisi
+                                    prompt.RequiresLineOfSight = false
+                                    if fireproximityprompt then fireproximityprompt(prompt) end
+                                    logAction("Auto Collect -> ProximityPrompt", true, string.format("Ambil %s di X:%.0f", obj, pos.X))
+                                end)
+                                break -- HANYA AMBIL 1! Sisa telur diambil di loop selanjutnya (0.5 detik kemudian)
+                            end
+                        end
+                    end
+                end
+                
+                -- Bersihkan memory (anti-lag)
+                for p, _ in pairs(_G_State.CollectedItems) do
+                    if typeof(p) ~= "Instance" or not p.Parent then _G_State.CollectedItems[p] = nil end
+                end
+            end
+        end
+        
+        -- C. Auto Nyiram Tanaman
+        if _G_State.AutoRefill then
+            local tool = getTool("Watering Can")
+            if tool and tool:FindFirstChild("WaterRemote") then
+                pcall(function() tool.WaterRemote:FireServer() end)
             end
         end
         
