@@ -202,34 +202,34 @@ local windui = loadstring(game:HttpGet("https://raw.githubusercontent.com/sandys
 
 local Window = windui:CreateWindow({
     Title = "Panda Industri Pro",
-    Icon = "rbxassetid://10618928818",
+    Icon = "box",
     Theme = "Dark",
     Size = UDim2.fromOffset(500, 380),
     Transparent = false
 })
 
-local TabFarm = Window:AddTab({ Title = "Farming", Icon = "rbxassetid://10618928818" })
-local TabFactory = Window:AddTab({ Title = "Factory", Icon = "rbxassetid://10618928818" })
-local TabAnimal = Window:AddTab({ Title = "Animals", Icon = "rbxassetid://10618928818" })
-local TabUpgrade = Window:AddTab({ Title = "Upgrades", Icon = "rbxassetid://10618928818" })
-local TabLogs = Window:AddTab({ Title = "Logs", Icon = "rbxassetid://10618928818" })
+local TabFarm = Window:Tab({ Title = "Farming", Icon = "leaf" })
+local TabFactory = Window:Tab({ Title = "Factory", Icon = "factory" })
+local TabAnimal = Window:Tab({ Title = "Animals", Icon = "paw-print" })
+local TabUpgrade = Window:Tab({ Title = "Upgrades", Icon = "trending-up" })
+local TabLogs = Window:Tab({ Title = "Logs", Icon = "scroll-text" })
 
 -- === TAB FARMING ===
-TabFarm:AddToggle({
+TabFarm:Toggle({
     Title = "Auto Refill Water",
     Desc = "Otomatis mengisi air di Gembor",
     Default = false,
     Callback = function(state) _G_State.AutoRefill = state end
 })
 
-TabFarm:AddToggle({
+TabFarm:Toggle({
     Title = "Auto Jual Pintar (Smart Delivery)",
     Desc = "Menjual HANYA saat tas kepenuhan, agar mesin sempat menyedot bahan",
     Default = false,
     Callback = function(state) _G_State.AutoDelivery = state end
 })
 
-TabFarm:AddToggle({
+TabFarm:Toggle({
     Title = "Auto Collect Barang (Magnet)",
     Desc = "Menarik Telur, Wol, Susu, dll ke badan",
     Default = false,
@@ -237,41 +237,41 @@ TabFarm:AddToggle({
 })
 
 -- === TAB FACTORY ===
-TabFactory:AddToggle({
+TabFactory:Toggle({
     Title = "Auto Proses SEMUA Mesin!",
-    Desc = "Otomatis memproses & mengambil hasil dari SEMUA mesin sekaligus (Telur, Wol, Susu, dll)",
+    Desc = "Otomatis memproses & mengambil hasil dari SEMUA mesin sekaligus",
     Default = false,
     Callback = function(state) _G_State.AutoFactory = state end
 })
 
 -- === TAB ANIMAL ===
-TabAnimal:AddToggle({
+TabAnimal:Toggle({
     Title = "Aktifkan Auto Beli",
     Desc = "Mulai membeli hewan yang dicentang di bawah",
     Default = false,
     Callback = function(state) _G_State.AutoBuyAnimal = state end
 })
-TabAnimal:AddToggle({ Title = "Beli Ayam", Default = false, Callback = function(state) _G_State.BuyAyam = state end })
-TabAnimal:AddToggle({ Title = "Beli Sapi", Default = false, Callback = function(state) _G_State.BuySapi = state end })
-TabAnimal:AddToggle({ Title = "Beli Domba", Default = false, Callback = function(state) _G_State.BuyDomba = state end })
-TabAnimal:AddToggle({ Title = "Beli Babi", Default = false, Callback = function(state) _G_State.BuyBabi = state end })
+TabAnimal:Toggle({ Title = "Beli Ayam", Default = false, Callback = function(state) _G_State.BuyAyam = state end })
+TabAnimal:Toggle({ Title = "Beli Sapi", Default = false, Callback = function(state) _G_State.BuySapi = state end })
+TabAnimal:Toggle({ Title = "Beli Domba", Default = false, Callback = function(state) _G_State.BuyDomba = state end })
+TabAnimal:Toggle({ Title = "Beli Babi", Default = false, Callback = function(state) _G_State.BuyBabi = state end })
 
 -- === TAB UPGRADE ===
-TabUpgrade:AddToggle({
+TabUpgrade:Toggle({
     Title = "Auto Universal Upgrade",
     Desc = "Otomatis membeli upgrade seperti Tas, Kecepatan, Air",
     Default = false,
     Callback = function(state) _G_State.AutoUpgradeUniversal = state end
 })
 
-TabUpgrade:AddToggle({
+TabUpgrade:Toggle({
     Title = "Auto Upgrade & Unlock Pabrik",
     Desc = "Membuka mesin baru dan meng-upgrade semua mesin",
     Default = false,
     Callback = function(state) _G_State.AutoUpgradeFactory = state end
 })
 
-TabUpgrade:AddToggle({
+TabUpgrade:Toggle({
     Title = "Auto Farm Mastery",
     Desc = "Otomatis level up Mastery / Skill memanen",
     Default = false,
@@ -279,7 +279,7 @@ TabUpgrade:AddToggle({
 })
 
 -- === TAB LOGS ===
-TabLogs:AddButton({
+TabLogs:Button({
     Title = "Copy Semua Log ke Clipboard",
     Desc = "Menyalin isi file Panda_Log.txt untuk di-paste",
     Callback = function()
@@ -308,7 +308,7 @@ TabLogs:AddButton({
     end
 })
 
-TabLogs:AddButton({
+TabLogs:Button({
     Title = "Hapus Log (Clear)",
     Desc = "Menghapus file log agar memori tidak penuh",
     Callback = function()
