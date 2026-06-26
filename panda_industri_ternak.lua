@@ -310,15 +310,9 @@ task.spawn(function()
                 
                 if closestFactory then
                     task.spawn(function()
-                        local originalCFrame = hrp.CFrame
-                        local part = closestFactory.Parent
-                        local cf = part:IsA("Model") and part:GetPivot() or part.CFrame
-                        hrp.CFrame = cf + Vector3.new(0, 3, 0)
                         closestFactory.RequiresLineOfSight = false
                         if fireproximityprompt then fireproximityprompt(closestFactory) end
-                        logAction("Patroli Mesin", true, "Ke Pabrik (Berdiam 2 detik untuk UI Clicker)")
-                        task.wait(2)
-                        hrp.CFrame = originalCFrame
+                        logAction("Patroli Mesin", true, "Akses Pabrik secara Remote (Tanpa Teleport)")
                     end)
                     task.wait(2.5) -- Beri jeda antar patroli
                 end
@@ -353,15 +347,9 @@ task.spawn(function()
                 
                 if closestTruck then
                     task.spawn(function()
-                        local originalCFrame = hrp.CFrame
-                        local part = closestTruck.Parent
-                        local cf = part:IsA("Model") and part:GetPivot() or part.CFrame
-                        hrp.CFrame = cf + Vector3.new(0, 3, 0)
                         closestTruck.RequiresLineOfSight = false
                         if fireproximityprompt then fireproximityprompt(closestTruck) end
-                        logAction("Patroli Penjualan", true, "Ke Truk Pengiriman (Berdiam 3 detik untuk UI Clicker)")
-                        task.wait(3)
-                        hrp.CFrame = originalCFrame
+                        logAction("Patroli Penjualan", true, "Akses Truk secara Remote (Tanpa Teleport)")
                     end)
                 end
             end
@@ -408,32 +396,113 @@ task.spawn(function()
             end
         end
 
-        -- 1. Auto Refill Air (Freeze + Instant Remote Refill)
+        -- 1. Auto Refill Air (Fast Teleport Refill)
         if hrp then
-            if _G_State.AutoRefill then
-                -- A. METODE FREEZE (Membekukan angka air lokal di Alat agar selalu 100%)
-                local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Watering Can") or LocalPlayer:FindFirstChild("Backpack") and LocalPlayer.Backpack:FindFirstChild("Watering Can")
-                if tool then
-                    pcall(function()
-                        for _, v in ipairs(tool:GetDescendants()) do
-                            if v:IsA("IntValue") or v:IsA("NumberValue") then
-                                local n = string.lower(v.Name)
-                                if string.find(n, "water") or string.find(n, "ammo") or string.find(n, "level") or string.find(n, "cap") or string.find(n, "max") then
-                                    if v.Value < 100 then v.Value = 9999 end
+            if _G_State.AutoRefill and (not _G_State.LastRefill or tick() - _G_State.LastRefill > 10) then
+                local closestWell = nil
+                local minDist = math.huge
+                for _, prompt in ipairs(workspace:GetDescendants()) do
+                    if prompt:IsA("ProximityPrompt") then
+                        local act = string.lower(prompt.ActionText or "")
+                        local obj = string.lower(prompt.ObjectText or "")
+                        local pName = string.lower(prompt.Parent and prompt.Parent.Name or "")
+                        
+                        -- Cek apakah ini sumur / tempat isi air
+                        if string.find(obj, "isi air") or string.find(act, "isi air") or string.find(pName, "sumur") or string.find(pName, "waterclaim") then
+                            local part = prompt.Parent
+                            if part then
+                                local pos = nil
+                                if part:IsA("BasePart") then pos = part.Position
+                                elseif part:IsA("Model") then pos = part:GetPivot().Position
+                                elseif part:IsA("Attachment") then pos = part.WorldPosition end
+                                
+                                if pos then
+                                    local dist = (pos - hrp.Position).Magnitude
+                                    if dist < minDist then
+                                        minDist = dist
+                                        closestWell = prompt
+                                    end
                                 end
                             end
                         end
-                        for name, val in pairs(tool:GetAttributes()) do
-                            local n = string.lower(name)
-                            if type(val) == "number" and (string.find(n, "water") or string.find(n, "ammo") or string.find(n, "cap") or string.find(n, "max")) then
-                                if val < 100 then tool:SetAttribute(name, 9999) end
-                            end
-                        end
-                    end)
+                    end
                 end
                 
-                -- B. METODE TELEPORT (Dihapus karena Metode Freeze / Infinite Water terbukti berhasil!)
-                -- Karakter tidak akan lagi teleport mondar-mandir ke sumur.
+                if closestWell then
+                    task.spawn(function()
+                        local char = LocalPlayer.Character
+                        local bp = LocalPlayer:FindFirstChild("Backpack")
+                        local part = closestWell.Parent
+                        local cf = nil
+                        if part:IsA("BasePart") then cf = part.CFrame
+                        elseif part:IsA("Model") then cf = part:GetPivot()
+                        elseif part:IsA("Attachment") then cf = CFrame.new(part.WorldPosition) end
+                        
+                        if not cf then return end
+                        
+                        -- Equip alat penyiram dulu
+                        if bp and char then
+                            for _, t in ipairs(bp:GetChildren()) do
+                                if t:IsA("Tool") and string.find(string.lower(t.Name), "water") then
+                                    t.Parent = char
+                                end
+                            end
+                        end
+                        task.wait(0.2)
+                        
+                        -- Teleport sekilas
+                        local originalCFrame = hrp.CFrame
+                        hrp.CFrame = cf + Vector3.new(0, 3, 0)
+                        task.wait(0.2)
+                        
+                        -- Tahan di sana sampai penuh (Maksimal 3 detik)
+                        local t = 0
+                        while t < 30 do
+                            local waterVal = 0
+                            local currentTool = char:FindFirstChild("Watering Can") or bp:FindFirstChild("Watering Can")
+                            if currentTool then
+                                for _, v in ipairs(currentTool:GetDescendants()) do
+                                    if (v:IsA("IntValue") or v:IsA("NumberValue")) and string.find(string.lower(v.Name), "water") then
+                                        waterVal = v.Value
+                                    end
+                                end
+                            end
+                            if waterVal >= 100 then break end
+                            
+                            closestWell.RequiresLineOfSight = false
+                            if fireproximityprompt then fireproximityprompt(closestWell) end
+                            task.wait(0.1)
+                            t = t + 1
+                        end
+                        
+                        hrp.CFrame = originalCFrame
+                        logAction("Auto Refill", true, "Isi air jarak jauh selesai (Penuh)!")
+                    end)
+                    
+                    _G_State.LastRefill = tick()
+                    task.wait(0.5) -- Beri jeda
+                end
+            end
+            
+            -- X. AURA SIRAM (Memperbesar area jangkauan siraman)
+            local toolHand = hrp.Parent and hrp.Parent:FindFirstChild("Watering Can")
+            if toolHand then
+                pcall(function()
+                    for _, v in ipairs(toolHand:GetDescendants()) do
+                        if v:IsA("NumberValue") or v:IsA("IntValue") then
+                            local n = string.lower(v.Name)
+                            if string.find(n, "range") or string.find(n, "radius") or string.find(n, "area") or string.find(n, "distance") then
+                                if v.Value < 150 then v.Value = 150 end
+                            end
+                        end
+                    end
+                    for name, val in pairs(toolHand:GetAttributes()) do
+                        local n = string.lower(name)
+                        if type(val) == "number" and (string.find(n, "range") or string.find(n, "radius") or string.find(n, "area") or string.find(n, "distance")) then
+                            if val < 150 then toolHand:SetAttribute(name, 150) end
+                        end
+                    end
+                end)
             end
             
             -- B. Auto Collect Barang
@@ -535,6 +604,19 @@ task.spawn(function()
                 if #targets > 0 then
                     task.spawn(function()
                         local target = targets[math.random(1, #targets)]
+                        local isAdminStand = _G_State.AdminStand and _G_State.BantuTargets and #_G_State.BantuTargets > 0
+                        
+                        if isAdminStand then
+                            local firstTargetName = string.lower(_G_State.BantuTargets[1])
+                            for _, t in ipairs(targets) do
+                                local pName = string.lower(t.Parent.Name)
+                                if pName == firstTargetName or string.find(pName, firstTargetName) then
+                                    target = t
+                                    break
+                                end
+                            end
+                        end
+                        
                         local originalCFrame = hrp.CFrame
                         
                         -- Pegang Gembor
@@ -551,9 +633,13 @@ task.spawn(function()
                             if not toolHand then toolHand = char:FindFirstChild("Watering Can") end
                         end
                         
-                        -- Teleport sekilas ke tetangga (5 studs di atas kepala)
-                        hrp.CFrame = target.CFrame + Vector3.new(0, 5, 0)
-                        logAction("Bantu Siram", true, "Teleport ke tetangga: " .. target.Parent.Name)
+                        if not isAdminStand then
+                            -- Teleport sekilas ke tetangga (5 studs di atas kepala)
+                            hrp.CFrame = target.CFrame + Vector3.new(0, 5, 0)
+                            logAction("Bantu Siram", true, "Teleport ke tetangga: " .. target.Parent.Name)
+                        else
+                            logAction("Bantu Siram", true, "Menyiram dari atas kepala: " .. target.Parent.Name)
+                        end
                         
                         -- Siram cepat 3 kali
                         for i = 1, 3 do
@@ -566,8 +652,10 @@ task.spawn(function()
                             task.wait(0.3)
                         end
                         
-                        -- Pulang
-                        hrp.CFrame = originalCFrame
+                        -- Pulang jika tidak sedang admin stand
+                        if not isAdminStand then
+                            hrp.CFrame = originalCFrame
+                        end
                     end)
                 end
             end
@@ -707,10 +795,50 @@ TabFarm:Toggle({
     Callback = function(state) _G_State.AutoBantuSiram = state; logAction("Menu -> Auto Bantu Siram", true, state and "AKTIF" or "MATI") end
 })
 
+TabFarm:Toggle({
+    Title = "Admin Stand (Nempel di Kepala)",
+    Desc = "Mengikuti dan melayang di atas kepala target siram pertamamu!",
+    Default = false,
+    Callback = function(state)
+        _G_State.AdminStand = state
+        
+        -- Matikan event lama jika ada
+        if _G.AdminStandConn then
+            _G.AdminStandConn:Disconnect()
+            _G.AdminStandConn = nil
+        end
+        
+        if state then
+            local rs = game:GetService("RunService")
+            _G.AdminStandConn = rs.Heartbeat:Connect(function()
+                if not _G_State.AdminStand then return end
+                if not _G_State.BantuTargets or #_G_State.BantuTargets == 0 then return end
+                
+                -- Ambil target pertama saja
+                local targetName = string.lower(_G_State.BantuTargets[1])
+                local p = nil
+                for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+                    if string.lower(player.Name) == targetName or string.lower(player.DisplayName) == targetName then
+                        p = player
+                        break
+                    end
+                end
+                
+                local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if p and myHrp and p.Character and p.Character:FindFirstChild("Head") then
+                    myHrp.CFrame = p.Character.Head.CFrame + Vector3.new(0, 4, 0)
+                    myHrp.Velocity = Vector3.new(0, 0, 0) -- Anti jatuh/terpeleset
+                end
+            end)
+        end
+        logAction("Menu -> Admin Stand", true, state and "AKTIF" or "MATI")
+    end
+})
+
 _G_State.BantuTargets = {}
 local PlayerSelectDropdown = TabFarm:Dropdown({
     Title = "Target Siram (Kosong = Semua)",
-    Desc = "Pilih pemain (Checkbox Multi-Select)",
+    Desc = "Pilih pemain (Target ke-1 jadi tumpangan Admin Stand)",
     Options = {"Memuat..."},
     Multi = true,
     Default = {},
