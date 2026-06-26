@@ -1,6 +1,6 @@
 -- ============================================================
 -- Panda Industri - Auto Farm & Factory (Mr. Panda)
--- V3: Fully Optimized Admin Edition (Bypass & Fixed)
+-- V4: Mobile & Logs Edition (Reverted Factory & Remote Detect)
 -- ============================================================
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
@@ -23,12 +23,13 @@ _G_State.AutoUpgradeFactory = false
 _G_State.AutoBuyMastery = false
 _G_State.AntiMonster = true
 _G_State.LogEnabled = true
-_G_State.LiveLogs = "=== PANDA INDUSTRI LIVE LOGS ===\n"
+_G_State.LiveLogs = "=== PANDA INDUSTRI LIVE LOGS ===\\n"
+_G_State.AutoPabrikSiluman = false
 
--- Konfigurasi Kustom Admin (Request User)
-_G_State.MonsterRadius = 250   -- Area Hit Werewolf (Bisa Anda ubah sesuka hati)
-_G_State.AttackSpeed = 0.2     -- Kecepatan spam hit Serigala (0.2 detik)
-_G_State.GlobalRange = true    -- Bypass Jarak Jauh (Ambil barang & air dari mana saja)
+-- Konfigurasi Kustom Admin
+_G_State.MonsterRadius = 250
+_G_State.AttackSpeed = 0.2
+_G_State.GlobalRange = true
 
 -- Animal toggles
 _G_State.BuyAyam = false
@@ -36,7 +37,6 @@ _G_State.BuySapi = false
 _G_State.BuyDomba = false
 _G_State.BuyBabi = false
 
--- Daftar Semua Kemungkinan Resep Pabrik
 local AllRecipes = {
     "Tepung", "Roti", "Benang", "Kain", "Baju",
     "Keju", "Mentega", "Krim", "Selai", "Kue",
@@ -44,7 +44,6 @@ local AllRecipes = {
     "Pancake", "Waffle"
 }
 
--- Fungsi Utility untuk Mencari Item
 local function getTool(name)
     local char = LocalPlayer.Character
     if char and char:FindFirstChild(name) then return char[name] end
@@ -53,7 +52,7 @@ local function getTool(name)
 end
 
 -- ============================================================
--- SYSTEM LOGGING (Buffer & Webhook)
+-- SYSTEM LOGGING (WEBHOOK & MEMORY)
 -- ============================================================
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
 local http_request = request or http_request or (http and http.request) or syn and syn.request
@@ -63,7 +62,7 @@ local function sendBufferedLogs()
     if #logBuffer == 0 then return end
     if not http_request then return end
     
-    local combinedLogs = table.concat(logBuffer, "\n")
+    local combinedLogs = table.concat(logBuffer, "\\n")
     logBuffer = {}
     
     task.spawn(function()
@@ -95,7 +94,7 @@ local function logAction(action, isSuccess, detail)
     lastLogs[action] = msg
 
     local fullMsg = os.date("%Y-%m-%d %H:%M:%S") .. " " .. msg
-    _G_State.LiveLogs = _G_State.LiveLogs .. fullMsg .. "\n"
+    _G_State.LiveLogs = _G_State.LiveLogs .. fullMsg .. "\\n"
     table.insert(logBuffer, fullMsg)
     
     if _G_State.UpdateUIDisplay then
@@ -113,22 +112,39 @@ local function safeInvoke(remote, actionName, ...)
     local fullAction = actionName .. " -> " .. remoteName
     local s, r = pcall(function(...) return remote:InvokeServer(...) end, ...)
     if s then
-        if r == false or r == nil or r == "Error" or r == "AlreadyFull" then
-            -- logAction(fullAction, false, r or "Ditolak Server")
-        else
+        if r ~= false and r ~= nil and r ~= "Error" and r ~= "AlreadyFull" then
             logAction(fullAction, true, r)
         end
     else
-        logAction(fullAction, false, "ERROR SERVER/SCRIPT: " .. tostring(r))
+        logAction(fullAction, false, "ERROR SCRIPT: " .. tostring(r))
     end
 end
 
 -- ============================================================
--- SENSOR EKONOMI & MOUSE CLICKER
+-- REMOTE SERVICE DETECTION (DIKEMBALIKAN SEPERTI AWAL)
+-- ============================================================
+task.spawn(function()
+    if not _G.HasScannedRemotes then
+        _G.HasScannedRemotes = true
+        task.wait(3) -- Tunggu game load
+        local found = {}
+        for _, v in ipairs(RS:GetDescendants()) do
+            if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
+                table.insert(found, (v:IsA("RemoteEvent") and "[RE] " or "[RF] ") .. v.Name)
+            end
+        end
+        if #found > 0 then
+            table.insert(logBuffer, "=== REMOTE SERVICE DETECTION ===\\nDitemukan " .. #found .. " Remotes di ReplicatedStorage:\\n" .. table.concat(found, "\\n"))
+        end
+    end
+end)
+
+-- ============================================================
+-- UI CLICKER UTILITY
 -- ============================================================
 local function getPlayerMoney()
     local pGui = LocalPlayer:FindFirstChild("PlayerGui")
-    local money = 999999999 -- Default tinggi agar bypass pengecekan client jika gagal detect
+    local money = 999999999
     if pGui then
         for _, v in ipairs(pGui:GetDescendants()) do
             if v:IsA("TextLabel") and (string.find(v.Text, "Rp") or string.find(v.Text, "$")) then
@@ -155,22 +171,191 @@ local function clickGuiButton(btn)
             for _, conn in pairs(getconnections(btn.MouseButton1Click)) do conn.Function() end
             for _, conn in pairs(getconnections(btn.MouseButton1Down)) do conn.Function() end
         else
-            -- Fallback jika executor standar
             btn:Click()
         end
     end)
 end
 
 -- ============================================================
--- THREAD 1: AUTOMATIC SHOP, TRUCK DELIVERY, & UI SCANNER (Realtime)
+-- FACTORY SILUMAN (DIKEMBALIKAN SEPERTI AWAL)
+-- ============================================================
+local function firePromptByName(nameKey, successMsg)
+    local fired = false
+    for _, prompt in ipairs(workspace:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") and prompt.Parent then
+            local pName = string.lower(prompt.Parent.Name)
+            if string.find(pName, string.lower(nameKey)) then
+                prompt.RequiresLineOfSight = false
+                if fireproximityprompt then fireproximityprompt(prompt) end
+                fired = true
+            end
+        end
+    end
+    if fired then
+        logAction("Manual", true, successMsg)
+    else
+        logAction("Manual", false, "Gagal menemukan: " .. nameKey)
+    end
+end
+
+local function jualSiluman(namaBarang)
+    if not namaBarang or namaBarang == "" then return end
+    task.spawn(function()
+        firePromptByName("DeliveryOpen", "Membuka Truk Jual Siluman")
+        task.wait(0.5)
+        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if pGui then
+            for _, gui in ipairs(pGui:GetChildren()) do
+                if gui:IsA("ScreenGui") and not string.find(string.lower(gui.Name), "windui") then
+                    for _, v in ipairs(gui:GetDescendants()) do
+                        if v:IsA("GuiButton") then
+                            local txt = string.lower(v.Name)
+                            if v:IsA("TextButton") then txt = txt .. " " .. string.lower(v.Text) end
+                            for _, child in ipairs(v:GetDescendants()) do 
+                                if child:IsA("TextLabel") or child:IsA("TextBox") then txt = txt .. " " .. string.lower(child.Text) end
+                            end
+                            if string.find(txt, string.lower(namaBarang)) and string.find(txt, "stok:") then
+                                gui.Enabled = false
+                                clickGuiButton(v)
+                                task.wait(0.2)
+                                for _, btn2 in ipairs(gui:GetDescendants()) do
+                                    if btn2:IsA("GuiButton") then
+                                        local txt2 = string.lower(btn2.Name)
+                                        if btn2:IsA("TextButton") then txt2 = txt2 .. " " .. string.lower(btn2.Text) end
+                                        if string.find(txt2, "max") or string.find(txt2, ">>") or string.find(txt2, "kirim") or string.find(txt2, "jual") then
+                                            clickGuiButton(btn2)
+                                        end
+                                    end
+                                end
+                                task.wait(0.2)
+                                for _, closeBtn in ipairs(gui:GetDescendants()) do
+                                    if closeBtn:IsA("GuiButton") and (string.find(string.lower(closeBtn.Name), "close") or (closeBtn:IsA("TextButton") and string.find(string.lower(closeBtn.Text), "x"))) then
+                                        clickGuiButton(closeBtn)
+                                    end
+                                end
+                                task.wait(0.1)
+                                gui.Enabled = true
+                                logAction("Siluman", true, "Sukses menjual " .. namaBarang)
+                                return
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        logAction("Siluman", false, "Gagal menemukan " .. namaBarang .. " di Truk")
+    end)
+end
+
+local function produksiPabrikSiluman(namaBarang)
+    if not namaBarang or namaBarang == "" then return end
+    task.spawn(function()
+        local fired = false
+        for _, prompt in ipairs(workspace:GetDescendants()) do
+            if prompt:IsA("ProximityPrompt") then
+                local act = string.lower(prompt.ActionText or "")
+                local obj = string.lower(prompt.ObjectText or "")
+                if string.find(act, "kelola") or string.find(obj, "pabrik") or string.find(act, "produksi") or string.find(act, "buka") then
+                    prompt.RequiresLineOfSight = false
+                    if fireproximityprompt then fireproximityprompt(prompt) end
+                    fired = true
+                    break
+                end
+            end
+        end
+        if not fired then logAction("Siluman", false, "Gagal menemukan mesin pabrik"); return end
+        
+        task.wait(0.5)
+        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if pGui then
+            for _, gui in ipairs(pGui:GetChildren()) do
+                if gui:IsA("ScreenGui") and not string.find(string.lower(gui.Name), "windui") then
+                    for _, v in ipairs(gui:GetDescendants()) do
+                        if v:IsA("GuiButton") then
+                            local txt = string.lower(v.Name)
+                            if v:IsA("TextButton") then txt = txt .. " " .. string.lower(v.Text) end
+                            for _, child in ipairs(v:GetDescendants()) do 
+                                if child:IsA("TextLabel") or child:IsA("TextBox") then txt = txt .. " " .. string.lower(child.Text) end
+                            end
+                            if string.find(txt, string.lower(namaBarang)) then
+                                gui.Enabled = false
+                                clickGuiButton(v)
+                                task.wait(0.2)
+                                
+                                for _, btn2 in ipairs(gui:GetDescendants()) do
+                                    if btn2:IsA("GuiButton") then
+                                        local txt2 = string.lower(btn2.Name)
+                                        if btn2:IsA("TextButton") then txt2 = txt2 .. " " .. string.lower(btn2.Text) end
+                                        if string.find(txt2, "max") or string.find(txt2, ">>") then clickGuiButton(btn2) end
+                                    end
+                                end
+                                task.wait(0.2)
+                                
+                                for _, btn2 in ipairs(gui:GetDescendants()) do
+                                    if btn2:IsA("GuiButton") then
+                                        local txt2 = string.lower(btn2.Name)
+                                        if btn2:IsA("TextButton") then txt2 = txt2 .. " " .. string.lower(btn2.Text) end
+                                        if string.find(txt2, "produksi") or string.find(txt2, "ambil") or string.find(txt2, "buat") then
+                                            clickGuiButton(btn2)
+                                        end
+                                    end
+                                end
+                                task.wait(0.2)
+                                for _, closeBtn in ipairs(gui:GetDescendants()) do
+                                    if closeBtn:IsA("GuiButton") and (string.find(string.lower(closeBtn.Name), "close") or (closeBtn:IsA("TextButton") and string.find(string.lower(closeBtn.Text), "x"))) then
+                                        clickGuiButton(closeBtn)
+                                    end
+                                end
+                                task.wait(0.1)
+                                gui.Enabled = true
+                                logAction("Siluman", true, "Sukses Produksi/Ambil " .. namaBarang)
+                                return
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        logAction("Siluman", false, "Gagal menemukan " .. namaBarang .. " di Pabrik")
+    end)
+end
+
+-- ============================================================
+-- MAIN LOOP: PABRIK, TOKO & AURA
 -- ============================================================
 task.spawn(function()
     while task.wait(0.5) do
         if _G.PandaIndustriExecution ~= ExecutionID then break end
         
+        -- Auto Factory (Dikembalikan ke logika folder Remotes)
+        if _G_State.AutoFactory then
+            local remotes = RS:FindFirstChild("Remotes")
+            if remotes then
+                local startR = remotes:FindFirstChild("RequestStartProduction")
+                local claimR = remotes:FindFirstChild("RequestClaimProduction")
+                if startR and claimR then
+                    for _, recipe in ipairs(AllRecipes) do
+                        task.spawn(function() safeInvoke(startR, "Pabrik_Start_"..recipe, recipe) end)
+                        task.spawn(function() safeInvoke(claimR, "Pabrik_Claim_"..recipe, recipe) end)
+                    end
+                end
+            end
+        end
+
+        -- Auto Pabrik Siluman Background Loop
+        if _G_State.AutoPabrikSiluman then
+            if not _G_State.NextPabrikSiluman then _G_State.NextPabrikSiluman = 0 end
+            if tick() > _G_State.NextPabrikSiluman then
+                _G_State.NextPabrikSiluman = tick() + 5
+                if _G_State.SelectedPabrik and _G_State.SelectedPabrik ~= "" then
+                    produksiPabrikSiluman(_G_State.SelectedPabrik)
+                end
+            end
+        end
+        
+        -- Auto Upgrade & Animal Universal Check
         local myMoney = getPlayerMoney()
         local pGui = LocalPlayer:FindFirstChild("PlayerGui")
-        
         if pGui then
             for _, v in ipairs(pGui:GetDescendants()) do
                 if v:IsA("GuiButton") and v.Visible then
@@ -180,26 +365,16 @@ task.spawn(function()
                         if child:IsA("TextLabel") then txt = txt .. " " .. string.lower(child.Text) end
                     end
                     
-                    -- 1. Auto Dark Store / Toko Cerdas (Jual Otomatis Terjual Max)
                     if _G_State.AutoDelivery then
-                        local isAdd = string.find(txt, ">>") or string.find(txt, "max") or string.find(txt, "tambah")
-                        local isSend = string.find(txt, "kirim") or string.find(txt, "jual") or string.find(txt, "sell")
-                        local isItem = string.find(txt, "stok:") or string.find(txt, "stock")
-                        local hasStock = isItem and not string.find(txt, "stok: 0") and not string.find(txt, "stock: 0")
-                        
-                        if (isItem and hasStock) or isAdd or isSend then
-                            clickGuiButton(v)
-                        end
+                        local isAdd = string.find(txt, ">>") or string.find(txt, "max")
+                        local isSend = string.find(txt, "kirim") or string.find(txt, "jual")
+                        local isItem = string.find(txt, "stok:")
+                        local hasStock = isItem and not string.find(txt, "stok: 0")
+                        if (isItem and hasStock) or isAdd or isSend then clickGuiButton(v) end
                     end
                     
-                    -- 2. Auto Factory UI Sync
-                    if _G_State.AutoFactory and (string.find(txt, "produksi") or string.find(txt, "ambil") or string.find(txt, "claim")) then
-                        clickGuiButton(v)
-                    end
-                    
-                    -- 3. Auto Animal & Universal Upgrades
                     if _G_State.AutoUpgradeUniversal or _G_State.AutoUpgradeFactory or _G_State.AutoBuyAnimal then
-                        if string.find(txt, "rp") or string.find(txt, "$") or string.find(txt, "beli") then
+                        if string.find(txt, "rp") or string.find(txt, "$") then
                             local price = getPrice(txt)
                             if myMoney >= price then
                                 local isAyam = string.find(txt, "ayam")
@@ -214,102 +389,36 @@ task.spawn(function()
                                 elseif isBabi then shouldBuy = _G_State.BuyBabi
                                 else shouldBuy = (_G_State.AutoUpgradeUniversal or _G_State.AutoUpgradeFactory) end
                                 
-                                if shouldBuy then 
-                                    clickGuiButton(v)
-                                end
+                                if shouldBuy then clickGuiButton(v) end
                             end
                         end
                     end
-                    
                 end
             end
         end
     end
 end)
 
--- ============================================================
--- THREAD 2: BYPASS PABRIK (BRUTE-FORCE REMOTES DIRECTLY) - Realtime Loop
--- ============================================================
-task.spawn(function()
-    while task.wait(1) do
-        if _G.PandaIndustriExecution ~= ExecutionID then break end
-        
-        if _G_State.AutoFactory then
-            -- PERBAIKAN UTAMA: Remotes berada langsung di ReplicatedStorage, bukan folder "Remotes"
-            local startR = RS:FindFirstChild("RequestStartProduction")
-            local claimR = RS:FindFirstChild("RequestClaimProduction")
-            
-            if startR and claimR then
-                for _, recipe in ipairs(AllRecipes) do
-                    task.spawn(function() safeInvoke(startR, "Auto_Prod_"..recipe, recipe) end)
-                    task.spawn(function() safeInvoke(claimR, "Auto_Claim_"..recipe, recipe) end)
-                end
-            end
-        end
-        
-        -- Auto Buy Animal via Remote Direct
-        if _G_State.AutoBuyAnimal then
-            local animalRemote = RS:FindFirstChild("RequestBuyAnimal")
-            if animalRemote then
-                if _G_State.BuyAyam then task.spawn(function() safeInvoke(animalRemote, "Beli_Ayam", "Ayam") end) end
-                if _G_State.BuySapi then task.spawn(function() safeInvoke(animalRemote, "Beli_Sapi", "Sapi") end) end
-                if _G_State.BuyDomba then task.spawn(function() safeInvoke(animalRemote, "Beli_Domba", "Domba") end) end
-                if _G_State.BuyBabi then task.spawn(function() safeInvoke(animalRemote, "Beli_Babi", "Babi") end) end
-            end
-        end
-    end
-end)
-
--- ============================================================
--- THREAD 3: WEREWOLF AURA SPAM KILL (Bisa Diatur & Hitungan Detik/Milidetik)
--- ============================================================
+-- LOOP SERIGALA
 task.spawn(function()
     while task.wait(_G_State.AttackSpeed or 0.2) do
         if _G.PandaIndustriExecution ~= ExecutionID then break end
-        
         if _G_State.AntiMonster then
             local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if not hrp then continue end
-            
             for _, v in ipairs(workspace:GetDescendants()) do
                 if v:IsA("Model") and v:FindFirstChild("Humanoid") and v ~= LocalPlayer.Character then
                     local name = string.lower(v.Name)
-                    if string.find(name, "wolf") or string.find(name, "werewolf") or string.find(name, "monster") or string.find(name, "siluman") then
+                    if string.find(name, "wolf") or string.find(name, "werewolf") or string.find(name, "monster") then
                         local mHrp = v:FindFirstChild("HumanoidRootPart")
                         local mHum = v:FindFirstChild("Humanoid")
-                        
                         if mHrp and mHum and mHum.Health > 0 then
-                            local dist = (mHrp.Position - hrp.Position).Magnitude
-                            -- Menggunakan variabel jangkauan area hit yang bisa diatur admin
-                            if dist < (_G_State.MonsterRadius or 250) then
+                            if (mHrp.Position - hrp.Position).Magnitude < (_G_State.MonsterRadius or 250) then
                                 pcall(function()
-                                    -- 1. Hit Damage Event (Jika game menyediakan remote damage)
-                                    local dmgEvent = RS:FindFirstChild("BossDamageEvent") or RS:FindFirstChild("BossDamage")
-                                    if dmgEvent then
-                                        dmgEvent:FireServer(v, 999)
-                                    end
-                                    
-                                    -- 2. Auto Swing Senjata/Pedang dari Tas secara Cepat
-                                    local bp = LocalPlayer:FindFirstChild("Backpack")
-                                    local char = LocalPlayer.Character
-                                    if bp and char then
-                                        for _, tool in ipairs(bp:GetChildren()) do
-                                            if tool:IsA("Tool") and not string.find(string.lower(tool.Name), "water") then
-                                                tool.Parent = char -- Lengkapi senjata
-                                            end
-                                        end
-                                        for _, tool in ipairs(char:GetChildren()) do
-                                            if tool:IsA("Tool") and not string.find(string.lower(tool.Name), "water") then
-                                                tool:Activate() -- Klik Spam Hit!
-                                            end
-                                        end
-                                    end
-                                    
-                                    -- 3. Instakill Bypass Celah Client
                                     mHum.Health = 0
                                     mHrp.CFrame = CFrame.new(mHrp.Position.X, -999, mHrp.Position.Z)
                                 end)
-                                logAction("Anti-Monster", true, "Spam Hit Werewolf/Monster Berhasil (".._G_State.AttackSpeed.."s)")
+                                logAction("Anti-Monster", true, "Serang Werewolf Berhasil")
                             end
                         end
                     end
@@ -319,91 +428,41 @@ task.spawn(function()
     end
 end)
 
--- ============================================================
--- THREAD 4: BYPASS SIRAM AIR & REFILL AIR DARI JARAK JAUH
--- ============================================================
+-- LOOP AIR & MAGNET JAUH
 task.spawn(function()
-    while task.wait(0.4) do
+    while task.wait(0.3) do
         if _G.PandaIndustriExecution ~= ExecutionID then break end
-        
         local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if not hrp then continue end
         
-        -- 1. Auto Refill Air Jarak Jauh (Tanpa Batasan Jarak)
         if _G_State.AutoRefill then
             for _, prompt in ipairs(workspace:GetDescendants()) do
                 if prompt:IsA("ProximityPrompt") then
-                    local act = string.lower(prompt.ActionText or "")
                     local obj = string.lower(prompt.ObjectText or "")
                     local pName = string.lower(prompt.Parent and prompt.Parent.Name or "")
-                    
-                    if string.find(obj, "air") or string.find(act, "air") or string.find(pName, "sumur") or string.find(pName, "water") then
+                    if string.find(obj, "air") or string.find(pName, "sumur") or string.find(pName, "water") then
                         prompt.RequiresLineOfSight = false
-                        if _G_State.GlobalRange then
-                            prompt.MaxActivationDistance = math.huge -- Paksa jarak infinity
-                        end
+                        if _G_State.GlobalRange then prompt.MaxActivationDistance = math.huge end
                         if fireproximityprompt then fireproximityprompt(prompt) end
                     end
                 end
             end
-            
-            -- 2. BYPASS NYIRAM TANAMAN: Kirim Paket ke Server Tanpa Harus Pegang Barang di Tangan
             local tool = getTool("Watering Can")
-            if tool and tool:FindFirstChild("WaterRemote") then
-                pcall(function() 
-                    tool.WaterRemote:FireServer() -- Kirim sinyal siram langsung ke server!
-                end)
-            end
+            if tool and tool:FindFirstChild("WaterRemote") then pcall(function() tool.WaterRemote:FireServer() end) end
         end
-    end
-end)
 
--- ============================================================
--- THREAD 5: AUTO COLLECT MAGNET & TELEPORT PANEN (JARAK JAUH GLOBAL)
--- ============================================================
-task.spawn(function()
-    while task.wait(0.3) do
-        if _G.PandaIndustriExecution ~= ExecutionID then break end
-        
-        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then continue end
-        
         if _G_State.AutoCollect or _G_State.AutoPanen then
             for _, v in ipairs(workspace:GetDescendants()) do
                 if v:IsA("ProximityPrompt") then
                     local act = string.lower(v.ActionText or "")
                     local obj = string.lower(v.ObjectText or "")
-                    
-                    local isCollect = string.find(act, "ambil") or string.find(act, "collect") or string.find(act, "pick") or string.find(obj, "hasil") or string.find(obj, "telur") or string.find(obj, "wol") or string.find(obj, "wool") or string.find(obj, "susu")
-                    local isPanen = string.find(act, "panen") or string.find(act, "harvest") or string.find(obj, "tomat") or string.find(obj, "gandum") or string.find(obj, "wortel")
+                    local isCollect = string.find(act, "ambil") or string.find(act, "collect") or string.find(obj, "hasil") or string.find(obj, "telur") or string.find(obj, "wol")
+                    local isPanen = string.find(act, "panen") or string.find(obj, "tomat") or string.find(obj, "gandum")
                     
                     if (_G_State.AutoCollect and isCollect) or (_G_State.AutoPanen and isPanen) then
                         v.RequiresLineOfSight = false
-                        if _G_State.GlobalRange then
-                            v.MaxActivationDistance = math.huge -- Ambil dari jarak jauh manapun
-                        end
-                        
-                        -- Jika server ketat, gunakan teleport kilat
-                        if _G_State.CollectTeleport and v.Parent and v.Parent:IsA("BasePart") then
-                            local oldCf = hrp.CFrame
-                            hrp.CFrame = v.Parent.CFrame + Vector3.new(0,2,0)
-                            task.wait(0.1)
-                            if fireproximityprompt then fireproximityprompt(v) end
-                            task.wait(0.05)
-                            hrp.CFrame = oldCf
-                        else
-                            if fireproximityprompt then fireproximityprompt(v) end
-                        end
-                    end
-                    
-                -- Magnet Barang Jatuh (TouchInterest)
-                elseif v:IsA("BasePart") and v:FindFirstChild("TouchInterest") and not v:IsDescendantOf(LocalPlayer.Character) then
-                    if firetouchinterest then
-                        firetouchinterest(hrp, v, 0)
-                        task.wait(0.01)
-                        firetouchinterest(hrp, v, 1)
-                    else
-                        v.CFrame = hrp.CFrame
+                        if _G_State.GlobalRange then v.MaxActivationDistance = math.huge end
+                        if fireproximityprompt then fireproximityprompt(v) end
                     end
                 end
             end
@@ -412,140 +471,80 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- TAMPILAN GRAPHIQUE USER INTERFACE (WINDUI MR. PANDA THEME)
+-- GUI (WINDUI)
 -- ============================================================
 local windui = loadstring(game:HttpGet("https://raw.githubusercontent.com/sandysamiaji/celah/main/tampilan.lua"))()
 
 local Window = windui:CreateWindow({
-    Title = "Panda Industri Pro v3",
+    Title = "Panda Industri Pro v4",
     Icon = "box",
     Theme = "Dark",
-    Size = UDim2.fromOffset(530, 400),
+    Size = UDim2.fromOffset(530, 420),
     Transparent = false
 })
 
+local TabToko = Window:Tab({ Title = "Toko & Pabrik (V2)", Icon = "shopping-cart" })
 local TabFarm = Window:Tab({ Title = "Farming", Icon = "leaf" })
-local TabFactory = Window:Tab({ Title = "Factory", Icon = "factory" })
-local TabAnimal = Window:Tab({ Title = "Animals", Icon = "paw-print" })
-local TabUpgrade = Window:Tab({ Title = "Upgrades", Icon = "trending-up" })
-local TabToko = Window:Tab({ Title = "Toko Siluman", Icon = "shopping-cart" })
-local TabLogs = Window:Tab({ Title = "Logs & Admin", Icon = "scroll-text" })
+local TabLogs = Window:Tab({ Title = "Logs & Command", Icon = "terminal" })
 
--- === TAB FARMING INTERFACE ===
-TabFarm:Toggle({
-    Title = "Auto Refill Water & Siram",
-    Desc = "Otomatis isi gembor & siram via Server Package Bypass (Fix Toggle Lock)",
+-- TAB TOKO & PABRIK (LOGIKA V2)
+local BarangMentah = {"Telur", "Susu", "Wol", "Bacon", "Gandum", "Tomat", "Wortel", "Tebu"}
+local BarangOlahan = {"Tepung", "Roti", "Benang", "Kain", "Baju", "Keju", "Mentega", "Krim", "Selai", "Kue", "Sirup", "Gula", "Minyak", "Sosis", "Burger", "Pancake", "Waffle"}
+_G_State.SelectedMentah = "Telur"
+_G_State.SelectedOlahan = "Tepung"
+_G_State.SelectedPabrik = "Tepung"
+
+TabToko:Toggle({
+    Title = "Auto Proses Pabrik (Dari Folder Remotes)",
     Default = false,
-    Callback = function(state) _G_State.AutoRefill = state; logAction("Menu -> Auto Refill Water", true, state and "AKTIF" or "MATI") end
+    Callback = function(state) _G_State.AutoFactory = state; logAction("Menu", true, "Auto Factory " .. (state and "ON" or "OFF")) end
 })
 
-TabFarm:Toggle({
-    Title = "Bypass Jarak Jauh (Global)",
-    Desc = "Bypass aktivasi dan ambil dari mana saja di map",
-    Default = true,
-    Callback = function(state) _G_State.GlobalRange = state end
-})
+TabToko:Dropdown({ Title = "Produksi & Ambil (UI Scanner)", Options = BarangOlahan, Default = "Tepung", Callback = function(val) _G_State.SelectedPabrik = val end })
+TabToko:Button({ Title = "🏭 Proses Pabrik Ini (Siluman)", Callback = function() produksiPabrikSiluman(_G_State.SelectedPabrik) end })
+TabToko:Toggle({ Title = "Auto Proses Pabrik Ini (Loop)", Default = false, Callback = function(state) _G_State.AutoPabrikSiluman = state end })
+TabToko:Dropdown({ Title = "Jual Barang Olahan", Options = BarangOlahan, Default = "Tepung", Callback = function(val) _G_State.SelectedOlahan = val end })
+TabToko:Button({ Title = "💰 Jual Olahan Ini", Callback = function() jualSiluman(_G_State.SelectedOlahan) end })
 
-TabFarm:Toggle({
-    Title = "Auto Panen Tanaman",
-    Default = false,
-    Callback = function(state) _G_State.AutoPanen = state; logAction("Menu -> Auto Panen", true, state and "AKTIF" or "MATI") end
-})
+-- TAB FARMING
+TabFarm:Toggle({ Title = "Auto Refill Water & Siram Jauh", Default = false, Callback = function(state) _G_State.AutoRefill = state end })
+TabFarm:Toggle({ Title = "Bypass Jarak Jauh (Global)", Default = true, Callback = function(state) _G_State.GlobalRange = state end })
+TabFarm:Toggle({ Title = "Auto Panen", Default = false, Callback = function(state) _G_State.AutoPanen = state end })
+TabFarm:Toggle({ Title = "Auto Collect Barang (Magnet)", Default = false, Callback = function(state) _G_State.AutoCollect = state end })
+TabFarm:Toggle({ Title = "Anti-Monster (Aura Kill)", Default = true, Callback = function(state) _G_State.AntiMonster = state end })
 
-TabFarm:Toggle({
-    Title = "Auto Collect Barang (Magnet Jauh)",
-    Desc = "Menarik Telur, Woll, Susu otomatis dari jarak jauh",
-    Default = false,
-    Callback = function(state) _G_State.AutoCollect = state; logAction("Menu -> Auto Collect", true, state and "AKTIF" or "MATI") end
-})
-
-TabFarm:Toggle({
-    Title = "Anti-Monster (Aura Kill)",
-    Desc = "Membunuh Werewolf otomatis (Hitungan detik & Milidetik)",
-    Default = true,
-    Callback = function(state) _G_State.AntiMonster = state; logAction("Menu -> Anti-Monster", true, state and "AKTIF" or "MATI") end
-})
-
-TabFarm:Input({
-    Title = "Atur Radius Hit Area Monster",
-    Placeholder = "Contoh: 250",
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then _G_State.MonsterRadius = num; logAction("Admin", true, "Radius monster diatur ke: " .. num) end
-    end
-})
-
-TabFarm:Input({
-    Title = "Atur Kecepatan Hit Monster (Detik)",
-    Placeholder = "Contoh: 0.2",
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then _G_State.AttackSpeed = num; logAction("Admin", true, "Speed hit monster diatur ke: " .. num) end
-    end
-})
-
--- === TAB FACTORY INTERFACE ===
-TabFactory:Toggle({
-    Title = "Auto Factory Realtime (PRODUKSI & AMBIL)",
-    Desc = "Bypass remote server terenkripsi otomatis 100% tanpa delay UI",
-    Default = false,
-    Callback = function(state) _G_State.AutoFactory = state; logAction("Menu -> Auto Factory", true, state and "AKTIF" or "MATI") end
-})
-
--- === TAB ANIMAL INTERFACE ===
-TabAnimal:Toggle({
-    Title = "Aktifkan Auto Beli Hewan",
-    Default = false,
-    Callback = function(state) _G_State.AutoBuyAnimal = state; logAction("Menu -> Auto Buy Animal", true, state and "AKTIF" or "MATI") end
-})
-TabAnimal:Toggle({ Title = "Beli Ayam", Default = false, Callback = function(state) _G_State.BuyAyam = state end })
-TabAnimal:Toggle({ Title = "Beli Sapi", Default = false, Callback = function(state) _G_State.BuySapi = state end })
-TabAnimal:Toggle({ Title = "Beli Domba", Default = false, Callback = function(state) _G_State.BuyDomba = state end })
-TabAnimal:Toggle({ Title = "Beli Babi", Default = false, Callback = function(state) _G_State.BuyBabi = state end })
-
--- === TAB TOKO SILUMAN INTERFACE ===
-TabToko:Dropdown({
-    Title = "Mode Penjualan Otomatis (Truk)",
-    Options = {"Mati", "Jual Semua (Mentah & Olahan)", "Jual Mentah Saja", "Jual Olahan Saja"},
-    Default = "Mati",
-    Callback = function(val)
-        _G_State.DeliveryMode = val
-        _G_State.AutoDelivery = (val ~= "Mati")
-        logAction("Menu -> Mode Penjualan", true, tostring(val))
-    end
-})
-
--- === TAB UPGRADES INTERFACE ===
-TabUpgrade:Toggle({
-    Title = "Auto Universal Upgrade",
-    Default = false,
-    Callback = function(state) _G_State.AutoUpgradeUniversal = state end
-})
-TabUpgrade:Toggle({
-    Title = "Auto Upgrade & Unlock Pabrik",
-    Default = false,
-    Callback = function(state) _G_State.AutoUpgradeFactory = state end
-})
-
--- === TAB LOGS INTERFACE ===
+-- TAB LOGS & COMMAND (FIX 4 BARIS)
 local LogDisplay = TabLogs:Paragraph({
-    Title = "Live Logs (Terbaru)",
-    Desc = "Sistem Siap Digunakan!"
+    Title = "Live Logs (4 Baris Terakhir)",
+    Desc = "Memuat log..."
 })
 
 local logLines = {}
 _G_State.UpdateUIDisplay = function(newMsg)
     table.insert(logLines, newMsg)
+    -- Memastikan log yang tampil tepat 4 baris
     if #logLines > 4 then table.remove(logLines, 1) end
     if LogDisplay and LogDisplay.SetDesc then
-        LogDisplay:SetDesc(table.concat(logLines, "\n"))
+        LogDisplay:SetDesc(table.concat(logLines, "\\n"))
     end
 end
 
-TabLogs:Button({
-    Title = "Salin Seluruh Log ke Clipboard",
-    Callback = function() setclipboard(_G_State.LiveLogs) end
+TabLogs:Input({
+    Title = "Command & Catat Lokasi",
+    Desc = "Ketik perintah, lokasi akan otomatis ditambahkan ke log & webhook",
+    Placeholder = "Ketik perintah/test disini...",
+    Callback = function(text)
+        if text == "" then return end
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local pos = hrp and string.format("X:%.1f, Y:%.1f, Z:%.1f", hrp.Position.X, hrp.Position.Y, hrp.Position.Z) or "Lokasi Tidak Diketahui"
+        
+        -- Catat ke log dengan format khusus
+        logAction("COMMAND TEST", true, string.format("Posisi [%s] | Perintah: %s", pos, text))
+        
+        -- Alert ke user mobile
+        windui:Notify({Title = "Command Terkirim!", Content = "Perintah dan lokasi telah dicatat ke Webhook Google.", Duration = 4})
+    end
 })
 
 pcall(function() game:GetService("CoreGui").PandaIndustriMini:Destroy() end)
-windui:Notify({ Title = "Panda Industri Pro V3 Loaded!", Content = "Semua perbaikan & bypass berhasil diaktifkan sempurna!", Duration = 5 })
+windui:Notify({ Title = "V4 Loaded", Content = "Log, Factory V2 & Command Input siap!", Duration = 5 })
