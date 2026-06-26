@@ -396,25 +396,43 @@ task.spawn(function()
             end
         end
 
-        -- 1. Auto Refill Air (Fast Teleport Refill)
-        if hrp then
-            if _G_State.AutoRefill and (not _G_State.LastRefill or tick() - _G_State.LastRefill > 5) then
-                -- Cek dulu isi airnya (Hanya isi jika habis / kurang dari 5)
-                local char = LocalPlayer.Character
-                local bp = LocalPlayer:FindFirstChild("Backpack")
-                local currentTool = char and char:FindFirstChild("Watering Can") or bp and bp:FindFirstChild("Watering Can")
-                local waterVal = 100 -- Default anggap penuh jika tool tak ditemukan
-                
-                if currentTool then
-                    for _, v in ipairs(currentTool:GetDescendants()) do
-                        if (v:IsA("IntValue") or v:IsA("NumberValue")) and string.find(string.lower(v.Name), "water") then
-                            waterVal = v.Value
+        -- Y. Auto Collect Barang (Magnet Jarak Jauh)
+        if _G_State.AutoCollect then
+            local char = LocalPlayer.Character
+            for _, v in ipairs(workspace:GetDescendants()) do
+                -- Mode 1: Proximity Prompt "Ambil"
+                if v:IsA("ProximityPrompt") then
+                    local act = string.lower(v.ActionText or "")
+                    local obj = string.lower(v.ObjectText or "")
+                    if string.find(act, "ambil") or string.find(act, "collect") or string.find(act, "pick") or string.find(obj, "hasil") or string.find(obj, "telur") or string.find(obj, "susu") or string.find(obj, "wol") or string.find(act, "pungut") then
+                        v.RequiresLineOfSight = false
+                        if fireproximityprompt then fireproximityprompt(v) end
+                    end
+                -- Mode 2: TouchInterest (Barang Jatuh)
+                elseif v:IsA("BasePart") and v:FindFirstChild("TouchInterest") and char and not v:IsDescendantOf(char) then
+                    -- Pastikan bukan ngambil part/senjata milik pemain lain
+                    local isPlayer = false
+                    for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+                        if p.Character and v:IsDescendantOf(p.Character) then isPlayer = true break end
+                    end
+                    if not isPlayer then
+                        if firetouchinterest then
+                            firetouchinterest(hrp, v, 0)
+                            task.wait(0.01)
+                            firetouchinterest(hrp, v, 1)
+                        else
+                            v.CFrame = hrp.CFrame -- Fallback jika script executor tidak support firetouchinterest
                         end
                     end
                 end
-                
-                if waterVal <= 5 then
-                    local closestWell = nil
+            end
+        end
+
+        -- 1. Auto Refill Air (Continuous Remote Refill)
+        if hrp then
+            if not _G_State.NextRefillDelay then _G_State.NextRefillDelay = 0 end
+            if _G_State.AutoRefill and (not _G_State.LastRefill or tick() - _G_State.LastRefill > _G_State.NextRefillDelay) then
+                local closestWell = nil
                 local minDist = math.huge
                 for _, prompt in ipairs(workspace:GetDescendants()) do
                     if prompt:IsA("ProximityPrompt") then
@@ -445,53 +463,13 @@ task.spawn(function()
                 
                 if closestWell then
                     task.spawn(function()
-                        local char = LocalPlayer.Character
-                        local bp = LocalPlayer:FindFirstChild("Backpack")
-                        local part = closestWell.Parent
-                        local cf = nil
-                        if part:IsA("BasePart") then cf = part.CFrame
-                        elseif part:IsA("Model") then cf = part:GetPivot()
-                        elseif part:IsA("Attachment") then cf = CFrame.new(part.WorldPosition) end
-                        
-                        if not cf then return end
-                        
-                        -- Equip alat penyiram dulu
-                        if bp and char then
-                            for _, t in ipairs(bp:GetChildren()) do
-                                if t:IsA("Tool") and string.find(string.lower(t.Name), "water") then
-                                    t.Parent = char
-                                end
-                            end
-                        end
-                        task.wait(0.2)
-                        
-                        -- Tembak Proximity Prompt Sumur dari Jarak Jauh (Tanpa Pindah!)
-                        local t = 0
-                        while t < 30 do
-                            local waterVal = 0
-                            local currentTool = char:FindFirstChild("Watering Can") or bp:FindFirstChild("Watering Can")
-                            if currentTool then
-                                for _, v in ipairs(currentTool:GetDescendants()) do
-                                    if (v:IsA("IntValue") or v:IsA("NumberValue")) and string.find(string.lower(v.Name), "water") then
-                                        waterVal = v.Value
-                                    end
-                                end
-                            end
-                            if waterVal >= 100 then break end
-                            
-                            closestWell.RequiresLineOfSight = false
-                            if fireproximityprompt then fireproximityprompt(closestWell) end
-                            task.wait(0.1)
-                            t = t + 1
-                        end
-                        
-                        logAction("Auto Refill", true, "Isi air jarak jauh selesai (Tanpa Pindah)!")
+                        closestWell.RequiresLineOfSight = false
+                        if fireproximityprompt then fireproximityprompt(closestWell) end
                     end)
                     
                     _G_State.LastRefill = tick()
-                    task.wait(0.5) -- Beri jeda
+                    _G_State.NextRefillDelay = math.random(5, 8) / 10 -- Delay acak 0.5 s/d 0.8 detik
                 end
-                end -- Penutup if waterVal <= 5
             end
             
             -- X. AURA SIRAM (Memperbesar area jangkauan siraman)
@@ -774,6 +752,73 @@ end)
 -- ============================================================
 -- UI Setup (WindUI Mr. Panda Theme)
 -- ============================================================
+local function firePromptByName(nameKey, successMsg)
+    local fired = false
+    for _, prompt in ipairs(workspace:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") and prompt.Parent then
+            local pName = string.lower(prompt.Parent.Name)
+            if string.find(pName, string.lower(nameKey)) then
+                prompt.RequiresLineOfSight = false
+                if fireproximityprompt then fireproximityprompt(prompt) end
+                fired = true
+            end
+        end
+    end
+    if fired then
+        logAction("Manual", true, successMsg)
+    else
+        logAction("Manual", false, "Gagal menemukan: " .. nameKey .. " (Pastikan map sudah ter-render)")
+    end
+end
+
+local function jualSiluman(namaBarang)
+    if not namaBarang or namaBarang == "" then return end
+    task.spawn(function()
+        firePromptByName("DeliveryOpen", "Membuka Truk Jual Siluman")
+        task.wait(0.5)
+        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if pGui then
+            for _, gui in ipairs(pGui:GetChildren()) do
+                if gui:IsA("ScreenGui") and not string.find(string.lower(gui.Name), "windui") and not string.find(string.lower(gui.Name), "panda") then
+                    for _, v in ipairs(gui:GetDescendants()) do
+                        if v:IsA("GuiButton") then
+                            local txt = string.lower(v.Name)
+                            if v:IsA("TextButton") then txt = txt .. " " .. string.lower(v.Text) end
+                            for _, child in ipairs(v:GetDescendants()) do 
+                                if child:IsA("TextLabel") or child:IsA("TextBox") then txt = txt .. " " .. string.lower(child.Text) end
+                            end
+                            if string.find(txt, string.lower(namaBarang)) and string.find(txt, "stok:") then
+                                gui.Enabled = false
+                                clickGuiButton(v)
+                                task.wait(0.2)
+                                for _, btn2 in ipairs(gui:GetDescendants()) do
+                                    if btn2:IsA("GuiButton") then
+                                        local txt2 = string.lower(btn2.Name)
+                                        if btn2:IsA("TextButton") then txt2 = txt2 .. " " .. string.lower(btn2.Text) end
+                                        if string.find(txt2, "max") or string.find(txt2, ">>") or string.find(txt2, "kirim") or string.find(txt2, "jual") then
+                                            clickGuiButton(btn2)
+                                        end
+                                    end
+                                end
+                                task.wait(0.2)
+                                for _, closeBtn in ipairs(gui:GetDescendants()) do
+                                    if closeBtn:IsA("GuiButton") and (string.find(string.lower(closeBtn.Name), "close") or (closeBtn:IsA("TextButton") and string.find(string.lower(closeBtn.Text), "x"))) then
+                                        clickGuiButton(closeBtn)
+                                    end
+                                end
+                                task.wait(0.1)
+                                gui.Enabled = true
+                                logAction("Siluman", true, "Sukses menjual " .. namaBarang .. " secara ghaib!")
+                                return
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        logAction("Siluman", false, "Gagal menemukan " .. namaBarang .. " di Truk")
+    end)
+end
 local windui = loadstring(game:HttpGet("https://raw.githubusercontent.com/sandysamiaji/celah/main/tampilan.lua"))()
 
 local Window = windui:CreateWindow({
@@ -789,6 +834,7 @@ local TabFactory = Window:Tab({ Title = "Factory", Icon = "factory" })
 local TabAnimal = Window:Tab({ Title = "Animals", Icon = "paw-print" })
 local TabUpgrade = Window:Tab({ Title = "Upgrades", Icon = "trending-up" })
 local TabLogs = Window:Tab({ Title = "Logs", Icon = "scroll-text" })
+local TabToko = Window:Tab({ Title = "Toko Siluman", Icon = "shopping-cart" })
 
 -- === TAB FARMING ===
 TabFarm:Toggle({
@@ -890,21 +936,8 @@ TabFarm:Dropdown({
 })
 
 TabFarm:Button({
-    Title = "Buka UI Truk Jual (Jarak Jauh)",
-    Callback = function()
-        for _, prompt in ipairs(workspace:GetDescendants()) do
-            if prompt:IsA("ProximityPrompt") then
-                local act = string.lower(prompt.ActionText or "")
-                local pName = string.lower(prompt.Parent and prompt.Parent.Name or "")
-                if string.find(act, "jual") or string.find(act, "kirim") or string.find(pName, "jual") then
-                    prompt.RequiresLineOfSight = false
-                    if fireproximityprompt then fireproximityprompt(prompt) end
-                    logAction("Manual", true, "Membuka UI Truk Jual secara remote")
-                    break
-                end
-            end
-        end
-    end
+    Title = "Buka Truk Jual (Jarak Jauh)",
+    Callback = function() firePromptByName("DeliveryOpen", "Membuka Truk Pengiriman secara remote") end
 })
 
 TabFarm:Toggle({
@@ -930,8 +963,10 @@ TabFactory:Toggle({
 })
 
 TabFactory:Button({
-    Title = "Buka UI Pabrik (Jarak Jauh)",
+    Title = "Buka Mesin Pabrik (Jarak Jauh)",
     Callback = function()
+        -- Karena Pabrik memiliki banyak prompt "Factory", kita gunakan loop lama yang lebih general
+        local fired = false
         for _, prompt in ipairs(workspace:GetDescendants()) do
             if prompt:IsA("ProximityPrompt") then
                 local act = string.lower(prompt.ActionText or "")
@@ -939,11 +974,12 @@ TabFactory:Button({
                 if string.find(act, "kelola") or string.find(obj, "pabrik") or string.find(act, "produksi") or string.find(act, "buka") then
                     prompt.RequiresLineOfSight = false
                     if fireproximityprompt then fireproximityprompt(prompt) end
-                    logAction("Manual", true, "Membuka UI Pabrik secara remote")
+                    fired = true
                     break
                 end
             end
         end
+        if fired then logAction("Manual", true, "Membuka UI Pabrik secara remote") end
     end
 })
 
@@ -959,7 +995,42 @@ TabAnimal:Toggle({ Title = "Beli Sapi", Default = false, Callback = function(sta
 TabAnimal:Toggle({ Title = "Beli Domba", Default = false, Callback = function(state) _G_State.BuyDomba = state; logAction("Menu -> Beli Domba", true, state and "AKTIF" or "MATI") end })
 TabAnimal:Toggle({ Title = "Beli Babi", Default = false, Callback = function(state) _G_State.BuyBabi = state; logAction("Menu -> Beli Babi", true, state and "AKTIF" or "MATI") end })
 
--- === TAB UPGRADE ===
+-- === TAB TOKO SILUMAN ===
+local BarangMentah = {"Telur", "Susu", "Wol", "Bacon", "Gandum", "Tomat", "Wortel", "Tebu"}
+local BarangOlahan = {"Tepung", "Roti", "Benang", "Kain", "Baju", "Keju", "Mentega", "Krim", "Selai", "Kue", "Sirup", "Gula", "Minyak", "Sosis", "Burger", "Pancake", "Waffle"}
+
+TabToko:Dropdown({
+    Title = "Jual Barang Mentah",
+    Desc = "Pilih hasil tani/hewan mentah",
+    Options = BarangMentah,
+    Default = "Telur",
+    Callback = function(val) _G_State.SelectedMentah = val end
+})
+TabToko:Button({
+    Title = "💰 Jual Semua Mentah Ini (Siluman)",
+    Callback = function() jualSiluman(_G_State.SelectedMentah) end
+})
+
+TabToko:Dropdown({
+    Title = "Jual Barang Olahan",
+    Desc = "Pilih hasil dari mesin pabrik",
+    Options = BarangOlahan,
+    Default = "Roti",
+    Callback = function(val) _G_State.SelectedOlahan = val end
+})
+TabToko:Button({
+    Title = "💰 Jual Semua Olahan Ini (Siluman)",
+    Callback = function() jualSiluman(_G_State.SelectedOlahan) end
+})
+
+-- === TAB UPGRADE & TOKO ===
+TabUpgrade:Button({Title = "🛒 Buka Toko Utama (Shop)", Callback = function() firePromptByName("OpenShop", "Membuka Toko Utama") end})
+TabUpgrade:Button({Title = "🎩 Buka Toko Skin (Alat)", Callback = function() firePromptByName("OpenSkinShop", "Membuka Toko Alat/Skin") end})
+TabUpgrade:Button({Title = "🎒 Buka Upgrade Gudang (Barn)", Callback = function() firePromptByName("UpgradeBarn", "Membuka Upgrade Gudang") end})
+TabUpgrade:Button({Title = "🚚 Buka Upgrade Truk (Delivery)", Callback = function() firePromptByName("UpgradeDelivery", "Membuka Upgrade Truk") end})
+TabUpgrade:Button({Title = "💧 Buka Upgrade Sumur (Well)", Callback = function() firePromptByName("UpgradeWell", "Membuka Upgrade Sumur") end})
+TabUpgrade:Button({Title = "⭐ Buka Skill Mastery", Callback = function() firePromptByName("OpenMastery", "Membuka UI Mastery") end})
+
 TabUpgrade:Toggle({
     Title = "Auto Universal Upgrade",
     Desc = "Otomatis membeli upgrade seperti Tas, Kecepatan, Air",
