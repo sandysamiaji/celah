@@ -474,26 +474,12 @@ task.spawn(function()
                 
                 if closestWell then
                     task.spawn(function()
-                        local part = closestWell.Parent
-                        local cf = nil
-                        if part:IsA("BasePart") then cf = part.CFrame
-                        elseif part:IsA("Model") then cf = part:GetPivot()
-                        elseif part:IsA("Attachment") then cf = CFrame.new(part.WorldPosition) end
-                        
-                        if cf then
-                            local oldCf = hrp.CFrame
-                            -- Teleport super cepat bolak-balik karena server mengecek jarak Sumur
-                            hrp.CFrame = cf + Vector3.new(0, 3, 0)
-                            task.wait(0.1)
-                            closestWell.RequiresLineOfSight = false
-                            if fireproximityprompt then fireproximityprompt(closestWell) end
-                            task.wait(0.1)
-                            hrp.CFrame = oldCf
-                        end
+                        closestWell.RequiresLineOfSight = false
+                        if fireproximityprompt then fireproximityprompt(closestWell) end
                     end)
                     
                     _G_State.LastRefill = tick()
-                    _G_State.NextRefillDelay = math.random(8, 15) / 10 -- Delay acak 0.8 s/d 1.5 detik agar tidak spam teleport
+                    _G_State.NextRefillDelay = math.random(5, 8) / 10 -- Delay acak 0.5 s/d 0.8 detik
                 end
             end
             
@@ -516,40 +502,6 @@ task.spawn(function()
                         end
                     end
                 end)
-            end
-            
-            -- B. Auto Collect Barang
-            if _G_State.AutoCollect then
-                if not _G_State.CollectedItems then _G_State.CollectedItems = {} end
-                
-                for _, prompt in ipairs(workspace:GetDescendants()) do
-                    if prompt:IsA("ProximityPrompt") then
-                        -- PASTIKAN HANYA BARANG DI DEKAT PEMAIN (Radius 150)
-                        if (prompt.Parent.Position - hrp.Position).Magnitude > 150 then continue end
-                        
-                        local act = prompt.ActionText or ""
-                        local obj = prompt.ObjectText or ""
-                        if act == "Ambil" and not string.find(obj, "Isi Air") then
-                            if not _G_State.CollectedItems[prompt] then
-                                _G_State.CollectedItems[prompt] = true
-                                pcall(function()
-                                    local pos = prompt.Parent.Position
-                                    hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 1.5, 0)
-                                    task.wait(0.4) -- Jeda aman pendaftaran posisi
-                                    prompt.RequiresLineOfSight = false
-                                    if fireproximityprompt then fireproximityprompt(prompt) end
-                                    logAction("Auto Collect -> ProximityPrompt", true, string.format("Ambil %s di X:%.0f", obj, pos.X))
-                                end)
-                                break -- HANYA AMBIL 1! Sisa telur diambil di loop selanjutnya (0.5 detik kemudian)
-                            end
-                        end
-                    end
-                end
-                
-                -- Bersihkan memory (anti-lag)
-                for p, _ in pairs(_G_State.CollectedItems) do
-                    if typeof(p) ~= "Instance" or not p.Parent then _G_State.CollectedItems[p] = nil end
-                end
             end
         end
         
@@ -647,6 +599,42 @@ task.spawn(function()
                         end
                         
                         if not isAdminStand then
+                            -- Teleport khusus Pahlawan (Isi Air dulu dengan lambat)
+                            local closestWell = nil
+                            local minDist = math.huge
+                            for _, prompt in ipairs(workspace:GetDescendants()) do
+                                if prompt:IsA("ProximityPrompt") then
+                                    local act = string.lower(prompt.ActionText or "")
+                                    local obj = string.lower(prompt.ObjectText or "")
+                                    local pName = string.lower(prompt.Parent and prompt.Parent.Name or "")
+                                    if string.find(obj, "isi air") or string.find(act, "isi air") or string.find(pName, "sumur") or string.find(pName, "waterclaim") then
+                                        local pos = prompt.Parent and (prompt.Parent:IsA("BasePart") and prompt.Parent.Position or (prompt.Parent:IsA("Model") and prompt.Parent:GetPivot().Position))
+                                        if pos then
+                                            local dist = (pos - hrp.Position).Magnitude
+                                            if dist < minDist then
+                                                minDist = dist
+                                                closestWell = prompt
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+
+                            if closestWell then
+                                local wellPart = closestWell.Parent
+                                local cf = nil
+                                if wellPart:IsA("BasePart") then cf = wellPart.CFrame
+                                elseif wellPart:IsA("Model") then cf = wellPart:GetPivot() end
+                                
+                                if cf then
+                                    hrp.CFrame = cf + Vector3.new(0, 3, 0)
+                                    task.wait(0.6) -- Kasih jeda santai agar air benar-benar keambil
+                                    closestWell.RequiresLineOfSight = false
+                                    if fireproximityprompt then fireproximityprompt(closestWell) end
+                                    task.wait(0.4)
+                                end
+                            end
+                            
                             -- Teleport sekilas ke tetangga (5 studs di atas kepala)
                             hrp.CFrame = target.CFrame + Vector3.new(0, 5, 0)
                             logAction("Bantu Siram", true, "Teleport ke tetangga: " .. target.Parent.Name)
@@ -1061,24 +1049,55 @@ TabFarm:Button({
                 if char and eChar and char:FindFirstChild("HumanoidRootPart") and eChar:FindFirstChild("HumanoidRootPart") then
                     local myHrp = char.HumanoidRootPart
                     local eHrp = eChar.HumanoidRootPart
+                    local myHum = char:FindFirstChild("Humanoid")
                     local oldCf = myHrp.CFrame
                     
-                    local flingForce = Instance.new("BodyAngularVelocity")
-                    flingForce.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                    flingForce.AngularVelocity = Vector3.new(0, 99999, 0)
-                    flingForce.Parent = myHrp
+                    if myHum then myHum.Sit = false end
                     
-                    for i = 1, 20 do
-                        if eChar and eChar:FindFirstChild("HumanoidRootPart") then
-                            myHrp.CFrame = eChar.HumanoidRootPart.CFrame
-                            myHrp.Velocity = Vector3.new(0, 0, 0)
+                    -- Buat dorongan Fling yang stabil (menggunakan BodyThrust dan pergerakan CFrame yang sangat presisi)
+                    local thrust = Instance.new("BodyThrust")
+                    thrust.Location = Vector3.new(0,0,0)
+                    thrust.Force = Vector3.new(9999, 9999, 9999)
+                    thrust.Parent = myHrp
+                    
+                    local bav = Instance.new("BodyAngularVelocity")
+                    bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                    bav.AngularVelocity = Vector3.new(0, 99999, 0)
+                    bav.Parent = myHrp
+                    
+                    -- Anti Fall-Damage & No-Clip saat menabrak
+                    for _, v in ipairs(char:GetDescendants()) do
+                        if v:IsA("BasePart") then
+                            v.CanCollide = false
+                            v.CustomPhysicalProperties = PhysicalProperties.new(50, 0, 0, 0, 0)
                         end
-                        task.wait(0.05)
                     end
                     
-                    if flingForce then flingForce:Destroy() end
-                    myHrp.CFrame = oldCf
+                    -- Serang target selama 1 detik
+                    for i = 1, 30 do
+                        if eChar and eChar:FindFirstChild("HumanoidRootPart") and char and char:FindFirstChild("HumanoidRootPart") then
+                            -- Posisikan diri sedikit di dalam dan di bawah musuh agar terlempar ke atas
+                            myHrp.CFrame = eChar.HumanoidRootPart.CFrame * CFrame.new(0, -0.5, 0)
+                        end
+                        task.wait(0.03)
+                    end
+                    
+                    -- Bersihkan Fling & Kembalikan ke posisi awal
+                    if thrust then thrust:Destroy() end
+                    if bav then bav:Destroy() end
+                    
+                    for _, v in ipairs(char:GetDescendants()) do
+                        if v:IsA("BasePart") then
+                            v.CanCollide = true
+                            v.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1) -- Standard Roblox
+                        end
+                    end
+                    
+                    task.wait(0.1)
                     myHrp.Velocity = Vector3.new(0,0,0)
+                    myHrp.RotVelocity = Vector3.new(0,0,0)
+                    myHrp.CFrame = oldCf
+                    
                     logAction("Admin", true, "Crash/Fling selesai dikirim ke " .. p.Name)
                 end
             end)
