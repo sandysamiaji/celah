@@ -8,6 +8,9 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 -- Variabel Toggle
+local ExecutionID = tick()
+_G.PandaIndustriExecution = ExecutionID
+
 local _G_State = {}
 _G_State.AutoRefill = false
 _G_State.AutoDelivery = false
@@ -164,6 +167,8 @@ end
 
 task.spawn(function()
     while task.wait(2) do
+        if _G.PandaIndustriExecution ~= ExecutionID then break end
+        
         local myMoney = getPlayerMoney()
         
         -- Siklus Tab Delivery (Smart Sales)
@@ -263,6 +268,8 @@ end)
 -- ============================================================
 task.spawn(function()
     while task.wait(0.5) do
+        if _G.PandaIndustriExecution ~= ExecutionID then break end
+        
         local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if not hrp then continue end
         
@@ -425,76 +432,8 @@ task.spawn(function()
                     end)
                 end
                 
-                -- B. METODE TELEPORT (Jika Server memaksa habis, ini akan mengisi ulang)
-                if not _G_State.LastRefill or tick() - _G_State.LastRefill > 2 then
-                    local closestWell = nil
-                    local minDist = math.huge
-                    for _, prompt in ipairs(workspace:GetDescendants()) do
-                        if prompt:IsA("ProximityPrompt") then
-                            local act = string.lower(prompt.ActionText or "")
-                            local obj = string.lower(prompt.ObjectText or "")
-                            local pName = string.lower(prompt.Parent and prompt.Parent.Name or "")
-                            
-                            -- Cek apakah ini sumur / tempat isi air
-                            if string.find(obj, "isi air") or string.find(act, "isi air") or string.find(pName, "sumur") or string.find(pName, "waterclaim") then
-                                local part = prompt.Parent
-                                if part then
-                                    local pos = nil
-                                    if part:IsA("BasePart") then pos = part.Position
-                                    elseif part:IsA("Model") then pos = part:GetPivot().Position
-                                    elseif part:IsA("Attachment") then pos = part.WorldPosition end
-                                    
-                                    if pos then
-                                        local dist = (pos - hrp.Position).Magnitude
-                                        if dist < minDist then
-                                            minDist = dist
-                                            closestWell = prompt
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    
-                    if closestWell then
-                        task.spawn(function()
-                            local char = LocalPlayer.Character
-                            local bp = LocalPlayer:FindFirstChild("Backpack")
-                            local part = closestWell.Parent
-                            local cf = nil
-                            if part:IsA("BasePart") then cf = part.CFrame
-                            elseif part:IsA("Model") then cf = part:GetPivot()
-                            elseif part:IsA("Attachment") then cf = CFrame.new(part.WorldPosition) end
-                            
-                            if not cf then return end
-                            
-                            -- Equip alat penyiram dulu
-                            if bp and char then
-                                for _, t in ipairs(bp:GetChildren()) do
-                                    if t:IsA("Tool") and string.find(string.lower(t.Name), "water") then
-                                        t.Parent = char
-                                    end
-                                end
-                            end
-                            task.wait(0.2)
-                            
-                            -- Teleport sekilas lalu balik!
-                            local originalCFrame = hrp.CFrame
-                            hrp.CFrame = cf + Vector3.new(0, 3, 0)
-                            task.wait(0.1)
-                            
-                            closestWell.RequiresLineOfSight = false
-                            if fireproximityprompt then fireproximityprompt(closestWell) end
-                            
-                            task.wait(0.1)
-                            hrp.CFrame = originalCFrame
-                            logAction("Auto Refill", true, "Isi air jarak jauh berhasil!")
-                        end)
-                        
-                        _G_State.LastRefill = tick()
-                        task.wait(0.5) -- Beri jeda
-                    end
-                end
+                -- B. METODE TELEPORT (Dihapus karena Metode Freeze / Infinite Water terbukti berhasil!)
+                -- Karakter tidak akan lagi teleport mondar-mandir ke sumur.
             end
             
             -- B. Auto Collect Barang
@@ -574,7 +513,22 @@ task.spawn(function()
                 local targets = {}
                 for _, p in ipairs(players) do
                     if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        table.insert(targets, p.Character.HumanoidRootPart)
+                        -- Filter Target (Jika daftar kosong, maka siram semua)
+                        local isTarget = false
+                        if not _G_State.BantuTargets or #_G_State.BantuTargets == 0 then
+                            isTarget = true
+                        else
+                            for _, t in ipairs(_G_State.BantuTargets) do
+                                if string.lower(p.Name) == string.lower(t) or string.lower(p.DisplayName) == string.lower(t) then
+                                    isTarget = true
+                                    break
+                                end
+                            end
+                        end
+                        
+                        if isTarget then
+                            table.insert(targets, p.Character.HumanoidRootPart)
+                        end
                     end
                 end
                 
@@ -751,6 +705,37 @@ TabFarm:Toggle({
     Desc = "Teleport keliling ke pemain lain & menyiram lahan mereka",
     Default = false,
     Callback = function(state) _G_State.AutoBantuSiram = state; logAction("Menu -> Auto Bantu Siram", true, state and "AKTIF" or "MATI") end
+})
+
+_G_State.BantuTargets = {}
+local PlayerSelectDropdown = TabFarm:Dropdown({
+    Title = "Target Siram (Kosong = Semua)",
+    Desc = "Pilih pemain (Checkbox Multi-Select)",
+    Options = {"Memuat..."},
+    Multi = true,
+    Default = {},
+    Callback = function(val)
+        if type(val) == "table" then
+            _G_State.BantuTargets = val
+        elseif type(val) == "string" then
+            _G_State.BantuTargets = {val}
+        else
+            _G_State.BantuTargets = {}
+        end
+    end
+})
+
+TabFarm:Button({
+    Title = "Refresh Daftar Pemain",
+    Callback = function()
+        local list = {}
+        for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+            if p ~= LocalPlayer then table.insert(list, p.Name) end
+        end
+        if PlayerSelectDropdown and PlayerSelectDropdown.Refresh then
+            PlayerSelectDropdown:Refresh(list)
+        end
+    end
 })
 
 TabFarm:Dropdown({
