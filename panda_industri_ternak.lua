@@ -398,8 +398,23 @@ task.spawn(function()
 
         -- 1. Auto Refill Air (Fast Teleport Refill)
         if hrp then
-            if _G_State.AutoRefill and (not _G_State.LastRefill or tick() - _G_State.LastRefill > 10) then
-                local closestWell = nil
+            if _G_State.AutoRefill and (not _G_State.LastRefill or tick() - _G_State.LastRefill > 5) then
+                -- Cek dulu isi airnya (Hanya isi jika habis / kurang dari 5)
+                local char = LocalPlayer.Character
+                local bp = LocalPlayer:FindFirstChild("Backpack")
+                local currentTool = char and char:FindFirstChild("Watering Can") or bp and bp:FindFirstChild("Watering Can")
+                local waterVal = 100 -- Default anggap penuh jika tool tak ditemukan
+                
+                if currentTool then
+                    for _, v in ipairs(currentTool:GetDescendants()) do
+                        if (v:IsA("IntValue") or v:IsA("NumberValue")) and string.find(string.lower(v.Name), "water") then
+                            waterVal = v.Value
+                        end
+                    end
+                end
+                
+                if waterVal <= 5 then
+                    local closestWell = nil
                 local minDist = math.huge
                 for _, prompt in ipairs(workspace:GetDescendants()) do
                     if prompt:IsA("ProximityPrompt") then
@@ -450,12 +465,7 @@ task.spawn(function()
                         end
                         task.wait(0.2)
                         
-                        -- Teleport sekilas
-                        local originalCFrame = hrp.CFrame
-                        hrp.CFrame = cf + Vector3.new(0, 3, 0)
-                        task.wait(0.2)
-                        
-                        -- Tahan di sana sampai penuh (Maksimal 3 detik)
+                        -- Tembak Proximity Prompt Sumur dari Jarak Jauh (Tanpa Pindah!)
                         local t = 0
                         while t < 30 do
                             local waterVal = 0
@@ -475,13 +485,13 @@ task.spawn(function()
                             t = t + 1
                         end
                         
-                        hrp.CFrame = originalCFrame
-                        logAction("Auto Refill", true, "Isi air jarak jauh selesai (Penuh)!")
+                        logAction("Auto Refill", true, "Isi air jarak jauh selesai (Tanpa Pindah)!")
                     end)
                     
                     _G_State.LastRefill = tick()
                     task.wait(0.5) -- Beri jeda
                 end
+                end -- Penutup if waterVal <= 5
             end
             
             -- X. AURA SIRAM (Memperbesar area jangkauan siraman)
@@ -872,9 +882,28 @@ TabFarm:Dropdown({
     Options = {"Mati", "Jual Semua (Mentah & Olahan)", "Jual Mentah Saja", "Jual Olahan Saja"},
     Default = "Mati",
     Callback = function(val)
-        _G_State.DeliveryMode = val
-        _G_State.AutoDelivery = (val ~= "Mati")
-        logAction("Menu -> Mode Penjualan", true, val)
+        local mode = val or "Mati"
+        _G_State.DeliveryMode = mode
+        _G_State.AutoDelivery = (mode ~= "Mati")
+        logAction("Menu -> Mode Penjualan", true, tostring(mode))
+    end
+})
+
+TabFarm:Button({
+    Title = "Buka UI Truk Jual (Jarak Jauh)",
+    Callback = function()
+        for _, prompt in ipairs(workspace:GetDescendants()) do
+            if prompt:IsA("ProximityPrompt") then
+                local act = string.lower(prompt.ActionText or "")
+                local pName = string.lower(prompt.Parent and prompt.Parent.Name or "")
+                if string.find(act, "jual") or string.find(act, "kirim") or string.find(pName, "jual") then
+                    prompt.RequiresLineOfSight = false
+                    if fireproximityprompt then fireproximityprompt(prompt) end
+                    logAction("Manual", true, "Membuka UI Truk Jual secara remote")
+                    break
+                end
+            end
+        end
     end
 })
 
@@ -898,6 +927,24 @@ TabFactory:Toggle({
     Desc = "Otomatis memproses & mengambil hasil dari SEMUA mesin sekaligus",
     Default = false,
     Callback = function(state) _G_State.AutoFactory = state; logAction("Menu -> Auto Factory", true, state and "AKTIF" or "MATI") end
+})
+
+TabFactory:Button({
+    Title = "Buka UI Pabrik (Jarak Jauh)",
+    Callback = function()
+        for _, prompt in ipairs(workspace:GetDescendants()) do
+            if prompt:IsA("ProximityPrompt") then
+                local act = string.lower(prompt.ActionText or "")
+                local obj = string.lower(prompt.ObjectText or "")
+                if string.find(act, "kelola") or string.find(obj, "pabrik") or string.find(act, "produksi") or string.find(act, "buka") then
+                    prompt.RequiresLineOfSight = false
+                    if fireproximityprompt then fireproximityprompt(prompt) end
+                    logAction("Manual", true, "Membuka UI Pabrik secara remote")
+                    break
+                end
+            end
+        end
+    end
 })
 
 -- === TAB ANIMAL ===
