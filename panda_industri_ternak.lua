@@ -275,44 +275,89 @@ task.spawn(function()
             
             -- 1. Kunjungi Pabrik (Jika Aktif)
             if _G_State.AutoFactory then
+                local closestFactory = nil
+                local minDist = math.huge
                 for _, prompt in ipairs(workspace:GetDescendants()) do
-                    if prompt:IsA("ProximityPrompt") and (prompt.Parent.Position - hrp.Position).Magnitude < 200 then
-                        local act = string.lower(prompt.ActionText or "")
-                        local obj = string.lower(prompt.ObjectText or "")
-                        -- Mencari menu "Kelola" atau "Pabrik"
-                        if string.find(act, "kelola") or string.find(obj, "pabrik") or string.find(act, "produksi") or string.find(act, "buka") then
-                            pcall(function()
-                                hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
-                                prompt.RequiresLineOfSight = false
-                                if fireproximityprompt then fireproximityprompt(prompt) end
-                                task.wait(2) -- Berdiam diri 2 detik agar UI Clicker sempat menekan tombol Produksi & Ambil
-                            end)
-                            logAction("Patroli Mesin", true, "Berjalan ke Pabrik untuk Produksi/Ambil!")
+                    if prompt:IsA("ProximityPrompt") then
+                        local part = prompt.Parent
+                        if part then
+                            local pos = nil
+                            if part:IsA("BasePart") then pos = part.Position
+                            elseif part:IsA("Model") then pos = part:GetPivot().Position
+                            elseif part:IsA("Attachment") then pos = part.WorldPosition end
+                            
+                            if pos then
+                                local dist = (pos - hrp.Position).Magnitude
+                                if dist < minDist then
+                                    local act = string.lower(prompt.ActionText or "")
+                                    local obj = string.lower(prompt.ObjectText or "")
+                                    if string.find(act, "kelola") or string.find(obj, "pabrik") or string.find(act, "produksi") or string.find(act, "buka") then
+                                        minDist = dist
+                                        closestFactory = prompt
+                                    end
+                                end
+                            end
                         end
                     end
+                end
+                
+                if closestFactory then
+                    task.spawn(function()
+                        local originalCFrame = hrp.CFrame
+                        local part = closestFactory.Parent
+                        local cf = part:IsA("Model") and part:GetPivot() or part.CFrame
+                        hrp.CFrame = cf + Vector3.new(0, 3, 0)
+                        closestFactory.RequiresLineOfSight = false
+                        if fireproximityprompt then fireproximityprompt(closestFactory) end
+                        logAction("Patroli Mesin", true, "Ke Pabrik (Berdiam 2 detik untuk UI Clicker)")
+                        task.wait(2)
+                        hrp.CFrame = originalCFrame
+                    end)
+                    task.wait(2.5) -- Beri jeda antar patroli
                 end
             end
             
             -- 2. Kunjungi Pengiriman (Jika Aktif)
             if _G_State.AutoDelivery then
+                local closestTruck = nil
+                local minDist = math.huge
                 for _, prompt in ipairs(workspace:GetDescendants()) do
-                    if prompt:IsA("ProximityPrompt") and (prompt.Parent.Position - hrp.Position).Magnitude < 200 then
-                        local act = string.lower(prompt.ActionText or "")
-                        if string.find(act, "jual") or string.find(act, "kirim") or string.find(string.lower(prompt.Parent.Name), "jual") then
-                            pcall(function()
-                                hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
-                                prompt.RequiresLineOfSight = false
-                                if fireproximityprompt then fireproximityprompt(prompt) end
-                                task.wait(4) -- Berdiam 4 detik agar UI Clicker sempat menggilir Tab Olahan & Mentah
-                            end)
-                            logAction("Patroli Penjualan", true, "Berjalan ke Truk Pengiriman untuk Dijual!")
+                    if prompt:IsA("ProximityPrompt") then
+                        local part = prompt.Parent
+                        if part then
+                            local pos = nil
+                            if part:IsA("BasePart") then pos = part.Position
+                            elseif part:IsA("Model") then pos = part:GetPivot().Position
+                            elseif part:IsA("Attachment") then pos = part.WorldPosition end
+                            
+                            if pos then
+                                local dist = (pos - hrp.Position).Magnitude
+                                if dist < minDist then
+                                    local act = string.lower(prompt.ActionText or "")
+                                    if string.find(act, "jual") or string.find(act, "kirim") or string.find(string.lower(part.Name), "jual") then
+                                        minDist = dist
+                                        closestTruck = prompt
+                                    end
+                                end
+                            end
                         end
                     end
                 end
+                
+                if closestTruck then
+                    task.spawn(function()
+                        local originalCFrame = hrp.CFrame
+                        local part = closestTruck.Parent
+                        local cf = part:IsA("Model") and part:GetPivot() or part.CFrame
+                        hrp.CFrame = cf + Vector3.new(0, 3, 0)
+                        closestTruck.RequiresLineOfSight = false
+                        if fireproximityprompt then fireproximityprompt(closestTruck) end
+                        logAction("Patroli Penjualan", true, "Ke Truk Pengiriman (Berdiam 3 detik untuk UI Clicker)")
+                        task.wait(3)
+                        hrp.CFrame = originalCFrame
+                    end)
+                end
             end
-            
-            -- Kembalikan posisi awal atau lanjut mungut agar tidak bengong
-            task.wait(0.5)
         end
         
         -- Z. Anti Monster (Werewolf Aura Kill)
@@ -356,62 +401,99 @@ task.spawn(function()
             end
         end
 
-        -- 1. Auto Refill Air (Instant Remote Refill)
+        -- 1. Auto Refill Air (Freeze + Instant Remote Refill)
         if hrp then
-            if _G_State.AutoRefill and (not _G_State.LastRefill or tick() - _G_State.LastRefill > 2) then
-                local closestWell = nil
-                local minDist = math.huge
-                for _, prompt in ipairs(workspace:GetDescendants()) do
-                    if prompt:IsA("ProximityPrompt") then
-                        local act = prompt.ActionText or ""
-                        local obj = prompt.ObjectText or ""
-                        local pName = prompt.Parent and prompt.Parent.Name or ""
-                        
-                        -- Cek apakah ini sumur / tempat isi air
-                        if string.find(obj, "Isi Air") or string.find(act, "Isi Air") or string.find(pName, "Sumur") or string.find(pName, "WaterClaim") then
-                            local part = prompt.Parent
-                            if part and part:IsA("BasePart") then
-                                local dist = (part.Position - hrp.Position).Magnitude
-                                if dist < minDist then
-                                    minDist = dist
-                                    closestWell = prompt
+            if _G_State.AutoRefill then
+                -- A. METODE FREEZE (Membekukan angka air lokal di Alat agar selalu 100%)
+                local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Watering Can") or LocalPlayer:FindFirstChild("Backpack") and LocalPlayer.Backpack:FindFirstChild("Watering Can")
+                if tool then
+                    pcall(function()
+                        for _, v in ipairs(tool:GetDescendants()) do
+                            if v:IsA("IntValue") or v:IsA("NumberValue") then
+                                local n = string.lower(v.Name)
+                                if string.find(n, "water") or string.find(n, "ammo") or string.find(n, "level") or string.find(n, "cap") or string.find(n, "max") then
+                                    if v.Value < 100 then v.Value = 9999 end
+                                end
+                            end
+                        end
+                        for name, val in pairs(tool:GetAttributes()) do
+                            local n = string.lower(name)
+                            if type(val) == "number" and (string.find(n, "water") or string.find(n, "ammo") or string.find(n, "cap") or string.find(n, "max")) then
+                                if val < 100 then tool:SetAttribute(name, 9999) end
+                            end
+                        end
+                    end)
+                end
+                
+                -- B. METODE TELEPORT (Jika Server memaksa habis, ini akan mengisi ulang)
+                if not _G_State.LastRefill or tick() - _G_State.LastRefill > 2 then
+                    local closestWell = nil
+                    local minDist = math.huge
+                    for _, prompt in ipairs(workspace:GetDescendants()) do
+                        if prompt:IsA("ProximityPrompt") then
+                            local act = string.lower(prompt.ActionText or "")
+                            local obj = string.lower(prompt.ObjectText or "")
+                            local pName = string.lower(prompt.Parent and prompt.Parent.Name or "")
+                            
+                            -- Cek apakah ini sumur / tempat isi air
+                            if string.find(obj, "isi air") or string.find(act, "isi air") or string.find(pName, "sumur") or string.find(pName, "waterclaim") then
+                                local part = prompt.Parent
+                                if part then
+                                    local pos = nil
+                                    if part:IsA("BasePart") then pos = part.Position
+                                    elseif part:IsA("Model") then pos = part:GetPivot().Position
+                                    elseif part:IsA("Attachment") then pos = part.WorldPosition end
+                                    
+                                    if pos then
+                                        local dist = (pos - hrp.Position).Magnitude
+                                        if dist < minDist then
+                                            minDist = dist
+                                            closestWell = prompt
+                                        end
+                                    end
                                 end
                             end
                         end
                     end
-                end
-                
-                if closestWell then
-                    task.spawn(function()
-                        local char = LocalPlayer.Character
-                        local bp = LocalPlayer:FindFirstChild("Backpack")
-                        local part = closestWell.Parent
-                        
-                        -- Equip alat penyiram dulu
-                        if bp and char then
-                            for _, tool in ipairs(bp:GetChildren()) do
-                                if tool:IsA("Tool") and string.find(string.lower(tool.Name), "water") then
-                                    tool.Parent = char
+                    
+                    if closestWell then
+                        task.spawn(function()
+                            local char = LocalPlayer.Character
+                            local bp = LocalPlayer:FindFirstChild("Backpack")
+                            local part = closestWell.Parent
+                            local cf = nil
+                            if part:IsA("BasePart") then cf = part.CFrame
+                            elseif part:IsA("Model") then cf = part:GetPivot()
+                            elseif part:IsA("Attachment") then cf = CFrame.new(part.WorldPosition) end
+                            
+                            if not cf then return end
+                            
+                            -- Equip alat penyiram dulu
+                            if bp and char then
+                                for _, t in ipairs(bp:GetChildren()) do
+                                    if t:IsA("Tool") and string.find(string.lower(t.Name), "water") then
+                                        t.Parent = char
+                                    end
                                 end
                             end
-                        end
-                        task.wait(0.2)
+                            task.wait(0.2)
+                            
+                            -- Teleport sekilas lalu balik!
+                            local originalCFrame = hrp.CFrame
+                            hrp.CFrame = cf + Vector3.new(0, 3, 0)
+                            task.wait(0.1)
+                            
+                            closestWell.RequiresLineOfSight = false
+                            if fireproximityprompt then fireproximityprompt(closestWell) end
+                            
+                            task.wait(0.1)
+                            hrp.CFrame = originalCFrame
+                            logAction("Auto Refill", true, "Isi air jarak jauh berhasil!")
+                        end)
                         
-                        -- Teleport sekilas lalu balik!
-                        local originalCFrame = hrp.CFrame
-                        hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
-                        task.wait(0.1)
-                        
-                        closestWell.RequiresLineOfSight = false
-                        if fireproximityprompt then fireproximityprompt(closestWell) end
-                        
-                        task.wait(0.1)
-                        hrp.CFrame = originalCFrame
-                        logAction("Auto Refill", true, "Isi air jarak jauh berhasil!")
-                    end)
-                    
-                    _G_State.LastRefill = tick()
-                    task.wait(0.5) -- Beri jeda
+                        _G_State.LastRefill = tick()
+                        task.wait(0.5) -- Beri jeda
+                    end
                 end
             end
             
