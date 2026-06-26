@@ -428,6 +428,17 @@ task.spawn(function()
             end
         end
 
+        -- W. Auto Pabrik Siluman (Setiap 5 detik)
+        if _G_State.AutoPabrikSiluman then
+            if not _G_State.NextPabrikSiluman then _G_State.NextPabrikSiluman = 0 end
+            if tick() > _G_State.NextPabrikSiluman then
+                _G_State.NextPabrikSiluman = tick() + 5
+                if _G_State.SelectedPabrik and _G_State.SelectedPabrik ~= "" then
+                    produksiPabrikSiluman(_G_State.SelectedPabrik)
+                end
+            end
+        end
+
         -- 1. Auto Refill Air (Continuous Remote Refill)
         if hrp then
             if not _G_State.NextRefillDelay then _G_State.NextRefillDelay = 0 end
@@ -463,12 +474,26 @@ task.spawn(function()
                 
                 if closestWell then
                     task.spawn(function()
-                        closestWell.RequiresLineOfSight = false
-                        if fireproximityprompt then fireproximityprompt(closestWell) end
+                        local part = closestWell.Parent
+                        local cf = nil
+                        if part:IsA("BasePart") then cf = part.CFrame
+                        elseif part:IsA("Model") then cf = part:GetPivot()
+                        elseif part:IsA("Attachment") then cf = CFrame.new(part.WorldPosition) end
+                        
+                        if cf then
+                            local oldCf = hrp.CFrame
+                            -- Teleport super cepat bolak-balik karena server mengecek jarak Sumur
+                            hrp.CFrame = cf + Vector3.new(0, 3, 0)
+                            task.wait(0.1)
+                            closestWell.RequiresLineOfSight = false
+                            if fireproximityprompt then fireproximityprompt(closestWell) end
+                            task.wait(0.1)
+                            hrp.CFrame = oldCf
+                        end
                     end)
                     
                     _G_State.LastRefill = tick()
-                    _G_State.NextRefillDelay = math.random(5, 8) / 10 -- Delay acak 0.5 s/d 0.8 detik
+                    _G_State.NextRefillDelay = math.random(8, 15) / 10 -- Delay acak 0.8 s/d 1.5 detik agar tidak spam teleport
                 end
             end
             
@@ -819,6 +844,84 @@ local function jualSiluman(namaBarang)
         logAction("Siluman", false, "Gagal menemukan " .. namaBarang .. " di Truk")
     end)
 end
+
+local function produksiPabrikSiluman(namaBarang)
+    if not namaBarang or namaBarang == "" then return end
+    task.spawn(function()
+        local fired = false
+        for _, prompt in ipairs(workspace:GetDescendants()) do
+            if prompt:IsA("ProximityPrompt") then
+                local act = string.lower(prompt.ActionText or "")
+                local obj = string.lower(prompt.ObjectText or "")
+                if string.find(act, "kelola") or string.find(obj, "pabrik") or string.find(act, "produksi") or string.find(act, "buka") then
+                    prompt.RequiresLineOfSight = false
+                    if fireproximityprompt then fireproximityprompt(prompt) end
+                    fired = true
+                    break
+                end
+            end
+        end
+        if not fired then logAction("Siluman", false, "Gagal menemukan mesin pabrik") return end
+        
+        task.wait(0.5)
+        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if pGui then
+            for _, gui in ipairs(pGui:GetChildren()) do
+                if gui:IsA("ScreenGui") and not string.find(string.lower(gui.Name), "windui") and not string.find(string.lower(gui.Name), "panda") then
+                    for _, v in ipairs(gui:GetDescendants()) do
+                        if v:IsA("GuiButton") then
+                            local txt = string.lower(v.Name)
+                            if v:IsA("TextButton") then txt = txt .. " " .. string.lower(v.Text) end
+                            for _, child in ipairs(v:GetDescendants()) do 
+                                if child:IsA("TextLabel") or child:IsA("TextBox") then txt = txt .. " " .. string.lower(child.Text) end
+                            end
+                            if string.find(txt, string.lower(namaBarang)) then
+                                gui.Enabled = false
+                                clickGuiButton(v)
+                                task.wait(0.2)
+                                
+                                -- 1. Klik Max / >> terlebih dahulu
+                                for _, btn2 in ipairs(gui:GetDescendants()) do
+                                    if btn2:IsA("GuiButton") then
+                                        local txt2 = string.lower(btn2.Name)
+                                        if btn2:IsA("TextButton") then txt2 = txt2 .. " " .. string.lower(btn2.Text) end
+                                        if string.find(txt2, "max") or string.find(txt2, ">>") then
+                                            clickGuiButton(btn2)
+                                        end
+                                    end
+                                end
+                                task.wait(0.2)
+                                
+                                -- 2. Klik Produksi / Ambil
+                                for _, btn2 in ipairs(gui:GetDescendants()) do
+                                    if btn2:IsA("GuiButton") then
+                                        local txt2 = string.lower(btn2.Name)
+                                        if btn2:IsA("TextButton") then txt2 = txt2 .. " " .. string.lower(btn2.Text) end
+                                        if string.find(txt2, "produksi") or string.find(txt2, "ambil") or string.find(txt2, "buat") then
+                                            clickGuiButton(btn2)
+                                        end
+                                    end
+                                end
+                                task.wait(0.2)
+                                for _, closeBtn in ipairs(gui:GetDescendants()) do
+                                    if closeBtn:IsA("GuiButton") and (string.find(string.lower(closeBtn.Name), "close") or (closeBtn:IsA("TextButton") and string.find(string.lower(closeBtn.Text), "x"))) then
+                                        clickGuiButton(closeBtn)
+                                    end
+                                end
+                                task.wait(0.1)
+                                gui.Enabled = true
+                                logAction("Siluman", true, "Sukses Produksi/Ambil " .. namaBarang .. " secara ghaib!")
+                                return
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        logAction("Siluman", false, "Gagal menemukan " .. namaBarang .. " di Pabrik")
+    end)
+end
+
 local windui = loadstring(game:HttpGet("https://raw.githubusercontent.com/sandysamiaji/celah/main/tampilan.lua"))()
 
 local Window = windui:CreateWindow({
@@ -922,6 +1025,69 @@ TabFarm:Button({
     end
 })
 
+TabFarm:Button({
+    Title = "⚔️ Kick/Crash Target (Troll)",
+    Callback = function()
+        local targetName = _G_State.BantuTargets and _G_State.BantuTargets[1]
+        if not targetName or targetName == "" then
+            logAction("Admin", false, "Pilih target pemain di dropdown atas terlebih dahulu!")
+            return
+        end
+        
+        local p = nil
+        for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+            if string.lower(player.Name) == string.lower(targetName) or string.lower(player.DisplayName) == string.lower(targetName) then
+                p = player
+                break
+            end
+        end
+        
+        if p then
+            logAction("Admin", true, "Mencoba menendang/mem-fling " .. p.Name)
+            task.spawn(function()
+                -- 1. Coba Admin Remote Server (Jika ada celah keamanan)
+                local rs = game:GetService("ReplicatedStorage")
+                local admin = rs:FindFirstChild("AdminRemote") or rs:FindFirstChild("Admin") or rs:FindFirstChild("ReportSubmitted")
+                if admin and admin:IsA("RemoteFunction") then
+                    pcall(function() admin:InvokeServer("Kick", p.Name, "Kicked by Panda Industri Pro") end)
+                    pcall(function() admin:InvokeServer("Ban", p.Name) end)
+                elseif admin and admin:IsA("RemoteEvent") then
+                    pcall(function() admin:FireServer("Kick", p.Name, "Kicked by Panda Industri Pro") end)
+                end
+                
+                -- 2. Physical Crash / Fling-Kill (Paling Ampuh)
+                local char = LocalPlayer.Character
+                local eChar = p.Character
+                if char and eChar and char:FindFirstChild("HumanoidRootPart") and eChar:FindFirstChild("HumanoidRootPart") then
+                    local myHrp = char.HumanoidRootPart
+                    local eHrp = eChar.HumanoidRootPart
+                    local oldCf = myHrp.CFrame
+                    
+                    local flingForce = Instance.new("BodyAngularVelocity")
+                    flingForce.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                    flingForce.AngularVelocity = Vector3.new(0, 99999, 0)
+                    flingForce.Parent = myHrp
+                    
+                    for i = 1, 20 do
+                        if eChar and eChar:FindFirstChild("HumanoidRootPart") then
+                            myHrp.CFrame = eChar.HumanoidRootPart.CFrame
+                            myHrp.Velocity = Vector3.new(0, 0, 0)
+                        end
+                        task.wait(0.05)
+                    end
+                    
+                    if flingForce then flingForce:Destroy() end
+                    myHrp.CFrame = oldCf
+                    myHrp.Velocity = Vector3.new(0,0,0)
+                    logAction("Admin", true, "Crash/Fling selesai dikirim ke " .. p.Name)
+                end
+            end)
+        else
+            logAction("Admin", false, "Pemain tidak ditemukan/sudah keluar!")
+        end
+    end
+})
+
 TabFarm:Dropdown({
     Title = "Mode Penjualan (Truk Jual)",
     Desc = "Pilih kategori barang yang ingin dijual",
@@ -935,9 +1101,60 @@ TabFarm:Dropdown({
     end
 })
 
+local DeliveryList = {"Truk (Belum Dimuat)"}
+local DeliveryPrompts = {} -- Menyimpan referensi prompt asli
+
+local DeliveryDropdown = TabFarm:Dropdown({
+    Title = "Pilih Pengiriman (Scan Map)",
+    Desc = "Klik Refresh di bawah jika kosong",
+    Options = DeliveryList,
+    Default = "Truk (Belum Dimuat)",
+    Callback = function(val) _G_State.SelectedDeliveryUI = val end
+})
+
 TabFarm:Button({
-    Title = "Buka Truk Jual (Jarak Jauh)",
-    Callback = function() firePromptByName("DeliveryOpen", "Membuka Truk Pengiriman secara remote") end
+    Title = "🔄 Refresh Daftar Pengiriman",
+    Callback = function()
+        DeliveryList = {}
+        DeliveryPrompts = {}
+        for _, prompt in ipairs(workspace:GetDescendants()) do
+            if prompt:IsA("ProximityPrompt") then
+                local pName = string.lower(prompt.Parent and prompt.Parent.Name or "")
+                local act = string.lower(prompt.ActionText or "")
+                
+                -- Cari kata kunci yang berhubungan dengan penjualan/pengiriman
+                if string.find(pName, "delivery") or string.find(act, "jual") or string.find(act, "kirim") or string.find(pName, "sell") then
+                    local dName = prompt.ObjectText
+                    if not dName or dName == "" then dName = prompt.Parent.Name end
+                    if dName ~= "" and not table.find(DeliveryList, dName) then
+                        table.insert(DeliveryList, dName)
+                        DeliveryPrompts[dName] = prompt
+                    end
+                end
+            end
+        end
+        if #DeliveryList == 0 then table.insert(DeliveryList, "Tidak Ditemukan") end
+        
+        if DeliveryDropdown and DeliveryDropdown.Refresh then
+            DeliveryDropdown:Refresh(DeliveryList)
+        end
+        logAction("Manual", true, "Menemukan " .. #DeliveryList .. " Tempat Jual")
+    end
+})
+
+TabFarm:Button({
+    Title = "🚚 Buka UI Jual Ini (Jarak Jauh)",
+    Callback = function()
+        local dName = _G_State.SelectedDeliveryUI
+        if dName and DeliveryPrompts[dName] then
+            local prompt = DeliveryPrompts[dName]
+            prompt.RequiresLineOfSight = false
+            if fireproximityprompt then fireproximityprompt(prompt) end
+            logAction("Manual", true, "Membuka UI: " .. dName)
+        else
+            logAction("Manual", false, "Pengiriman belum dipilih atau coba Refresh")
+        end
+    end
 })
 
 TabFarm:Toggle({
@@ -962,24 +1179,59 @@ TabFactory:Toggle({
     Callback = function(state) _G_State.AutoFactory = state; logAction("Menu -> Auto Factory", true, state and "AKTIF" or "MATI") end
 })
 
+local FactoryList = {"Pabrik (Belum Dimuat)"}
+local FactoryPrompts = {} -- Menyimpan referensi prompt asli
+
+local FactoryDropdown = TabFactory:Dropdown({
+    Title = "Pilih Pabrik (Scan Map)",
+    Desc = "Klik Refresh di bawah jika kosong",
+    Options = FactoryList,
+    Default = "Pabrik (Belum Dimuat)",
+    Callback = function(val) _G_State.SelectedFactoryUI = val end
+})
+
 TabFactory:Button({
-    Title = "Buka Mesin Pabrik (Jarak Jauh)",
+    Title = "🔄 Refresh Daftar Pabrik",
     Callback = function()
-        -- Karena Pabrik memiliki banyak prompt "Factory", kita gunakan loop lama yang lebih general
-        local fired = false
+        FactoryList = {}
+        FactoryPrompts = {}
         for _, prompt in ipairs(workspace:GetDescendants()) do
             if prompt:IsA("ProximityPrompt") then
                 local act = string.lower(prompt.ActionText or "")
                 local obj = string.lower(prompt.ObjectText or "")
-                if string.find(act, "kelola") or string.find(obj, "pabrik") or string.find(act, "produksi") or string.find(act, "buka") then
-                    prompt.RequiresLineOfSight = false
-                    if fireproximityprompt then fireproximityprompt(prompt) end
-                    fired = true
-                    break
+                local pName = prompt.Parent and prompt.Parent.Name or ""
+                
+                if string.find(act, "kelola") or string.find(obj, "pabrik") or string.find(act, "produksi") or string.find(string.lower(pName), "factory") then
+                    local fName = prompt.ObjectText
+                    if not fName or fName == "" then fName = pName end
+                    if fName ~= "" and not table.find(FactoryList, fName) then
+                        table.insert(FactoryList, fName)
+                        FactoryPrompts[fName] = prompt
+                    end
                 end
             end
         end
-        if fired then logAction("Manual", true, "Membuka UI Pabrik secara remote") end
+        if #FactoryList == 0 then table.insert(FactoryList, "Tidak Ditemukan") end
+        
+        if FactoryDropdown and FactoryDropdown.Refresh then
+            FactoryDropdown:Refresh(FactoryList)
+        end
+        logAction("Manual", true, "Menemukan " .. #FactoryList .. " Pabrik")
+    end
+})
+
+TabFactory:Button({
+    Title = "🏭 Buka UI Pabrik Ini (Jarak Jauh)",
+    Callback = function()
+        local fName = _G_State.SelectedFactoryUI
+        if fName and FactoryPrompts[fName] then
+            local prompt = FactoryPrompts[fName]
+            prompt.RequiresLineOfSight = false
+            if fireproximityprompt then fireproximityprompt(prompt) end
+            logAction("Manual", true, "Membuka UI: " .. fName)
+        else
+            logAction("Manual", false, "Pabrik belum dipilih atau coba Refresh")
+        end
     end
 })
 
@@ -999,12 +1251,16 @@ TabAnimal:Toggle({ Title = "Beli Babi", Default = false, Callback = function(sta
 local BarangMentah = {"Telur", "Susu", "Wol", "Bacon", "Gandum", "Tomat", "Wortel", "Tebu"}
 local BarangOlahan = {"Tepung", "Roti", "Benang", "Kain", "Baju", "Keju", "Mentega", "Krim", "Selai", "Kue", "Sirup", "Gula", "Minyak", "Sosis", "Burger", "Pancake", "Waffle"}
 
+_G_State.SelectedMentah = "Telur"
+_G_State.SelectedOlahan = "Tepung"
+_G_State.SelectedPabrik = "Tepung"
+
 TabToko:Dropdown({
     Title = "Jual Barang Mentah",
     Desc = "Pilih hasil tani/hewan mentah",
     Options = BarangMentah,
     Default = "Telur",
-    Callback = function(val) _G_State.SelectedMentah = val end
+    Callback = function(val) _G_State.SelectedMentah = val or "Telur" end
 })
 TabToko:Button({
     Title = "💰 Jual Semua Mentah Ini (Siluman)",
@@ -1015,12 +1271,31 @@ TabToko:Dropdown({
     Title = "Jual Barang Olahan",
     Desc = "Pilih hasil dari mesin pabrik",
     Options = BarangOlahan,
-    Default = "Roti",
-    Callback = function(val) _G_State.SelectedOlahan = val end
+    Default = "Tepung",
+    Callback = function(val) _G_State.SelectedOlahan = val or "Tepung" end
 })
 TabToko:Button({
     Title = "💰 Jual Semua Olahan Ini (Siluman)",
     Callback = function() jualSiluman(_G_State.SelectedOlahan) end
+})
+
+TabToko:Dropdown({
+    Title = "Produksi & Ambil (Pabrik)",
+    Desc = "Pilih barang yang ingin diproduksi di pabrik",
+    Options = BarangOlahan,
+    Default = "Tepung",
+    Callback = function(val) _G_State.SelectedPabrik = val or "Tepung" end
+})
+TabToko:Button({
+    Title = "🏭 Proses Pabrik Ini (Siluman)",
+    Callback = function() produksiPabrikSiluman(_G_State.SelectedPabrik) end
+})
+
+TabToko:Toggle({
+    Title = "Auto Proses Pabrik Ini (Loop)",
+    Desc = "Otomatis melakukan Pabrik Siluman setiap 5 detik di background",
+    Default = false,
+    Callback = function(state) _G_State.AutoPabrikSiluman = state; logAction("Menu -> Auto Pabrik Siluman", true, state and "AKTIF" or "MATI") end
 })
 
 -- === TAB UPGRADE & TOKO ===
