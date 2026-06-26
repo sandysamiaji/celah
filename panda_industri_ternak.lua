@@ -47,8 +47,37 @@ local function getTool(name)
 end
 
 -- ============================================================
--- SYSTEM LOGGING (Memory-based)
+-- SYSTEM LOGGING (Memory & Webhook)
 -- ============================================================
+local WEBHOOK_URL = "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnQ7uq0joG0eQc6dy8l6__kX8bDpe2u7QoYZKWttCX-bDUH0c5To8lVap5PVcDksknvQWf9MYGxpQBAn4dyKHC82AtB-EsE5KrZKylCVXbDUz7tOdzBzgouqBJIHG2rXp66RjG6ceQvndUrDIZQClXFLgjcx9S3bOUfobD2sl1lF3GTmyKwcLB33N7_dBBqVZsieN0fmoFqb7qav9u4QlWWuFDkZJGKMYML01WKZrb7i0mos6AbJF8bYgTwARBtUTzIGa-uOuihl3g67qfI&lib=M0kM5YpAOF3rQs_FEmEldthp_5JTylzCh"
+local http_request = request or http_request or (http and http.request) or syn and syn.request
+local logBuffer = {}
+
+local function sendBufferedLogs()
+    if #logBuffer == 0 then return end
+    if not http_request then return end
+    
+    local combinedLogs = table.concat(logBuffer, "\n")
+    logBuffer = {} -- Kosongkan buffer setelah disiapkan
+    
+    task.spawn(function()
+        pcall(function()
+            http_request({
+                Url = WEBHOOK_URL,
+                Method = "POST",
+                Body = combinedLogs
+            })
+        end)
+    end)
+end
+
+-- Kirim log secara batch setiap 5 detik untuk menghindari rate-limit
+task.spawn(function()
+    while task.wait(5) do
+        sendBufferedLogs()
+    end
+end)
+
 local lastLogs = {}
 local function logAction(action, isSuccess, detail)
     if not _G_State.LogEnabled then return end
@@ -63,8 +92,11 @@ local function logAction(action, isSuccess, detail)
 
     local fullMsg = os.date("%Y-%m-%d %H:%M:%S") .. " " .. msg
     
-    -- Tulis ke memori (Tanpa pakai file .txt yang ribet di Android)
+    -- Tulis ke memori (Untuk UI)
     _G_State.LiveLogs = _G_State.LiveLogs .. fullMsg .. "\n"
+    
+    -- Tulis ke Buffer Webhook (Untuk dikirim ke Google Sheets)
+    table.insert(logBuffer, fullMsg)
     
     -- Coba update UI utama jika function tersedia
     if _G_State.UpdateUIDisplay then
