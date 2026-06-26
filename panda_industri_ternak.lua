@@ -505,6 +505,57 @@ task.spawn(function()
             end
         end
         
+        -- Y. Auto Panen & Collect Barang
+        if _G_State.AutoCollect or _G_State.AutoPanen then
+            if not _G_State.CollectedItems then _G_State.CollectedItems = {} end
+            
+            local count = 0
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("ProximityPrompt") then
+                    local act = string.lower(v.ActionText or "")
+                    local obj = string.lower(v.ObjectText or "")
+                    
+                    local isCollect = string.find(act, "ambil") or string.find(act, "collect") or string.find(act, "pick") or string.find(obj, "hasil") or string.find(obj, "telur") or string.find(obj, "susu") or string.find(obj, "wol") or string.find(act, "pungut")
+                    local isPanen = string.find(act, "panen") or string.find(act, "harvest") or string.find(obj, "tomat") or string.find(obj, "gandum") or string.find(obj, "wortel") or string.find(obj, "tebu")
+                    
+                    if not string.find(obj, "isi air") and not string.find(act, "isi air") then
+                        if (_G_State.AutoCollect and isCollect) or (_G_State.AutoPanen and isPanen) then
+                            if not _G_State.CollectedItems[v] then
+                                _G_State.CollectedItems[v] = true
+                                pcall(function()
+                                    if _G_State.CollectTeleport then
+                                        local part = v.Parent
+                                        if part and part:IsA("BasePart") then
+                                            local pos = part.Position
+                                            if hrp and (hrp.Position - pos).Magnitude > 15 then
+                                                hrp.CFrame = part.CFrame + Vector3.new(0, 2, 0)
+                                                task.wait(0.3) -- Jeda aman teleport
+                                            end
+                                        end
+                                    else
+                                        local part = v.Parent
+                                        if part and part:IsA("BasePart") and hrp then
+                                            if (part.Position - hrp.Position).Magnitude > 150 then return end -- Skip jika terlalu jauh (mode jarak jauh)
+                                        end
+                                    end
+                                    
+                                    v.RequiresLineOfSight = false
+                                    if fireproximityprompt then fireproximityprompt(v) end
+                                    logAction("Auto", true, "Ambil/Panen: " .. (v.ObjectText or v.ActionText or ""))
+                                end)
+                                count = count + 1
+                                if count >= 2 then break end -- Batasi 2 per loop agar tidak spam/lag/nge-kick dari server
+                            end
+                        end
+                    end
+                end
+            end
+            
+            for p, _ in pairs(_G_State.CollectedItems) do
+                if typeof(p) ~= "Instance" or not p.Parent then _G_State.CollectedItems[p] = nil end
+            end
+        end
+        
         -- C. Auto Nyiram Tanaman (Pegang Gembor & Siram)
         if _G_State.AutoRefill then
             -- 1. Pindahkan dari tas ke tangan
@@ -1177,10 +1228,24 @@ TabFarm:Button({
 })
 
 TabFarm:Toggle({
+    Title = "Auto Panen (Tanaman)",
+    Desc = "Memanen Tomat, Gandum, Wortel, dll secara otomatis",
+    Default = false,
+    Callback = function(state) _G_State.AutoPanen = state; logAction("Menu -> Auto Panen", true, state and "AKTIF" or "MATI") end
+})
+
+TabFarm:Toggle({
     Title = "Auto Collect Barang (Magnet)",
-    Desc = "Menarik Telur, Wol, Susu, dll ke badan",
+    Desc = "Menarik Telur, Wol, Susu, dll secara otomatis",
     Default = false,
     Callback = function(state) _G_State.AutoCollect = state; logAction("Menu -> Auto Collect", true, state and "AKTIF" or "MATI") end
+})
+
+TabFarm:Toggle({
+    Title = "⚙️ Mode Teleport Cepat (Panen/Magnet)",
+    Desc = "NYALAKAN INI jika panen jarak jauh dilarang oleh server",
+    Default = false,
+    Callback = function(state) _G_State.CollectTeleport = state; logAction("Menu -> Teleport Panen", true, state and "AKTIF" or "MATI") end
 })
 
 TabFarm:Toggle({
