@@ -671,20 +671,67 @@ TabLogs:Toggle({
     end
 })
 
-local LogDisplay = TabLogs:Button({
-    Title = "Aktivitas Terakhir:",
-    Desc = "Belum ada aktivitas...",
-    Callback = function() end
+local LogDisplay = TabLogs:Paragraph({
+    Title = "Live Logs (3 Baris Terakhir)",
+    Desc = "Belum ada aktivitas..."
 })
 
--- Hubungkan fungsi update ke UI
+local logLines = {}
 _G_State.UpdateUIDisplay = function(newMsg)
-    if LogDisplay and LogDisplay.Set then
-        LogDisplay:Set({Desc = newMsg})
-    elseif LogDisplay and LogDisplay.SetDesc then
-        LogDisplay:SetDesc(newMsg)
+    table.insert(logLines, newMsg)
+    if #logLines > 3 then table.remove(logLines, 1) end
+    if LogDisplay and LogDisplay.SetDesc then
+        LogDisplay:SetDesc(table.concat(logLines, "\n"))
     end
 end
+
+TabLogs:Input({
+    Title = "Kirim Catatan (Ke Webhook)",
+    Desc = "Ketik lokasi/teks lalu Enter untuk mencatat ke log",
+    Placeholder = "Ketik catatan di sini...",
+    Callback = function(text)
+        if text == "" then return end
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local pos = hrp and string.format("X:%.1f, Y:%.1f, Z:%.1f", hrp.Position.X, hrp.Position.Y, hrp.Position.Z) or "Unknown Pos"
+        table.insert(logBuffer, string.format("[%s] CATATAN PABRIK | Lokasi: %s | Teks: %s", os.date("%Y-%m-%d %H:%M:%S"), pos, text))
+        windui:Notify({Title="Terkirim!", Content="Catatan dikirim ke Google Webhook.", Duration=3})
+    end
+})
+
+TabLogs:Button({
+    Title = "Test Semua Alat & Objek",
+    Desc = "Jalankan Auto-Test untuk alat di tas dan objek di map",
+    Callback = function()
+        logAction("Test", true, "Memulai Auto-Test Tools & Prompts...")
+        task.spawn(function()
+            local prompts = {}
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("ProximityPrompt") then table.insert(prompts, v) end
+            end
+            if #prompts > 0 then
+                for _, p in ipairs(prompts) do
+                    local name = p.Parent and p.Parent.Name or "Unknown"
+                    logAction("Test Sentuh", true, name)
+                    pcall(function() if fireproximityprompt then fireproximityprompt(p) end end)
+                    task.wait(0.05)
+                end
+            end
+            local bp = LocalPlayer:FindFirstChild("Backpack")
+            local char = LocalPlayer.Character
+            local tools = {}
+            if bp then for _, t in ipairs(bp:GetChildren()) do if t:IsA("Tool") then table.insert(tools, t) end end end
+            if char then for _, t in ipairs(char:GetChildren()) do if t:IsA("Tool") then table.insert(tools, t) end end end
+            if #tools > 0 then
+                for _, t in ipairs(tools) do
+                    logAction("Test Alat", true, t.Name)
+                    pcall(function() t.Parent = char; task.wait(0.1); t:Activate() end)
+                    task.wait(0.2)
+                end
+            end
+            logAction("Test", true, "Auto-Test Selesai!")
+        end)
+    end
+})
 
 TabLogs:Button({
     Title = "Salin (Copy) Log",
@@ -700,6 +747,7 @@ TabLogs:Button({
     Desc = "Bersihkan memori log",
     Callback = function()
         _G_State.LiveLogs = "=== PANDA INDUSTRI LIVE LOGS ===\n"
+        logLines = {}
         lastLogs = {}
         if _G_State.UpdateUIDisplay then _G_State.UpdateUIDisplay("Belum ada aktivitas...") end
         windui:Notify({Title="Dibersihkan!", Content="Log memori sudah dihapus.", Duration=3})
@@ -707,10 +755,10 @@ TabLogs:Button({
 })
 
 -- Matikan UI overlay jika masih nyala dari script sebelumnya
-pcall(function() game:GetService("CoreGui").MrPandaLiveLogs:Destroy() end)
+pcall(function() game:GetService("CoreGui").PandaIndustriMini:Destroy() end)
 
 windui:Notify({
     Title = "Mr. Panda Loaded!",
-    Content = "Sistem Live Log Memory Aktif!",
+    Content = "Sistem Live Log Memory & Webhook Aktif!",
     Duration = 5
 })
