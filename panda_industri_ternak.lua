@@ -356,51 +356,60 @@ task.spawn(function()
             end
         end
 
-        -- 1. Auto Refill Air
+        -- 1. Auto Refill Air (Instant Remote Refill)
         if hrp then
             if _G_State.AutoRefill and (not _G_State.LastRefill or tick() - _G_State.LastRefill > 2) then
                 local closestWell = nil
-                local minDist = 150 -- Radius cari sumur (Jangan nyolong sumur tetangga)
+                local minDist = math.huge
                 for _, prompt in ipairs(workspace:GetDescendants()) do
                     if prompt:IsA("ProximityPrompt") then
-                        local dist = (prompt.Parent.Position - hrp.Position).Magnitude
-                        if dist > 150 then continue end -- HANYA DI RADIUS PEMAIN
-                        
                         local act = prompt.ActionText or ""
                         local obj = prompt.ObjectText or ""
-                        if string.find(obj, "Isi Air") or string.find(act, "Isi Air") or (string.find(act, "Ambil") and string.find(prompt.Parent.Name, "Sumur")) then
-                            if dist < minDist then
-                                minDist = dist
-                                closestWell = prompt
+                        local pName = prompt.Parent and prompt.Parent.Name or ""
+                        
+                        -- Cek apakah ini sumur / tempat isi air
+                        if string.find(obj, "Isi Air") or string.find(act, "Isi Air") or string.find(pName, "Sumur") or string.find(pName, "WaterClaim") then
+                            local part = prompt.Parent
+                            if part and part:IsA("BasePart") then
+                                local dist = (part.Position - hrp.Position).Magnitude
+                                if dist < minDist then
+                                    minDist = dist
+                                    closestWell = prompt
+                                end
                             end
                         end
                     end
                 end
                 
                 if closestWell then
-                    pcall(function()
-                        -- Auto Equip Watering Can (Tempat Air) sebelum ngisi air
+                    task.spawn(function()
                         local char = LocalPlayer.Character
                         local bp = LocalPlayer:FindFirstChild("Backpack")
+                        local part = closestWell.Parent
+                        
+                        -- Equip alat penyiram dulu
                         if bp and char then
                             for _, tool in ipairs(bp:GetChildren()) do
                                 if tool:IsA("Tool") and string.find(string.lower(tool.Name), "water") then
                                     tool.Parent = char
-                                    task.wait(0.2)
                                 end
                             end
                         end
+                        task.wait(0.2)
                         
-                        local pos = closestWell.Parent.Position
-                        if (hrp.Position - pos).Magnitude > 10 then
-                            hrp.CFrame = closestWell.Parent.CFrame + Vector3.new(0, 3, 0)
-                            task.wait(0.5) -- Anti Error 277
-                            logAction("Auto Refill -> Teleport", true, string.format("Ke Sumur terdekat di X:%.0f", pos.X))
-                        end
+                        -- Teleport sekilas lalu balik!
+                        local originalCFrame = hrp.CFrame
+                        hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+                        task.wait(0.1)
+                        
                         closestWell.RequiresLineOfSight = false
                         if fireproximityprompt then fireproximityprompt(closestWell) end
-                        logAction("Auto Refill -> ProximityPrompt", true, "Berhasil klik Sumur!")
+                        
+                        task.wait(0.1)
+                        hrp.CFrame = originalCFrame
+                        logAction("Auto Refill", true, "Isi air jarak jauh berhasil!")
                     end)
+                    
                     _G_State.LastRefill = tick()
                     task.wait(0.5) -- Beri jeda
                 end
@@ -470,6 +479,61 @@ task.spawn(function()
             local tool = getTool("Watering Can")
             if tool and tool:FindFirstChild("WaterRemote") then
                 pcall(function() tool.WaterRemote:FireServer() end)
+            end
+        end
+
+        -- D. Auto Bantu Siram Tetangga
+        if _G_State.AutoBantuSiram then
+            if not _G_State.BantuTick then _G_State.BantuTick = 0 end
+            if tick() - _G_State.BantuTick > 5 then
+                _G_State.BantuTick = tick()
+                
+                local players = game:GetService("Players"):GetPlayers()
+                local targets = {}
+                for _, p in ipairs(players) do
+                    if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        table.insert(targets, p.Character.HumanoidRootPart)
+                    end
+                end
+                
+                if #targets > 0 then
+                    task.spawn(function()
+                        local target = targets[math.random(1, #targets)]
+                        local originalCFrame = hrp.CFrame
+                        
+                        -- Pegang Gembor
+                        local bp = LocalPlayer:FindFirstChild("Backpack")
+                        local char = LocalPlayer.Character
+                        local toolHand = nil
+                        if bp and char then
+                            for _, tool in ipairs(bp:GetChildren()) do
+                                if tool:IsA("Tool") and string.find(string.lower(tool.Name), "water") then
+                                    tool.Parent = char
+                                    toolHand = tool
+                                end
+                            end
+                            if not toolHand then toolHand = char:FindFirstChild("Watering Can") end
+                        end
+                        
+                        -- Teleport sekilas ke tetangga (5 studs di atas kepala)
+                        hrp.CFrame = target.CFrame + Vector3.new(0, 5, 0)
+                        logAction("Bantu Siram", true, "Teleport ke tetangga: " .. target.Parent.Name)
+                        
+                        -- Siram cepat 3 kali
+                        for i = 1, 3 do
+                            if toolHand then
+                                pcall(function()
+                                    if toolHand:FindFirstChild("WaterRemote") then toolHand.WaterRemote:FireServer() end
+                                    toolHand:Activate()
+                                end)
+                            end
+                            task.wait(0.3)
+                        end
+                        
+                        -- Pulang
+                        hrp.CFrame = originalCFrame
+                    end)
+                end
             end
         end
         
@@ -598,6 +662,13 @@ TabFarm:Toggle({
     Desc = "Otomatis mengisi air di Gembor",
     Default = false,
     Callback = function(state) _G_State.AutoRefill = state; logAction("Menu -> Auto Refill Water", true, state and "AKTIF" or "MATI") end
+})
+
+TabFarm:Toggle({
+    Title = "Auto Bantu Siram (Pahlawan)",
+    Desc = "Teleport keliling ke pemain lain & menyiram lahan mereka",
+    Default = false,
+    Callback = function(state) _G_State.AutoBantuSiram = state; logAction("Menu -> Auto Bantu Siram", true, state and "AKTIF" or "MATI") end
 })
 
 TabFarm:Dropdown({
