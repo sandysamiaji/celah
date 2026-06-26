@@ -49,7 +49,7 @@ end
 -- ============================================================
 -- SYSTEM LOGGING (Memory & Webhook)
 -- ============================================================
-local WEBHOOK_URL = "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnQ7uq0joG0eQc6dy8l6__kX8bDpe2u7QoYZKWttCX-bDUH0c5To8lVap5PVcDksknvQWf9MYGxpQBAn4dyKHC82AtB-EsE5KrZKylCVXbDUz7tOdzBzgouqBJIHG2rXp66RjG6ceQvndUrDIZQClXFLgjcx9S3bOUfobD2sl1lF3GTmyKwcLB33N7_dBBqVZsieN0fmoFqb7qav9u4QlWWuFDkZJGKMYML01WKZrb7i0mos6AbJF8bYgTwARBtUTzIGa-uOuihl3g67qfI&lib=M0kM5YpAOF3rQs_FEmEldthp_5JTylzCh"
+local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
 local http_request = request or http_request or (http and http.request) or syn and syn.request
 local logBuffer = {}
 
@@ -379,6 +379,18 @@ task.spawn(function()
                 
                 if closestWell then
                     pcall(function()
+                        -- Auto Equip Watering Can (Tempat Air) sebelum ngisi air
+                        local char = LocalPlayer.Character
+                        local bp = LocalPlayer:FindFirstChild("Backpack")
+                        if bp and char then
+                            for _, tool in ipairs(bp:GetChildren()) do
+                                if tool:IsA("Tool") and string.find(string.lower(tool.Name), "water") then
+                                    tool.Parent = char
+                                    task.wait(0.2)
+                                end
+                            end
+                        end
+                        
                         local pos = closestWell.Parent.Position
                         if (hrp.Position - pos).Magnitude > 10 then
                             hrp.CFrame = closestWell.Parent.CFrame + Vector3.new(0, 3, 0)
@@ -756,6 +768,25 @@ TabLogs:Button({
 
 -- Matikan UI overlay jika masih nyala dari script sebelumnya
 pcall(function() game:GetService("CoreGui").PandaIndustriMini:Destroy() end)
+
+-- ============================================================
+-- REMOTE SERVICE DETECTION (Auto-Scan)
+-- ============================================================
+task.spawn(function()
+    if not _G.HasScannedRemotes then
+        _G.HasScannedRemotes = true
+        task.wait(3) -- Tunggu game load
+        local found = {}
+        for _, v in ipairs(RS:GetDescendants()) do
+            if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
+                table.insert(found, (v:IsA("RemoteEvent") and "[RE] " or "[RF] ") .. v.Name)
+            end
+        end
+        if #found > 0 then
+            table.insert(logBuffer, "=== REMOTE SERVICE DETECTION ===\nDitemukan " .. #found .. " Remotes di ReplicatedStorage:\n" .. table.concat(found, "\n"))
+        end
+    end
+end)
 
 windui:Notify({
     Title = "Mr. Panda Loaded!",
