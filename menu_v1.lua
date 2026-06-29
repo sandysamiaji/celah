@@ -14,18 +14,37 @@ getgenv().isUnderAttack = false
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
 local http_request = request or http_request or (http and http.request) or syn and syn.request
 
+getgenv().logBuffer = getgenv().logBuffer or {}
+
 local function sendLog(logText)
-    if not http_request then return end
-    pcall(function()
-        http_request({
-            Url = WEBHOOK_URL,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = HttpService:JSONEncode({
-                content = logText
-            })
-        })
-    end)
+    table.insert(getgenv().logBuffer, logText)
+end
+
+if not getgenv().LogLoopStarted then
+    getgenv().LogLoopStarted = true
+    coroutine.wrap(function()
+        while true do
+            wait(5)
+            if #getgenv().logBuffer > 0 then
+                -- Gabungkan semua isi buffer yang terkumpul dengan baris baru (enter)
+                local combinedText = table.concat(getgenv().logBuffer, "\n")
+                getgenv().logBuffer = {} -- Kosongkan buffer setelah disalin
+                
+                if http_request then
+                    pcall(function()
+                        http_request({
+                            Url = WEBHOOK_URL,
+                            Method = "POST",
+                            Headers = {["Content-Type"] = "application/json"},
+                            Body = HttpService:JSONEncode({
+                                content = combinedText
+                            })
+                        })
+                    end)
+                end
+            end
+        end
+    end)()
 end
 
 -- Spy / Hook untuk mendeteksi remote yang ditembakkan secara manual
