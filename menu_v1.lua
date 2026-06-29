@@ -2,12 +2,59 @@ local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
 
 local getgenv = getgenv or function() return _G end
 getgenv().autoMerge = false
 getgenv().autoCollect = false
 getgenv().autoDefense = false
 getgenv().isUnderAttack = false
+
+-- ==================== WEBHOOK LOGGER ====================
+local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
+local http_request = request or http_request or (http and http.request) or syn and syn.request
+
+local function sendLog(logText)
+    if not http_request then return end
+    pcall(function()
+        http_request({
+            Url = WEBHOOK_URL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode({
+                content = logText
+            })
+        })
+    end)
+end
+
+-- Spy / Hook untuk mendeteksi remote yang ditembakkan secara manual
+if not getgenv().PandaHooked then
+    getgenv().PandaHooked = true
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        
+        if method == "FireServer" or method == "InvokeServer" then
+            -- Hanya melog remote MergeRequest, PickUp, dan Drop agar tidak spam
+            if self.Name == "MergeRequest" or self.Name == "PickUp" or self.Name == "Drop" then
+                local args = {...}
+                local argStr = ""
+                for i, v in ipairs(args) do
+                    if typeof(v) == "Instance" then
+                        argStr = argStr .. "Instance("..v.Name.."), "
+                    else
+                        argStr = argStr .. tostring(v) .. ", "
+                    end
+                end
+                
+                -- Kirim via webhook
+                sendLog("[C2S] " .. self.Name .. " | Args: " .. argStr)
+            end
+        end
+        return oldNamecall(self, ...)
+    end)
+end
 
 -- ==================== LOGIC FUNCTIONS ====================
 local function getBestBombArg()
@@ -97,6 +144,26 @@ Title.TextSize = 16
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.BorderSizePixel = 0
 
+-- Close Button
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Parent = Title
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 14
+CloseBtn.BorderSizePixel = 0
+
+CloseBtn.MouseButton1Click:Connect(function()
+    -- Matikan semua loop saat di-close
+    getgenv().autoMerge = false
+    getgenv().autoCollect = false
+    getgenv().autoDefense = false
+    ScreenGui:Destroy()
+end)
+
 local ScrollFrame = Instance.new("ScrollingFrame")
 ScrollFrame.Parent = MainFrame
 ScrollFrame.Size = UDim2.new(1, 0, 1, -30)
@@ -148,7 +215,6 @@ local function createButton(name, callback)
 end
 
 -- ==================== ADDING BUTTONS ====================
--- Padding spacing
 local pad = Instance.new("Frame", ScrollFrame)
 pad.Size = UDim2.new(1,0,0,2)
 pad.BackgroundTransparency = 1
