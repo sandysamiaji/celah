@@ -110,11 +110,11 @@ end)
 FarmTab:AddToggle({
 	Name = "Auto Merge",
 	Default = false,
-	Callback = function(Value)
+    Callback = function(Value)
 		getgenv().autoMerge = Value
-        task.spawn(function()
+        coroutine.wrap(function()
             while getgenv().autoMerge do
-                task.wait(1)
+                wait(1)
                 
                 -- Hanya merge jika kondisi aman (tidak sedang diserang / memegang bom)
                 if not getgenv().isUnderAttack then
@@ -137,7 +137,7 @@ FarmTab:AddToggle({
                     end)
                 end
             end
-        end)
+        end)()
 	end    
 })
 
@@ -146,9 +146,9 @@ FarmTab:AddToggle({
 	Default = false,
 	Callback = function(Value)
 		getgenv().autoCollect = Value
-        task.spawn(function()
+        coroutine.wrap(function()
             while getgenv().autoCollect do
-                task.wait(0.5)
+                wait(0.5)
                 -- Teleportasikan semua drop ke player (berdasarkan log objek sentuhan "RMB_..." dan "neon")
                 pcall(function()
                     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -158,7 +158,7 @@ FarmTab:AddToggle({
                                 -- Filter agar hanya mengambil objek uang / part tertentu (bisa disesuaikan)
                                 if string.match(obj.Name, "RMB_") or obj.Name == "neon" then
                                     firetouchinterest(hrp, obj, 0)
-                                    task.wait(0.01)
+                                    wait(0.01)
                                     firetouchinterest(hrp, obj, 1)
                                 end
                             end
@@ -166,7 +166,7 @@ FarmTab:AddToggle({
                     end
                 end)
             end
-        end)
+        end)()
 	end    
 })
 
