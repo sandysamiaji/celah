@@ -14,6 +14,7 @@ _G.NukeGameExecution = ExecutionID
 
 local _G_State = {}
 _G_State.AutoMerge = false
+_G_State.MergeDelay = 0.5
 _G_State.AutoCollect = false
 _G_State.AutoDefense = false
 _G_State.SpyRemotes = false
@@ -173,8 +174,9 @@ if not _G.NukeSensor then
         if v.Name == "Nuke" and v:IsA("BasePart") then
             -- Tunggu sebentar agar posisi bom update
             task.delay(0.5, function()
+                local lvl = (v.Parent and tonumber(v.Parent.Name)) and v.Parent.Name or "?"
                 local pos = string.format("X:%.1f, Y:%.1f, Z:%.1f", v.Position.X, v.Position.Y, v.Position.Z)
-                logAction("BOMB SPAWN", true, "Nuke baru terdeteksi di " .. pos)
+                logAction("BOMB SPAWN", true, "Nuke Lv." .. tostring(lvl) .. " terdeteksi di " .. pos)
             end)
         end
     end)
@@ -194,29 +196,44 @@ task.spawn(function()
             
             if #mergeRemotes > 0 and #pickupRemotes > 0 then
                 local pickUp = pickupRemotes[1]
-                local nukes = {}
+                local mergeRemote = mergeRemotes[1]
+                
+                -- Kumpulkan dan kelompokkan berdasarkan Level (Nama Parent)
+                local nukeGroups = {}
                 for _, v in ipairs(workspace:GetDescendants()) do
                     if v.Name == "Nuke" and v:IsA("BasePart") then
-                        table.insert(nukes, v)
+                        local p = v.Parent
+                        if p and tonumber(p.Name) then
+                            local lvl = tonumber(p.Name)
+                            if not nukeGroups[lvl] then nukeGroups[lvl] = {} end
+                            table.insert(nukeGroups[lvl], v)
+                        end
                     end
                 end
                 
-                if #nukes > 0 then
-                    local firedCount = 0
-                    for _, remote in ipairs(mergeRemotes) do
-                        for _, nuke in ipairs(nukes) do
+                local firedCount = 0
+                for lvl, group in pairs(nukeGroups) do
+                    -- Jika ada minimal 2 bom dengan level yang sama, kita bisa merge
+                    if #group >= 2 then
+                        local pairsToMerge = math.floor(#group / 2)
+                        for i = 1, pairsToMerge do
+                            local targetNuke = group[i] -- ambil salah satu sebagai inisiator
+                            
                             -- Siluman PickUp: Ambil lalu gabungkan secepat kilat
-                            safeFire(pickUp, nuke)
-                            task.wait(0.01)
-                            safeFire(remote, nuke)
+                            safeFire(pickUp, targetNuke)
+                            task.wait(0.05)
+                            safeFire(mergeRemote, targetNuke)
+                            
                             firedCount = firedCount + 1
                             if not _G_State.AutoMerge then break end
-                            task.wait(0.01)
+                            task.wait(_G_State.MergeDelay or 0.5)
                         end
                     end
-                    if firedCount > 0 then
-                        logAction("Auto Merge", true, "Mengambil & Menggabung " .. tostring(firedCount) .. " Nuke secara siluman")
-                    end
+                    if not _G_State.AutoMerge then break end
+                end
+                
+                if firedCount > 0 then
+                    logAction("Auto Merge", true, "Sukses menggabung " .. tostring(firedCount) .. " pasang Nuke secara siluman")
                 end
             end
         end
@@ -345,6 +362,17 @@ TabMain:Toggle({
         _G_State.AutoMerge = state
         logAction("Menu", true, "Auto Merge " .. (state and "ON" or "OFF")) 
     end 
+})
+
+TabMain:Slider({
+    Title = "⏱️ Auto Merge Delay",
+    Step = 0.1,
+    Min = 0.2,
+    Max = 2.0,
+    Default = 0.5,
+    Callback = function(value)
+        _G_State.MergeDelay = value
+    end
 })
 
 TabMain:Toggle({ 
