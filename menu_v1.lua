@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
+
 local getgenv = getgenv or function() return _G end
 getgenv().autoMerge = false
 getgenv().autoCollect = false
@@ -16,7 +17,9 @@ local http_request = request or http_request or (http and http.request) or syn a
 getgenv().logBuffer = getgenv().logBuffer or {}
 
 local function sendLog(logText)
-    table.insert(getgenv().logBuffer, logText)
+    local ok, ts = pcall(function() return os.date("%Y-%m-%d %H:%M:%S") end)
+    ts = (ok and ts) or "unknown-time"
+    table.insert(getgenv().logBuffer, "[" .. ts .. "] " .. tostring(logText))
 end
 
 if not getgenv().LogLoopStarted then
@@ -243,17 +246,56 @@ createToggle("Auto Merge", false, function(Value)
         while getgenv().autoMerge do
             wait(1)
             if not getgenv().isUnderAttack then
-                pcall(function()
-                    local nr = ReplicatedStorage:FindFirstChild("NukeRemotes")
-                    if nr and nr:FindFirstChild("MergeRequest") then nr.MergeRequest:FireServer() end
-                end)
-                pcall(function()
-                    local pkgs = ReplicatedStorage:FindFirstChild("Packages")
-                    if pkgs then
-                        local req = pkgs.Remotes.Networking["RE/Merge/MergeRequest"]
-                        if req then req:FireServer() end
+                -- Safe fire helper with logging
+                local function safeFire(remote, ...)
+                    if not remote then
+                        sendLog("safeFire: remote is nil")
+                        return false
                     end
-                end)
+                    local ok, err = pcall(function() remote:FireServer(...) end)
+                    if not ok then
+                        sendLog("FireServer failed for " .. tostring(remote.Name) .. ": " .. tostring(err))
+                    else
+                        sendLog("FireServer succeeded for " .. tostring(remote.Name))
+                    end
+                    return ok
+                end
+
+                -- Try NukeRemotes.MergeRequest
+                local nr = ReplicatedStorage:FindFirstChild("NukeRemotes")
+                if nr then
+                    local mr = nr:FindFirstChild("MergeRequest")
+                    if mr then
+                        safeFire(mr)
+                    else
+                        sendLog("NukeRemotes.MergeRequest not found")
+                    end
+                else
+                    sendLog("NukeRemotes not found")
+                end
+
+                -- Try Packages -> Remotes -> Networking -> RE/Merge/MergeRequest
+                local pkgs = ReplicatedStorage:FindFirstChild("Packages")
+                if pkgs then
+                    local rems = pkgs:FindFirstChild("Remotes")
+                    if rems then
+                        local networking = rems:FindFirstChild("Networking")
+                        if networking then
+                            local req = networking:FindFirstChild("RE/Merge/MergeRequest")
+                            if req then
+                                safeFire(req)
+                            else
+                                sendLog("Packages.Remotes.Networking.RE/Merge/MergeRequest not found")
+                            end
+                        else
+                            sendLog("Packages.Remotes.Networking not found")
+                        end
+                    else
+                        sendLog("Packages.Remotes not found")
+                    end
+                else
+                    sendLog("Packages not found")
+                end
             end
         end
     end)()
@@ -313,6 +355,57 @@ createButton("Rebuild Done", function()
         local remotes = ReplicatedStorage:FindFirstChild("NukeRemotes")
         if remotes and remotes:FindFirstChild("RebuildDone") then
             remotes.RebuildDone:FireServer()
+        end
+    end)
+end)
+
+createButton("Dump Remotes", function()
+    pcall(function()
+        local function dumpInstance(inst, depth, lines)
+            depth = depth or 0
+            lines = lines or {}
+            table.insert(lines, string.rep("  ", depth) .. "- " .. tostring(inst.Name) .. " (" .. tostring(inst.ClassName) .. ")")
+            for _, c in ipairs(inst:GetChildren()) do
+                dumpInstance(c, depth + 1, lines)
+            end
+            return lines
+        end
+
+        local lines = {}
+        local ok, err = pcall(function()
+            table.insert(lines, "== ReplicatedStorage ==")
+            for _, c in ipairs(ReplicatedStorage:GetChildren()) do
+                dumpInstance(c, 0, lines)
+            end
+
+            local pkgs = ReplicatedStorage:FindFirstChild("Packages")
+            if pkgs then
+                table.insert(lines, "== Packages ==")
+                local rems = pkgs:FindFirstChild("Remotes")
+                if rems then
+                    dumpInstance(rems, 0, lines)
+                    local networking = rems:FindFirstChild("Networking")
+                    if networking then
+                        table.insert(lines, "== Packages.Remotes.Networking ==")
+                        for _, c in ipairs(networking:GetChildren()) do
+                            dumpInstance(c, 0, lines)
+                        end
+                    else
+                        table.insert(lines, "Packages.Remotes.Networking not found")
+                    end
+                else
+                    table.insert(lines, "Packages.Remotes not found")
+                end
+            else
+                table.insert(lines, "Packages not found in ReplicatedStorage")
+            end
+        end)
+
+        if not ok then
+            sendLog("Dump Remotes failed: " .. tostring(err))
+        else
+            -- prepend a header with timestamp for clarity
+            sendLog("=== Dump Remotes ===\n" .. table.concat(lines, "\n"))
         end
     end)
 end)
