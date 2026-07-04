@@ -332,12 +332,7 @@ local function tweenTo(targetPos)
     return false
 end
 
-local function bringNukeTo(nukeModel, targetPos)
-    local primary = nukeModel.PrimaryPart or nukeModel:FindFirstChildWhichIsA("BasePart")
-    if primary then
-        primary.CFrame = CFrame.new(targetPos)
-    end
-end
+-- Dihapus bringNukeTo karena menyebabkan ghosting (berbayang) di server
 
 -- ============================================================
 -- AUTO MERGE LOOP
@@ -369,15 +364,11 @@ task.spawn(function()
                 local n1 = nukes[i]
                 local n2 = nukes[i+1]
                 
-                -- Hanya bisa merge jika ada pasangan nuke dengan level yang SAMA
+                -- Harus ada pasangan level yang sama untuk bisa di-merge
                 if n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent then
                     
-                    if n1.dist > 80 or n2.dist > 80 then
-                        tweenTo(n1.pos)
-                    else
-                        bringNukeTo(n1.model, pullPos)
-                        bringNukeTo(n2.model, pullPos)
-                    end
+                    -- JALAN KE BOMB 1 (Wajib agar server tidak menganggapnya palsu/ghost)
+                    tweenTo(n1.pos)
                     
                     holdConfirmed = false
                     safeFire(pickUpRE, n1.model)
@@ -389,18 +380,24 @@ task.spawn(function()
                     end
                     
                     if holdConfirmed then
-                        -- Gabungkan nuke 1 yang sedang dipegang ke nuke 2
+                        -- JALAN KE BOMB 2
+                        tweenTo(n2.pos)
+                        
+                        -- Gabungkan Bomb 1 (di tangan) ke Bomb 2
                         safeFire(mergeRE, n2.model)
                         merged = merged + 1
                         task.wait(0.15)
                     end
                     
-                    -- Lompati n2 karena sudah dipakai
                     i = i + 2
                 else
-                    -- Jika level tidak sama, lanjut ke nuke berikutnya
                     i = i + 1
                 end
+            end
+            
+            -- Setelah selesai merge, kembali ke titik kumpul (jika ada)
+            if State.MergeGatherPos and merged > 0 then
+                tweenTo(State.MergeGatherPos)
             end
             
             if merged > 0 then
