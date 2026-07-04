@@ -125,22 +125,23 @@ local remoteCache = {}
 
 local function resolveRemote(name)
     if remoteCache[name] then
-        -- Validasi bahwa instance masih ada
         if remoteCache[name].Parent then return remoteCache[name] end
         remoteCache[name] = nil
     end
     local paths = REMOTE_PATHS[name]
     if not paths then return nil end
     for _, pathStr in ipairs(paths) do
-        local parts  = string.split(pathStr, ".")
+        -- Pisahkan path berdasarkan titik '.' untuk folder/container
+        -- Tapi nama remote-nya sendiri bisa mengandung '/' seperti 'RE/Pickup/PickUp'
+        local parts = string.split(pathStr, ".")
         local cursor = RS
         local ok = true
         for _, part in ipairs(parts) do
+            -- Cari child dengan nama persis (termasuk yang mengandung '/')
             local child = cursor:FindFirstChild(part)
             if not child then
-                -- Coba cari dengan WaitForChild singkat
-                child = cursor:FindFirstChild(part, true) -- recursive
-                if not child then ok = false; break end
+                ok = false
+                break
             end
             cursor = child
         end
