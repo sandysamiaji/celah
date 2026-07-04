@@ -255,65 +255,61 @@ task.spawn(function()
         
         -- AUTO MERGE
         if _G_State.AutoMerge and not _G_State.IsUnderAttack then
-            local mergeRemotes = findInstancesByNames(RS, {"MergeRequest", "RE/Merge/MergeRequest"})
-            local pickupRemotes = findInstancesByNames(RS, {"PickUp", "RE/Pickup/PickUp"})
-            
-            if #mergeRemotes > 0 and #pickupRemotes > 0 then
-                -- Kumpulkan dan kelompokkan berdasarkan Nilai (Teks di Nuke)
-                local nukeGroups = {}
-                for _, v in ipairs(workspace:GetDescendants()) do
-                    if v.Name == "Nuke" and v:IsA("BasePart") then
-                        local val = getBombValue(v)
-                        if val ~= "?" then
-                            if not nukeGroups[val] then nukeGroups[val] = {} end
-                            table.insert(nukeGroups[val], v)
+            -- MENGGUNAKAN REMOTE ASLI SAJA (Mencegah error dari double firing)
+            local nukeRemotes = RS:FindFirstChild("NukeRemotes")
+            if nukeRemotes then
+                local pickUp = nukeRemotes:FindFirstChild("PickUp")
+                local mergeReq = nukeRemotes:FindFirstChild("MergeRequest")
+                
+                if pickUp and mergeReq then
+                    local char = Players.LocalPlayer.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    
+                    local allNukes = {}
+                    for _, v in ipairs(workspace:GetDescendants()) do
+                        if v.Name == "Nuke" and v:IsA("BasePart") then
+                            -- Hanya kumpulkan Nuke di sekitar pemain (radius 150) agar tidak mencuri dari tetangga
+                            if hrp and (v.Position - hrp.Position).Magnitude < 150 then
+                                table.insert(allNukes, v)
+                            elseif not hrp then
+                                table.insert(allNukes, v)
+                            end
                         end
                     end
-                end
-                
-                local firedCount = 0
-                for val, group in pairs(nukeGroups) do
-                    -- Jika ada minimal 2 bom dengan nilai yang sama, kita bisa merge
-                    local unmerged = {}
-                    for _, v in ipairs(group) do table.insert(unmerged, v) end
                     
-                    while #unmerged >= 2 do
-                        local nuke1 = table.remove(unmerged, 1)
-                        local pairedIndex = nil
-                        
-                        -- Cari bom yang berdekatan (maksimal jarak 200 stud) untuk memastikan mereka ada di base yang sama
-                        for i, nuke2 in ipairs(unmerged) do
-                            if (nuke1.Position - nuke2.Position).Magnitude < 200 then
-                                pairedIndex = i
-                                break
-                            end
+                    -- Kelompokkan berdasarkan teks nilai Nuke
+                    local nukeGroups = {}
+                    for _, n in ipairs(allNukes) do
+                        local val = getBombValue(n)
+                        if val ~= "?" then
+                            if not nukeGroups[val] then nukeGroups[val] = {} end
+                            table.insert(nukeGroups[val], n)
                         end
-                        
-                        if pairedIndex then
-                            local nuke2 = table.remove(unmerged, pairedIndex)
+                    end
+                    
+                    local firedCount = 0
+                    for val, group in pairs(nukeGroups) do
+                        while #group >= 2 do
+                            local n1 = table.remove(group, 1)
+                            local n2 = table.remove(group, 1)
                             
-                            -- Tembak semua varian PickUp (Ambil)
-                            for _, pRemote in ipairs(pickupRemotes) do
-                                safeFire(pRemote, nuke1)
-                            end
+                            -- Proses Ambil
+                            safeFire(pickUp, n1)
+                            task.wait(0.15) -- Waktu paling stabil agar tidak nyangkut
                             
-                            task.wait(0.05) -- Jeda super kilat
-                            
-                            -- Tembak semua varian MergeRequest (Gabung)
-                            for _, mRemote in ipairs(mergeRemotes) do
-                                safeFire(mRemote, nuke2)
-                            end
+                            -- Proses Gabung
+                            safeFire(mergeReq, n2)
                             
                             firedCount = firedCount + 1
                             if not _G_State.AutoMerge then break end
                             task.wait(_G_State.MergeDelay or 0.5)
                         end
+                        if not _G_State.AutoMerge then break end
                     end
-                    if not _G_State.AutoMerge then break end
-                end
-                
-                if firedCount > 0 then
-                    logAction("Auto Merge", true, "Sukses mengeksekusi " .. tostring(firedCount) .. " pasang Nuke secara siluman")
+                    
+                    if firedCount > 0 then
+                        logAction("Auto Merge", true, "Menyatukan " .. tostring(firedCount) .. " pasang Nuke di base Anda.")
+                    end
                 end
             end
         end
