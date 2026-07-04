@@ -9,8 +9,6 @@ getgenv().autoCollect = false
 getgenv().autoDefense = false
 getgenv().isUnderAttack = false
 
-rubah test
-
 -- ==================== WEBHOOK LOGGER ====================
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
 local http_request = request or http_request or (http and http.request) or syn and syn.request
