@@ -242,6 +242,13 @@ local function getNukeLevel(nuke)
     return 0
 end
 
+local function logLoopState(msg)
+    if State.LastLoopLog ~= msg then
+        State.LastLoopLog = msg
+        logAction("Loop", true, msg)
+    end
+end
+
 local function getAllNukes()
     local nukes = {}
     local hrp = getHRP()
@@ -399,6 +406,7 @@ task.spawn(function()
         local nukes = getAllNukes()
         
         if State.IsHolding and currentTargetLevel then
+            logLoopState("Memegang Lvl " .. currentTargetLevel .. " | Mencari kembaran di " .. #nukes .. " nukes")
             -- Cari apakah ada pasangan untuk bom yang sedang kita pegang
             local targetNuke = nil
             for _, nk in ipairs(nukes) do
@@ -428,7 +436,7 @@ task.spawn(function()
                 -- Buat log isi nukes untuk dianalisis
                 local isi = ""
                 for _, nk in ipairs(nukes) do isi = isi .. nk.level .. "," end
-                logAction("Diag", false, "Gagal menemukan level " .. currentTargetLevel .. " | Isi nukes: [" .. isi .. "] | Melakukan Drop.")
+                logLoopState("Kembaran Lvl " .. currentTargetLevel .. " tidak ditemukan! Melakukan Drop. (Isi: " .. isi .. ")")
                 
                 -- Tidak ada pasangan lagi untuk level ini, JATUHKAN!
                 local heldObj = State.HeldNukeModel
@@ -448,6 +456,7 @@ task.spawn(function()
         else
             -- Tangan kosong (atau kita paksa kosongkan jika sinkronisasi salah)
             if State.IsHolding then
+                logLoopState("Sinkronisasi salah (IsHolding tapi currentLvl nil). Paksa Drop.")
                 local heldObj = State.HeldNukeModel
                 pcall(function() RS.NukeRemotes.Drop:FireServer(heldObj) end)
                 if dropRE then safeFire(dropRE, heldObj) end
@@ -457,6 +466,7 @@ task.spawn(function()
             end
             currentTargetLevel = nil
             
+            logLoopState("Tangan kosong | Memindai pasangan baru dari " .. #nukes .. " nukes")
             -- Cari pasangan level terkecil yang tersedia
             local targetPairLvl = nil
             local firstNuke = nil
@@ -490,7 +500,7 @@ task.spawn(function()
                     currentTargetLevel = targetPairLvl
                     State.HeldNukeModel = firstNuke.model
                 else
-                    logAction("Diag", false, "Timeout menunggu HoldStarted. Membatalkan PickUp.")
+                    logLoopState("Gagal PickUp (Timeout HoldStarted). Membatalkan PickUp.")
                     -- Gagal PickUp, reset
                     local heldObj = State.HeldNukeModel
                     pcall(function() RS.NukeRemotes.Drop:FireServer(heldObj) end)
@@ -499,6 +509,7 @@ task.spawn(function()
                     State.HeldNukeModel = nil
                 end
             else
+                logLoopState("Tidak ada pasangan (Idle). Berdiri di titik kumpul.")
                 -- Tidak ada pasangan sama sekali, diam di titik kumpul
                 if State.MergeGatherPos and (pPos - State.MergeGatherPos).Magnitude > 5 then
                     hrp.CFrame = CFrame.new(State.MergeGatherPos)
@@ -836,6 +847,48 @@ TabTools:Button({
     end
 })
 
+TabTools:Button({
+    Title    = "🗑️ Test Drop (No Args)",
+    Callback = function()
+        local dropRE = resolveRemote("Drop")
+        if dropRE then 
+            pcall(function() RS.NukeRemotes.Drop:FireServer() end)
+            safeFire(dropRE)
+            logAction("Test", true, "Fired Drop()") 
+            windui:Notify({ Title = "Test Drop", Content = "Mengirim Drop()", Duration = 3 })
+        end
+    end
+})
+
+TabTools:Button({
+    Title    = "🗑️ Test Drop (Model)",
+    Callback = function()
+        local dropRE = resolveRemote("Drop")
+        if dropRE and State.HeldNukeModel then 
+            pcall(function() RS.NukeRemotes.Drop:FireServer(State.HeldNukeModel) end)
+            safeFire(dropRE, State.HeldNukeModel)
+            logAction("Test", true, "Fired Drop(Model)") 
+            windui:Notify({ Title = "Test Drop", Content = "Mengirim Drop(Model)", Duration = 3 })
+        else
+            windui:Notify({ Title = "Test Drop", Content = "HeldNukeModel kosong!", Duration = 3 })
+        end
+    end
+})
+
+TabTools:Button({
+    Title    = "🗑️ Test Drop (XYZ)",
+    Callback = function()
+        local dropRE = resolveRemote("Drop")
+        local hrp = getHRP()
+        if dropRE and hrp then 
+            pcall(function() RS.NukeRemotes.Drop:FireServer(hrp.Position.X, hrp.Position.Y, hrp.Position.Z) end)
+            safeFire(dropRE, hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+            logAction("Test", true, "Fired Drop(XYZ)") 
+            windui:Notify({ Title = "Test Drop", Content = "Mengirim Drop(XYZ)", Duration = 3 })
+        end
+    end
+})
+
 TabTools:Input({
     Title       = "🚀 Teleport ke Koordinat (X, Y, Z)",
     Placeholder = "Contoh: 100, 20, -50",
@@ -962,6 +1015,54 @@ TabLogs:Input({
         windui:Notify({ Title = "Terkirim", Content = "Dicatat ke webhook.", Duration = 3 })
     end
 })
+
+-- ============================================================
+-- REMOTE SPY (HOOKMETAMETHOD)
+-- ============================================================
+TabTools:Toggle({
+    Title    = "🕵️ Enable Remote Spy",
+    Default  = false,
+    Callback = function(state)
+        State.RemoteSpyEnabled = state
+        logAction("Spy Toggle", true, "Remote Spy " .. (state and "ON" or "OFF"))
+        windui:Notify({ Title = "Remote Spy", Content = "Remote Spy is " .. (state and "ON" or "OFF"), Duration = 3 })
+    end
+})
+
+local oldNamecall
+if hookmetamethod then
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if State.RemoteSpyEnabled then
+            if method == "FireServer" or method == "InvokeServer" then
+                local args = {...}
+                local name = tostring(self.Name)
+                
+                -- Filter spam remotes (bisa ditambah sesuai kebutuhan)
+                if name ~= "MouseUpdate" and name ~= "Ping" and name ~= "Heartbeat" and name ~= "LockStateUpdate" then
+                    local argStr = ""
+                    for i, v in ipairs(args) do
+                        if typeof(v) == "Instance" then
+                            argStr = argStr .. v:GetFullName()
+                        elseif typeof(v) == "Vector3" then
+                            argStr = argStr .. string.format("Vec3(%.1f, %.1f, %.1f)", v.X, v.Y, v.Z)
+                        else
+                            argStr = argStr .. tostring(v)
+                        end
+                        if i < #args then argStr = argStr .. ", " end
+                    end
+                    
+                    -- Hindari yield dalam metamethod, gunakan task.defer
+                    task.defer(function()
+                        local caller = checkcaller() and "[SCRIPT]" or "[GAME]"
+                        logAction("Spy-Net", true, string.format("%s %s(%s)", caller, name, argStr))
+                    end)
+                end
+            end
+        end
+        return oldNamecall(self, ...)
+    end))
+end
 
 -- ============================================================
 -- SELESAI
