@@ -255,71 +255,81 @@ task.spawn(function()
         
         -- AUTO MERGE
         if _G_State.AutoMerge and not _G_State.IsUnderAttack then
-            -- MENGGUNAKAN REMOTE ASLI SAJA (Mencegah error dari double firing)
-            local nukeRemotes = RS:FindFirstChild("NukeRemotes")
-            if nukeRemotes then
-                local pickUp = nukeRemotes:FindFirstChild("PickUp")
-                local mergeReq = nukeRemotes:FindFirstChild("MergeRequest")
+            -- BERDASARKAN LOG SPY: 
+            -- PickUp yang bekerja ada di NukeRemotes
+            -- MergeRequest yang menghasilkan efek (MergeVFX) ada di Packages.Remotes.Networking
+            
+            local pickUp
+            if RS:FindFirstChild("NukeRemotes") then
+                pickUp = RS.NukeRemotes:FindFirstChild("PickUp")
+            end
+            
+            local mergeReq
+            local pkgNet = RS:FindFirstChild("Packages") and RS.Packages:FindFirstChild("Remotes") and RS.Packages.Remotes:FindFirstChild("Networking")
+            if pkgNet then
+                mergeReq = pkgNet:FindFirstChild("RE/Merge/MergeRequest")
+            end
+            
+            -- Fallback jika game update
+            if not mergeReq and RS:FindFirstChild("NukeRemotes") then
+                mergeReq = RS.NukeRemotes:FindFirstChild("MergeRequest")
+            end
+            
+            if pickUp and mergeReq then
+                local allNukes = {}
+                for _, v in ipairs(workspace:GetDescendants()) do
+                    if v.Name == "Nuke" and v:IsA("BasePart") then
+                        table.insert(allNukes, v)
+                    end
+                end
                 
-                if pickUp and mergeReq then
-                    local char = Players.LocalPlayer.Character
-                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    
-                    local allNukes = {}
-                    for _, v in ipairs(workspace:GetDescendants()) do
-                        if v.Name == "Nuke" and v:IsA("BasePart") then
-                            table.insert(allNukes, v)
-                        end
+                -- Kelompokkan berdasarkan teks nilai Nuke
+                local nukeGroups = {}
+                for _, n in ipairs(allNukes) do
+                    local val = getBombValue(n)
+                    if val ~= "?" then
+                        if not nukeGroups[val] then nukeGroups[val] = {} end
+                        table.insert(nukeGroups[val], n)
                     end
+                end
+                
+                local firedCount = 0
+                for val, group in pairs(nukeGroups) do
+                    local unmerged = {}
+                    for _, v in ipairs(group) do table.insert(unmerged, v) end
                     
-                    -- Kelompokkan berdasarkan teks nilai Nuke
-                    local nukeGroups = {}
-                    for _, n in ipairs(allNukes) do
-                        local val = getBombValue(n)
-                        if val ~= "?" then
-                            if not nukeGroups[val] then nukeGroups[val] = {} end
-                            table.insert(nukeGroups[val], n)
-                        end
-                    end
-                    
-                    local firedCount = 0
-                    for val, group in pairs(nukeGroups) do
-                        local unmerged = {}
-                        for _, v in ipairs(group) do table.insert(unmerged, v) end
+                    while #unmerged >= 2 do
+                        local n1 = table.remove(unmerged, 1)
+                        local pairedIndex = nil
                         
-                        while #unmerged >= 2 do
-                            local n1 = table.remove(unmerged, 1)
-                            local pairedIndex = nil
-                            
-                            -- Pastikan dua bom ini berdekatan (satu base) untuk mencegah error merge beda base
-                            for i, n2 in ipairs(unmerged) do
-                                if (n1.Position - n2.Position).Magnitude < 200 then
-                                    pairedIndex = i
-                                    break
-                                end
-                            end
-                            
-                            if pairedIndex then
-                                local n2 = table.remove(unmerged, pairedIndex)
-                                
-                                -- Proses Ambil
-                                safeFire(pickUp, n1)
-                                task.wait(0.15) -- Waktu paling stabil agar tidak nyangkut
-                                
-                                -- Proses Gabung
-                                safeFire(mergeReq, n2)
-                                
-                                firedCount = firedCount + 1
-                                if not _G_State.AutoMerge then break end
-                                task.wait(_G_State.MergeDelay or 0.5)
+                        -- Pastikan dua bom ini berdekatan (satu base) untuk mencegah error merge beda base
+                        for i, n2 in ipairs(unmerged) do
+                            if (n1.Position - n2.Position).Magnitude < 200 then
+                                pairedIndex = i
+                                break
                             end
                         end
-                        if not _G_State.AutoMerge then break end
+                        
+                        if pairedIndex then
+                            local n2 = table.remove(unmerged, pairedIndex)
+                            
+                            -- Proses Ambil
+                            safeFire(pickUp, n1)
+                            task.wait(0.2) -- Jeda aman agar server mendaftarkan HoldStarted
+                            
+                            -- Proses Gabung
+                            safeFire(mergeReq, n2)
+                            
+                            firedCount = firedCount + 1
+                            if not _G_State.AutoMerge then break end
+                            task.wait(_G_State.MergeDelay or 0.5)
+                        end
                     end
-                    
-                    if firedCount > 0 then
-                        logAction("Auto Merge", true, "Menyatukan " .. tostring(firedCount) .. " pasang Nuke di base Anda.")
-                    end
+                    if not _G_State.AutoMerge then break end
+                end
+                
+                if firedCount > 0 then
+                    logAction("Auto Merge", true, "Berhasil menembakkan " .. tostring(firedCount) .. " pasang Nuke.")
                 end
             end
         end
@@ -338,7 +348,14 @@ task.spawn(function()
                     local collectCount = 0
                     for _, obj in pairs(workspace:GetDescendants()) do
                         if obj:IsA("BasePart") and obj:FindFirstChildWhichIsA("TouchTransmitter") then
-                            if string.match(obj.Name, "RMB_") or obj.Name == "neon" then
+                            local n = string.lower(obj.Name)
+                            -- Deteksi: 
+                            -- 1. Part tidak di-anchor (biasanya item drop fisik yang jatuh ke tanah)
+                            -- 2. Nama part mengandung unsur uang/tombol klaim tycoon
+                            local isDrop = not obj.Anchored
+                            local isButton = string.find(n, "rmb") or string.find(n, "neon") or string.find(n, "coin") or string.find(n, "cash") or string.find(n, "money") or string.find(n, "drop") or string.find(n, "collect") or string.find(n, "claim") or string.find(n, "giver") or string.find(n, "reward")
+                            
+                            if isDrop or isButton then
                                 firetouchinterest(hrp, obj, 0)
                                 task.wait(0.01)
                                 firetouchinterest(hrp, obj, 1)
@@ -527,6 +544,58 @@ TabMain:Button({
             else
                 logAction("Manual", false, "Remote RebuildDone tidak ditemukan")
             end
+        end)
+    end
+})
+
+TabMain:Divider()
+
+TabMain:Button({
+    Title = "💰 Force Infinite Money (Eksploit) ⚠️",
+    Callback = function()
+        pcall(function()
+            local offline = RS:FindFirstChild("NukeRemotes") and RS.NukeRemotes:FindFirstChild("OfflineEarnings")
+            local group = RS:FindFirstChild("NukeRemotes") and RS.NukeRemotes:FindFirstChild("ClaimGroupReward")
+            local city = RS:FindFirstChild("NukeRemotes") and RS.NukeRemotes:FindFirstChild("CityRewardPaid")
+            
+            -- Cari bom dengan level tertinggi di workspace (berdasarkan atribut/nama angka)
+            local maxLvl = 0
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("Model") and tonumber(v.Name) then
+                    local lvl = tonumber(v.Name)
+                    if lvl > maxLvl then
+                        maxLvl = lvl
+                    end
+                end
+            end
+            
+            -- Jika tidak ada bom, gunakan default 1000
+            local baseLvl = maxLvl > 0 and maxLvl or 1000
+            local massiveMoney = baseLvl
+            
+            -- Kirimkan permintaan hadiah sebanyak 8 kali secara terpisah (seolah-olah 8 kali hit)
+            task.spawn(function()
+                for i = 1, 8 do
+                    if offline then
+                        safeFire(offline, massiveMoney)
+                        safeFire(offline, tostring(massiveMoney))
+                    end
+                    
+                    if group then
+                        safeFire(group, massiveMoney)
+                    end
+                    
+                    if city then
+                        safeFire(city, massiveMoney)
+                    end
+                    
+                    task.wait(0.1) -- Sedikit jeda agar tidak terdeteksi spam oleh server
+                end
+                
+                logAction("Eksploit", true, "Selesai menyuntikkan uang " .. tostring(baseLvl) .. " sebanyak 8 kali (Hit beruntun).")
+            end)
+            
+            logAction("Eksploit", true, "Memulai eksploit uang (8x hit beruntun)...")
         end)
     end
 })
