@@ -155,7 +155,7 @@ if hasHook and not _G.NukeHooked then
                 local okName, name = pcall(function() return self.Name end)
                 if okName and _G_State.SpyRemotes and not ignoreSpam[name] then
                     local argStr = formatArgs(...)
-                    local logMsg = string.format("[SPY] %s | %s | %s", method, name, argStr)
+                    local logMsg = string.format("[SPY] C2S (%s) | %s | %s", method, name, argStr)
                     logAction("REMOTE", true, logMsg)
                 end
             end
@@ -167,16 +167,68 @@ if hasHook and not _G.NukeHooked then
     end
 end
 
+-- ============================================================
+-- S2C SPY (SERVER TO CLIENT)
+-- ============================================================
+local function setupS2CSpy(remote)
+    if remote:IsA("RemoteEvent") then
+        if _G.S2CHooked_List[remote] then return end
+        _G.S2CHooked_List[remote] = true
+        
+        remote.OnClientEvent:Connect(function(...)
+            if _G_State.SpyRemotes then
+                local name = remote.Name
+                if not ignoreSpam[name] then
+                    local argStr = formatArgs(...)
+                    local logMsg = string.format("[SPY] S2C (OnClientEvent) | %s | %s", name, argStr)
+                    logAction("REMOTE", true, logMsg)
+                end
+            end
+        end)
+    end
+end
+
+if not _G.S2CHooked_List then
+    _G.S2CHooked_List = {}
+    -- Cari semua remote di RS & Workspace
+    local function scanAndHook(root)
+        pcall(function()
+            for _, r in ipairs(root:GetDescendants()) do
+                if isRemoteInstance(r) then setupS2CSpy(r) end
+            end
+        end)
+    end
+    scanAndHook(RS)
+    scanAndHook(workspace)
+    
+    -- Pantau jika ada remote baru
+    RS.DescendantAdded:Connect(function(v)
+        if isRemoteInstance(v) then setupS2CSpy(v) end
+    end)
+    workspace.DescendantAdded:Connect(function(v)
+        if isRemoteInstance(v) then setupS2CSpy(v) end
+    end)
+end
+
+local function getBombValue(nuke)
+    local gui = nuke:FindFirstChildWhichIsA("SurfaceGui") or nuke:FindFirstChildWhichIsA("BillboardGui")
+    if gui then
+        local tl = gui:FindFirstChildWhichIsA("TextLabel", true)
+        if tl then return tl.Text end
+    end
+    return "?"
+end
+
 -- Deteksi Bom Muncul
 if not _G.NukeSensor then
     _G.NukeSensor = true
     workspace.DescendantAdded:Connect(function(v)
         if v.Name == "Nuke" and v:IsA("BasePart") then
-            -- Tunggu sebentar agar posisi bom update
-            task.delay(0.5, function()
-                local lvl = (v.Parent and tonumber(v.Parent.Name)) and v.Parent.Name or "?"
+            -- Tunggu sebentar agar posisi bom update & UI termuat
+            task.delay(1.0, function()
+                local val = getBombValue(v)
                 local pos = string.format("X:%.1f, Y:%.1f, Z:%.1f", v.Position.X, v.Position.Y, v.Position.Z)
-                logAction("BOMB SPAWN", true, "Nuke Lv." .. tostring(lvl) .. " terdeteksi di " .. pos)
+                logAction("BOMB SPAWN", true, "Nuke [" .. val .. "] terdeteksi di " .. pos)
             end)
         end
     end)
@@ -198,22 +250,21 @@ task.spawn(function()
                 local pickUp = pickupRemotes[1]
                 local mergeRemote = mergeRemotes[1]
                 
-                -- Kumpulkan dan kelompokkan berdasarkan Level (Nama Parent)
+                -- Kumpulkan dan kelompokkan berdasarkan Nilai (Teks di Nuke)
                 local nukeGroups = {}
                 for _, v in ipairs(workspace:GetDescendants()) do
                     if v.Name == "Nuke" and v:IsA("BasePart") then
-                        local p = v.Parent
-                        if p and tonumber(p.Name) then
-                            local lvl = tonumber(p.Name)
-                            if not nukeGroups[lvl] then nukeGroups[lvl] = {} end
-                            table.insert(nukeGroups[lvl], v)
+                        local val = getBombValue(v)
+                        if val ~= "?" then
+                            if not nukeGroups[val] then nukeGroups[val] = {} end
+                            table.insert(nukeGroups[val], v)
                         end
                     end
                 end
                 
                 local firedCount = 0
-                for lvl, group in pairs(nukeGroups) do
-                    -- Jika ada minimal 2 bom dengan level yang sama, kita bisa merge
+                for val, group in pairs(nukeGroups) do
+                    -- Jika ada minimal 2 bom dengan nilai yang sama, kita bisa merge
                     if #group >= 2 then
                         local pairsToMerge = math.floor(#group / 2)
                         for i = 1, pairsToMerge do
@@ -365,13 +416,14 @@ TabMain:Toggle({
 })
 
 TabMain:Slider({
-    Title = "⏱️ Auto Merge Delay",
-    Step = 0.1,
-    Min = 0.2,
-    Max = 2.0,
-    Default = 0.5,
+    Title = "⏱️ Auto Merge Delay (Skala 1-20)",
+    Step = 1,
+    Min = 2,
+    Max = 20,
+    Default = 5,
     Callback = function(value)
-        _G_State.MergeDelay = value
+        _G_State.MergeDelay = value / 10
+        logAction("Menu", true, "Delay diubah ke " .. tostring(_G_State.MergeDelay) .. " detik")
     end
 })
 
