@@ -33,6 +33,7 @@ _G.NukeGameExecution = ExecutionID -- Mematikan loop dari script versi lama (v1)
 
 local State = {
     AutoMerge      = false,
+    StealNukes     = false,
     AutoCollect    = false,
     AutoDefense    = false,
     AutoRebirth    = false,
@@ -197,19 +198,25 @@ end
 -- ============================================================
 local function getAllNukes()
     local nukes = {}
+    local hrp = getHRP()
+    local hrpPos = hrp and hrp.Position or Vector3.new(0,0,0)
+    
     for _, v in ipairs(workspace:GetDescendants()) do
         if v:IsA("Model") and v.Name == "Nuke" then
             local primary = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")
             if primary then
-                table.insert(nukes, { model = v, part = primary, pos = primary.Position })
+                local dist = (primary.Position - hrpPos).Magnitude
+                -- Jika StealNukes OFF, hanya ambil nuke dalam radius 250 studs (area base sendiri)
+                if State.StealNukes or dist <= 250 then
+                    table.insert(nukes, { model = v, part = primary, pos = primary.Position, dist = dist })
+                end
             end
         end
     end
     -- Urutkan dari yang terdekat ke karakter
-    local hrp = getHRP()
     if hrp then
         table.sort(nukes, function(a, b)
-            return (a.pos - hrp.Position).Magnitude < (b.pos - hrp.Position).Magnitude
+            return a.dist < b.dist
         end)
     end
     return nukes
@@ -281,13 +288,16 @@ pcall(function()
     end
 end)
 
-local function bringNukeToPlayer(nukeModel)
+local function tweenTo(targetPos)
     local hrp = getHRP()
-    local primary = nukeModel.PrimaryPart or nukeModel:FindFirstChildWhichIsA("BasePart")
-    if hrp and primary then
-        -- Pindahkan nuke ke dekat player secara lokal
-        primary.CFrame = hrp.CFrame * CFrame.new(0, 0, -3)
-        task.wait(0.05)
+    if hrp then
+        local dist = (hrp.Position - targetPos).Magnitude
+        if dist < 5 then return true end -- Sudah dekat
+        local tInfo = TweenInfo.new(dist / 50, Enum.EasingStyle.Linear)
+        local tween = TweenService:Create(hrp, tInfo, {CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))})
+        tween:Play()
+        tween.Completed:Wait()
+        task.wait(0.1)
         return true
     end
     return false
@@ -305,42 +315,50 @@ task.spawn(function()
         local nukes = getAllNukes()
         if #nukes == 0 then continue end
         
-        local merged = 0
         local pickUpRE  = resolveRemote("PickUp")
         local mergeRE   = resolveRemote("MergeRequest")
 
         if pickUpRE and mergeRE then
-            for _, nukeInfo in ipairs(nukes) do
-                if not State.AutoMerge then break end
-                if nukeInfo.model and nukeInfo.model.Parent then
-                    -- Bypass teleport: pindahkan nuke ke dekat player
-                    bringNukeToPlayer(nukeInfo.model)
+            -- Jika kita BELUM memegang nuke, kita harus ambil 1 nuke terdekat dulu
+            if not State.IsHolding then
+                local nearest = nukes[1]
+                if nearest and nearest.model and nearest.model.Parent then
+                    -- Jalan/Tween ke Nuke pertama agar server validasi posisinya
+                    tweenTo(nearest.pos)
                     
                     holdConfirmed = false
-                    safeFire(pickUpRE, nukeInfo.model)
+                    safeFire(pickUpRE, nearest.model)
                     
-                    -- Tunggu maksimal 0.3 detik untuk konfirmasi HoldStarted
+                    -- Tunggu konfirmasi hold
                     local waited = 0
-                    while not holdConfirmed and waited < 0.3 do
-                        task.wait(0.05)
-                        waited = waited + 0.05
+                    while not holdConfirmed and waited < 1 do
+                        task.wait(0.1)
+                        waited = waited + 0.1
                     end
                     
-                    -- Jika server memvalidasi PickUp, kirim Merge
                     if holdConfirmed then
-                        safeFire(mergeRE, nukeInfo.model)
-                        merged = merged + 1
-                        task.wait(0.15)
+                        logAction("Auto Merge", true, "Berhasil memegang 1 nuke sebagai Base")
                     else
-                        -- Fallback paksa merge jika tidak ada respons HoldStarted
-                        safeFire(mergeRE, nukeInfo.model)
+                        logAction("Auto Merge", false, "Gagal mengambil nuke base, coba lagi...")
                     end
                 end
+            else
+                -- Jika SUDAH memegang nuke, remote merge semua nuke lainnya TANPA perlu berjalan ke sana!
+                -- Ini adalah bypass teleport yang sebenarnya.
+                local merged = 0
+                for i = 2, #nukes do
+                    local nukeInfo = nukes[i]
+                    if not State.AutoMerge then break end
+                    if nukeInfo.model and nukeInfo.model.Parent then
+                        safeFire(mergeRE, nukeInfo.model)
+                        merged = merged + 1
+                        task.wait(0.1)
+                    end
+                end
+                if merged > 0 then
+                    logAction("Auto Merge", true, "Remote Merge " .. merged .. " nuke(s)")
+                end
             end
-        end
-        
-        if merged > 0 then
-            logAction("Auto Merge", true, "Proses " .. merged .. " nuke(s)")
         end
     end
 end)
@@ -520,6 +538,15 @@ TabMain:Toggle({
 })
 
 TabMain:Toggle({
+    Title    = "😈 Steal Opponents' Nukes (Global)",
+    Default  = false,
+    Callback = function(v)
+        State.StealNukes = v
+        logAction("Menu", true, "Steal Nukes " .. (v and "ON" or "OFF"))
+    end
+})
+
+TabMain:Toggle({
     Title    = "💰 Auto Collect Drop",
     Default  = false,
     Callback = function(v)
@@ -621,14 +648,14 @@ TabLaunch:Button({
     Callback = function()
         local nuke, dist = getNearestFreeNuke()
         if nuke then
-            bringNukeToPlayer(nuke)
+            tweenTo(nuke.PrimaryPart.Position)
             local pickUpRE = resolveRemote("PickUp")
             local mergeRE = resolveRemote("MergeRequest")
             if pickUpRE and mergeRE then
                 safeFire(pickUpRE, nuke)
                 task.wait(0.2)
                 safeFire(mergeRE, nuke)
-                logAction("Manual Merge", true, "Mencoba merge (Bypass Bring Nuke)")
+                logAction("Manual Merge", true, "Mencoba merge (Bypass Tween)")
             end
         else
             logAction("Manual Merge", false, "Tidak ada nuke tersedia")
