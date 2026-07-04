@@ -274,22 +274,34 @@ task.spawn(function()
                 local firedCount = 0
                 for val, group in pairs(nukeGroups) do
                     -- Jika ada minimal 2 bom dengan nilai yang sama, kita bisa merge
-                    if #group >= 2 then
-                        local pairsToMerge = math.floor(#group / 2)
-                        for i = 1, pairsToMerge do
-                            local nukeHand = group[i * 2 - 1]
-                            local nukeTarget = group[i * 2]
+                    local unmerged = {}
+                    for _, v in ipairs(group) do table.insert(unmerged, v) end
+                    
+                    while #unmerged >= 2 do
+                        local nuke1 = table.remove(unmerged, 1)
+                        local pairedIndex = nil
+                        
+                        -- Cari bom yang berdekatan (maksimal jarak 200 stud) untuk memastikan mereka ada di base yang sama
+                        for i, nuke2 in ipairs(unmerged) do
+                            if (nuke1.Position - nuke2.Position).Magnitude < 200 then
+                                pairedIndex = i
+                                break
+                            end
+                        end
+                        
+                        if pairedIndex then
+                            local nuke2 = table.remove(unmerged, pairedIndex)
                             
-                            -- Tembak semua varian PickUp (jaga-jaga ada fake remote)
+                            -- Tembak semua varian PickUp (Ambil)
                             for _, pRemote in ipairs(pickupRemotes) do
-                                safeFire(pRemote, nukeHand)
+                                safeFire(pRemote, nuke1)
                             end
                             
-                            task.wait(0.2) -- Jeda penting agar server mencatat kita memegang bom
+                            task.wait(0.05) -- Jeda super kilat
                             
-                            -- Tembak semua varian MergeRequest
+                            -- Tembak semua varian MergeRequest (Gabung)
                             for _, mRemote in ipairs(mergeRemotes) do
-                                safeFire(mRemote, nukeTarget)
+                                safeFire(mRemote, nuke2)
                             end
                             
                             firedCount = firedCount + 1
@@ -432,18 +444,15 @@ TabMain:Toggle({
     end 
 })
 
-TabMain:Dropdown({
-    Title = "⏱️ Auto Merge Speed",
-    Multi = false,
-    Options = {"Super Fast (0.01s)", "Fast (0.1s)", "Normal (0.5s)", "Slow (1s)"},
-    Default = "Normal (0.5s)",
+TabMain:Slider({
+    Title = "⏱️ Kecepatan Merge (0.1s - 1.0s)",
+    Step = 1,
+    Min = 1,
+    Max = 10,
+    Default = 5,
     Callback = function(value)
-        if value == "Super Fast (0.01s)" then _G_State.MergeDelay = 0.01
-        elseif value == "Fast (0.1s)" then _G_State.MergeDelay = 0.1
-        elseif value == "Normal (0.5s)" then _G_State.MergeDelay = 0.5
-        elseif value == "Slow (1s)" then _G_State.MergeDelay = 1.0
-        end
-        logAction("Menu", true, "Kecepatan diubah ke " .. value)
+        _G_State.MergeDelay = value / 10
+        logAction("Menu", true, "Kecepatan diubah ke " .. tostring(_G_State.MergeDelay) .. " detik")
     end
 })
 
