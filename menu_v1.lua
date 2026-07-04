@@ -250,41 +250,27 @@ task.spawn(function()
                 local pickUp = pickupRemotes[1]
                 local mergeRemote = mergeRemotes[1]
                 
-                -- Kumpulkan dan kelompokkan berdasarkan Nilai (Teks di Nuke)
-                local nukeGroups = {}
+                local nukes = {}
                 for _, v in ipairs(workspace:GetDescendants()) do
                     if v.Name == "Nuke" and v:IsA("BasePart") then
-                        local val = getBombValue(v)
-                        if val ~= "?" then
-                            if not nukeGroups[val] then nukeGroups[val] = {} end
-                            table.insert(nukeGroups[val], v)
-                        end
+                        table.insert(nukes, v)
                     end
                 end
                 
                 local firedCount = 0
-                for val, group in pairs(nukeGroups) do
-                    -- Jika ada minimal 2 bom dengan nilai yang sama, kita bisa merge
-                    if #group >= 2 then
-                        local pairsToMerge = math.floor(#group / 2)
-                        for i = 1, pairsToMerge do
-                            local targetNuke = group[i] -- ambil salah satu sebagai inisiator
-                            
-                            -- Siluman PickUp: Ambil lalu gabungkan secepat kilat
-                            safeFire(pickUp, targetNuke)
-                            task.wait(0.05)
-                            safeFire(mergeRemote, targetNuke)
-                            
-                            firedCount = firedCount + 1
-                            if not _G_State.AutoMerge then break end
-                            task.wait(_G_State.MergeDelay or 0.5)
-                        end
-                    end
+                for _, targetNuke in ipairs(nukes) do
+                    -- Siluman PickUp: Ambil lalu gabungkan secepat kilat
+                    safeFire(pickUp, targetNuke)
+                    task.wait(0.01)
+                    safeFire(mergeRemote, targetNuke)
+                    
+                    firedCount = firedCount + 1
                     if not _G_State.AutoMerge then break end
+                    task.wait(_G_State.MergeDelay or 0.5)
                 end
                 
                 if firedCount > 0 then
-                    logAction("Auto Merge", true, "Sukses menggabung " .. tostring(firedCount) .. " pasang Nuke secara siluman")
+                    logAction("Auto Merge", true, "Mencoba menggabung " .. tostring(firedCount) .. " Nuke secara siluman")
                 end
             end
         end
@@ -415,15 +401,18 @@ TabMain:Toggle({
     end 
 })
 
-TabMain:Slider({
-    Title = "⏱️ Auto Merge Delay (Skala 1-20)",
-    Step = 1,
-    Min = 2,
-    Max = 20,
-    Default = 5,
+TabMain:Dropdown({
+    Title = "⏱️ Auto Merge Speed",
+    Multi = false,
+    Options = {"Super Fast (0.01s)", "Fast (0.1s)", "Normal (0.5s)", "Slow (1s)"},
+    Default = "Normal (0.5s)",
     Callback = function(value)
-        _G_State.MergeDelay = value / 10
-        logAction("Menu", true, "Delay diubah ke " .. tostring(_G_State.MergeDelay) .. " detik")
+        if value == "Super Fast (0.01s)" then _G_State.MergeDelay = 0.01
+        elseif value == "Fast (0.1s)" then _G_State.MergeDelay = 0.1
+        elseif value == "Normal (0.5s)" then _G_State.MergeDelay = 0.5
+        elseif value == "Slow (1s)" then _G_State.MergeDelay = 1.0
+        end
+        logAction("Menu", true, "Kecepatan diubah ke " .. value)
     end
 })
 
