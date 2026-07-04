@@ -1035,13 +1035,13 @@ State.RemoteSpyEnabled = true
 local oldNamecall
 if hookmetamethod then
     oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-        local method = getnamecallmethod()
+        local method = string.lower(tostring(getnamecallmethod() or ""))
         if State.RemoteSpyEnabled then
-            if method == "FireServer" or method == "InvokeServer" then
+            if method == "fireserver" or method == "invokeserver" then
                 local args = {...}
                 local name = tostring(self.Name)
                 
-                -- Filter spam remotes (bisa ditambah sesuai kebutuhan)
+                -- Filter spam remotes
                 if name ~= "MouseUpdate" and name ~= "Ping" and name ~= "Heartbeat" and name ~= "LockStateUpdate" then
                     local argStr = ""
                     for i, v in ipairs(args) do
@@ -1055,11 +1055,8 @@ if hookmetamethod then
                         if i < #args then argStr = argStr .. ", " end
                     end
                     
-                    -- Hindari yield dalam metamethod, gunakan task.defer
-                    task.defer(function()
-                        local caller = checkcaller() and "[SCRIPT]" or "[GAME]"
-                        logAction("Spy-Net", true, string.format("%s %s(%s)", caller, name, argStr))
-                    end)
+                    local caller = checkcaller() and "[SCRIPT]" or "[GAME]"
+                    logAction("Spy-Net", true, string.format("%s %s(%s)", caller, name, argStr))
                 end
             end
         end
