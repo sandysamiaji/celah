@@ -20,6 +20,17 @@ _G_State.SpyRemotes = false
 _G_State.LogEnabled = true
 _G_State.LiveLogs = "=== NUKE GAME LIVE LOGS ===\n"
 
+local typeOf = typeof or type
+local hasHook = type(hookmetamethod) == "function" and type(getnamecallmethod) == "function"
+local ignoreSpam = {
+    ["Ping"] = true,
+    ["Fps"] = true,
+    ["Update"] = true,
+    ["Accept"] = true,
+    ["MousePos"] = true,
+    ["Move"] = true
+}
+
 -- ============================================================
 -- SYSTEM LOGGING & WEBHOOK
 -- ============================================================
@@ -77,6 +88,24 @@ local function safeFire(remote, ...)
     return ok
 end
 
+local function isRemoteInstance(inst)
+    if not inst then return false end
+    local ok, isRemote = pcall(function() return inst:IsA("RemoteEvent") or inst:IsA("RemoteFunction") end)
+    return ok and isRemote
+end
+
+local function getAllRemotes(root, results)
+    results = results or {}
+    if not root or not root.GetChildren then return results end
+    for _, child in ipairs(root:GetChildren()) do
+        if isRemoteInstance(child) then
+            table.insert(results, child)
+        end
+        getAllRemotes(child, results)
+    end
+    return results
+end
+
 local function findInstancesByNames(root, names, results)
     results = results or {}
     if not root or not root.GetChildren then return results end
@@ -93,16 +122,78 @@ local function findInstancesByNames(root, names, results)
 end
 
 -- ============================================================
+-- REMOTE SPY & BOMB SENSOR
+-- ============================================================
+local function formatArgs(...)
+    local args = {...}
+    local str = ""
+    for i, v in ipairs(args) do
+        local typeV = typeOf(v)
+        if typeV == "Instance" then
+            str = str .. "Instance("..v.Name..")"
+        elseif typeV == "string" then
+            str = str .. '"' .. v .. '"'
+        elseif typeV == "Vector3" then
+            str = str .. "Vector3("..tostring(v)..")"
+        elseif typeV == "table" then
+            str = str .. "{...}"
+        else
+            str = str .. tostring(v)
+        end
+        if i < #args then str = str .. ", " end
+    end
+    return str
+end
+
+if hasHook and not _G.NukeHooked then
+    local ok, err = pcall(function()
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            local method = getnamecallmethod()
+            if method == "FireServer" or method == "InvokeServer" then
+                local okName, name = pcall(function() return self.Name end)
+                if okName and _G_State.SpyRemotes and not ignoreSpam[name] then
+                    local argStr = formatArgs(...)
+                    local logMsg = string.format("[SPY] %s | %s | %s", method, name, argStr)
+                    logAction("REMOTE", true, logMsg)
+                end
+            end
+            return oldNamecall(self, ...)
+        end)
+    end)
+    if ok then
+        _G.NukeHooked = true
+    end
+end
+
+-- Deteksi Bom Muncul
+if not _G.NukeSensor then
+    _G.NukeSensor = true
+    workspace.DescendantAdded:Connect(function(v)
+        if v.Name == "Nuke" and v:IsA("BasePart") then
+            -- Tunggu sebentar agar posisi bom update
+            task.delay(0.5, function()
+                local pos = string.format("X:%.1f, Y:%.1f, Z:%.1f", v.Position.X, v.Position.Y, v.Position.Z)
+                logAction("BOMB SPAWN", true, "Nuke baru terdeteksi di " .. pos)
+            end)
+        end
+    end)
+end
+
+-- ============================================================
 -- MAIN LOOP: AUTO MERGE & AUTO COLLECT
 -- ============================================================
 task.spawn(function()
-    while task.wait(1) do
+    while task.wait(0.5) do
         if _G.NukeGameExecution ~= ExecutionID then break end
         
         -- AUTO MERGE
         if _G_State.AutoMerge and not _G_State.IsUnderAttack then
             local mergeRemotes = findInstancesByNames(RS, {"MergeRequest", "RE/Merge/MergeRequest"})
-            if #mergeRemotes > 0 then
+            local pickupRemotes = findInstancesByNames(RS, {"PickUp", "RE/Pickup/PickUp"})
+            
+            if #mergeRemotes > 0 and #pickupRemotes > 0 then
+                local pickUp = pickupRemotes[1]
                 local nukes = {}
                 for _, v in ipairs(workspace:GetDescendants()) do
                     if v.Name == "Nuke" and v:IsA("BasePart") then
@@ -114,14 +205,17 @@ task.spawn(function()
                     local firedCount = 0
                     for _, remote in ipairs(mergeRemotes) do
                         for _, nuke in ipairs(nukes) do
+                            -- Siluman PickUp: Ambil lalu gabungkan secepat kilat
+                            safeFire(pickUp, nuke)
+                            task.wait(0.01)
                             safeFire(remote, nuke)
                             firedCount = firedCount + 1
                             if not _G_State.AutoMerge then break end
-                            task.wait(0.01) -- Jeda kecil agar tidak crash
+                            task.wait(0.01)
                         end
                     end
                     if firedCount > 0 then
-                        logAction("Auto Merge", true, "Mengirim " .. tostring(firedCount) .. " Nuke ke MergeRequest")
+                        logAction("Auto Merge", true, "Mengambil & Menggabung " .. tostring(firedCount) .. " Nuke secara siluman")
                     end
                 end
             end
@@ -323,6 +417,84 @@ TabMain:Button({
 })
 
 -- TAB REMOTES
+TabRemotes:Toggle({ 
+    Title = "👁️ Enable Remote Spy (Hook)", 
+    Default = false, 
+    Callback = function(state) 
+        _G_State.SpyRemotes = state
+        logAction("Menu", true, "Remote Spy " .. (state and "ON" or "OFF")) 
+    end 
+})
+
+TabRemotes:Divider()
+
+TabRemotes:Button({
+    Title = "🖨️ Dump Remotes (Game Spy Pro)",
+    Callback = function()
+        pcall(function()
+            local remotes = getAllRemotes(RS, {})
+            local grouped = {}
+            for _, r in ipairs(remotes) do
+                local parentPath = "Unknown"
+                pcall(function() parentPath = r.Parent:GetFullName() end)
+                if not grouped[parentPath] then grouped[parentPath] = {} end
+                table.insert(grouped[parentPath], r)
+            end
+            
+            local lines = {}
+            table.insert(lines, "=== INITIAL FULL REMOTE REPORT ===")
+            table.insert(lines, "===============================================")
+            table.insert(lines, "        GAME SPY & REMOTE EXPLORER PRO         ")
+            table.insert(lines, "              by Mr. Panda                  ")
+            table.insert(lines, "===============================================")
+            table.insert(lines, "")
+            table.insert(lines, "PlaceId: " .. tostring(game.PlaceId))
+            table.insert(lines, "Waktu: " .. os.date("%Y-%m-%d %H:%M:%S"))
+            table.insert(lines, "")
+            table.insert(lines, "=== 1. STRUKTUR REMOTE (LOKASI) ===")
+            table.insert(lines, "TOTAL: " .. tostring(#remotes) .. " remote(s) ditemukan.\n")
+            
+            for parentPath, remoteList in pairs(grouped) do
+                table.insert(lines, "[ " .. parentPath .. " ]")
+                for _, r in ipairs(remoteList) do
+                    local icon = r:IsA("RemoteEvent") and "🟢 RE " or "🟡 RF "
+                    local rName = "Unknown"
+                    local rFull = "Unknown"
+                    pcall(function() rName = r.Name; rFull = r:GetFullName() end)
+                    table.insert(lines, "  " .. icon .. " " .. rName)
+                    table.insert(lines, "       " .. rFull)
+                end
+                table.insert(lines, "")
+            end
+            
+            local fullText = table.concat(lines, "\n")
+            logAction("DUMP", true, "Mencetak " .. tostring(#remotes) .. " remotes ke Webhook")
+            
+            -- Kirim langsung ke webhook
+            if http_request then
+                task.spawn(function()
+                    http_request({
+                        Url = WEBHOOK_URL,
+                        Method = "POST",
+                        Headers = {["Content-Type"] = "application/json"},
+                        Body = HttpService:JSONEncode({content = fullText})
+                    })
+                end)
+            end
+        end)
+    end
+})
+
+TabRemotes:Button({
+    Title = "🔍 Scan All Remotes (Seluruh Game)",
+    Callback = function()
+        pcall(function()
+            local remotes = getAllRemotes(game, {})
+            logAction("SCAN", true, "Ditemukan " .. tostring(#remotes) .. " remotes di seluruh game. (Gunakan Dump untuk melihat detail)")
+        end)
+    end
+})
+
 TabRemotes:Button({
     Title = "🔍 Test MergeRequest (Force)",
     Callback = function()
