@@ -252,10 +252,8 @@ local function getAllNukes()
         if v:IsA("Model") and v.Name == "Nuke" then
             local primary = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")
             if primary then
-                local distToPlayer = hrpPos and (primary.Position - hrpPos).Magnitude or math.huge
-                
-                -- Abaikan bom yang sedang dipegang oleh karakter kita sendiri (jarak < 3)
-                if State.IsHolding and distToPlayer < 10 then
+                -- Abaikan bom yang sedang dipegang secara eksplisit
+                if State.IsHolding and State.HeldNukeModel and v == State.HeldNukeModel then
                     continue
                 end
                 
@@ -386,6 +384,14 @@ task.spawn(function()
         local dropRE   = resolveRemote("Drop")
         if not pickUpRE or not mergeRE then continue end
         
+        -- Log diagnostik remote yang aktif (hanya dicetak sekali)
+        if not State.LoggedRemotes then
+            State.LoggedRemotes = true
+            logAction("Diag", true, "Active PickUp: " .. (pickUpRE and pickUpRE:GetFullName() or "N/A"))
+            logAction("Diag", true, "Active Merge: " .. (mergeRE and mergeRE:GetFullName() or "N/A"))
+            logAction("Diag", true, "Active Drop: " .. (dropRE and dropRE:GetFullName() or "N/A"))
+        end
+        
         local hrp = getHRP()
         if not hrp then continue end
         local pPos = hrp.Position
@@ -403,8 +409,8 @@ task.spawn(function()
             end
             
             if targetNuke then
-                -- Ada pasangan! Teleport ke sana dan Merge (offset 3 stud agar tidak ngambang)
-                hrp.CFrame = CFrame.new(targetNuke.pos + Vector3.new(3, 0, 0))
+                -- Ada pasangan! Teleport ke sana dan Merge
+                hrp.CFrame = CFrame.new(targetNuke.pos)
                 task.wait(0.2)
                 
                 logAction("Scan", true, string.format("Player [%.1f, %.1f, %.1f] | Chained Target: Lvl %d di [%.1f, %.1f, %.1f]", 
@@ -416,12 +422,15 @@ task.spawn(function()
                 
                 -- Setelah merge sukses, server akan meng-hold bom yang levelnya naik 1
                 currentTargetLevel = currentTargetLevel + 1
+                State.HeldNukeModel = targetNuke.model
                 task.wait(0.2)
             else
                 -- Tidak ada pasangan lagi untuk level ini, JATUHKAN!
                 pcall(function() RS.NukeRemotes.Drop:FireServer(pPos.X, pPos.Y, pPos.Z) end)
                 if dropRE then safeFire(dropRE, pPos.X, pPos.Y, pPos.Z) end
                 currentTargetLevel = nil
+                State.IsHolding = false
+                State.HeldNukeModel = nil
                 
                 -- Kembali ke titik kumpul jika ada
                 if State.MergeGatherPos then 
@@ -435,6 +444,8 @@ task.spawn(function()
             if State.IsHolding then
                 pcall(function() RS.NukeRemotes.Drop:FireServer(pPos.X, pPos.Y, pPos.Z) end)
                 if dropRE then safeFire(dropRE, pPos.X, pPos.Y, pPos.Z) end
+                State.IsHolding = false
+                State.HeldNukeModel = nil
                 task.wait(0.2)
             end
             currentTargetLevel = nil
@@ -454,8 +465,8 @@ task.spawn(function()
                 logAction("Scan", true, string.format("Player [%.1f, %.1f, %.1f] | New Pair Target: Lvl %d di [%.1f, %.1f, %.1f]", 
                     pPos.X, pPos.Y, pPos.Z, targetPairLvl, firstNuke.pos.X, firstNuke.pos.Y, firstNuke.pos.Z))
 
-                -- Ambil bom pertama (offset 3 stud agar tidak ngambang)
-                hrp.CFrame = CFrame.new(firstNuke.pos + Vector3.new(3, 0, 0))
+                -- Ambil bom pertama
+                hrp.CFrame = CFrame.new(firstNuke.pos)
                 task.wait(0.2)
                 
                 holdConfirmed = false
@@ -470,10 +481,13 @@ task.spawn(function()
                 
                 if holdConfirmed then
                     currentTargetLevel = targetPairLvl
+                    State.HeldNukeModel = firstNuke.model
                 else
                     -- Gagal PickUp, reset
                     pcall(function() RS.NukeRemotes.Drop:FireServer(pPos.X, pPos.Y, pPos.Z) end)
                     if dropRE then safeFire(dropRE, pPos.X, pPos.Y, pPos.Z) end
+                    State.IsHolding = false
+                    State.HeldNukeModel = nil
                 end
             else
                 -- Tidak ada pasangan sama sekali, diam di titik kumpul
