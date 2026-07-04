@@ -255,140 +255,129 @@ task.spawn(function()
         
         -- AUTO MERGE
         if _G_State.AutoMerge and not _G_State.IsUnderAttack then
-            -- BERDASARKAN LOG SPY: 
-            -- PickUp yang bekerja ada di NukeRemotes
-            -- MergeRequest yang menghasilkan efek (MergeVFX) ada di Packages.Remotes.Networking
-            
-            local pickUp
-            if RS:FindFirstChild("NukeRemotes") then
-                pickUp = RS.NukeRemotes:FindFirstChild("PickUp")
-            end
-            
-            local mergeReq
-            local pkgNet = RS:FindFirstChild("Packages") and RS.Packages:FindFirstChild("Remotes") and RS.Packages.Remotes:FindFirstChild("Networking")
-            if pkgNet then
-                mergeReq = pkgNet:FindFirstChild("RE/Merge/MergeRequest")
-            end
-            
-            -- Fallback jika game update
-            if not mergeReq and RS:FindFirstChild("NukeRemotes") then
-                mergeReq = RS.NukeRemotes:FindFirstChild("MergeRequest")
-            end
-            
-            local dropRemote
-            if RS:FindFirstChild("NukeRemotes") then
-                dropRemote = RS.NukeRemotes:FindFirstChild("Drop")
-            end
-            if not dropRemote and pkgNet then
-                dropRemote = pkgNet:FindFirstChild("RE/Pickup/Drop")
-            end
-            
-            if pickUp and mergeReq then
-                local char = Players.LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local success, err = pcall(function()
+                local pickUp
+                if RS:FindFirstChild("NukeRemotes") then
+                    pickUp = RS.NukeRemotes:FindFirstChild("PickUp")
+                end
                 
-                if hrp then
-                    -- Cek apakah kita sedang memegang bom di tangan
-                    local heldBomb = nil
-                    for _, v in ipairs(char:GetDescendants()) do
-                        if v.Name == "Nuke" and v:IsA("BasePart") then
-                            heldBomb = v
-                            break
-                        end
-                    end
+                local mergeReq
+                local pkgNet = RS:FindFirstChild("Packages") and RS.Packages:FindFirstChild("Remotes") and RS.Packages.Remotes:FindFirstChild("Networking")
+                if pkgNet then
+                    mergeReq = pkgNet:FindFirstChild("RE/Merge/MergeRequest")
+                end
+                
+                if not mergeReq and RS:FindFirstChild("NukeRemotes") then
+                    mergeReq = RS.NukeRemotes:FindFirstChild("MergeRequest")
+                end
+                
+                local dropRemote
+                if RS:FindFirstChild("NukeRemotes") then
+                    dropRemote = RS.NukeRemotes:FindFirstChild("Drop")
+                end
+                if not dropRemote and pkgNet then
+                    dropRemote = pkgNet:FindFirstChild("RE/Pickup/Drop")
+                end
+                
+                if pickUp and mergeReq then
+                    local char = Players.LocalPlayer.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
                     
-                    -- Kumpulkan semua bom di tanah (bukan di tangan) dalam radius 150
-                    local groundNukes = {}
-                    for _, v in ipairs(workspace:GetDescendants()) do
-                        if v.Name == "Nuke" and v:IsA("BasePart") and v.Parent ~= char then
-                            local dist = (v.Position - hrp.Position).Magnitude
-                            if dist < 150 then
-                                table.insert(groundNukes, {part = v, distance = dist})
-                            end
-                        end
-                    end
-                    
-                    -- Urutkan bom dari yang terdekat dengan pemain
-                    table.sort(groundNukes, function(a, b)
-                        return a.distance < b.distance
-                    end)
-                    
-                    -- Ekstrak kembali part-nya agar loop di bawah tidak error
-                    local sortedNukes = {}
-                    for _, v in ipairs(groundNukes) do
-                        table.insert(sortedNukes, v.part)
-                    end
-                    
-                    if heldBomb then
-                        local uiVal = getBombValue(heldBomb)
-                        local heldVal = uiVal
-                        
-                        if (uiVal == "?" or uiVal == "" or uiVal == "Nuke" or not uiVal) and _G_State.LastPickedUpVal then
-                            heldVal = _G_State.LastPickedUpVal
-                        end
-                        
-                        -- Cari bom di tanah dengan nilai yang sama (sudah urut dari terdekat)
-                        local targetMerge = nil
-                        for _, n in ipairs(sortedNukes) do
-                            if getBombValue(n) == heldVal then
-                                targetMerge = n
+                    if hrp then
+                        local heldBomb = nil
+                        for _, v in ipairs(char:GetDescendants()) do
+                            if v.Name == "Nuke" and v:IsA("BasePart") then
+                                heldBomb = v
                                 break
                             end
                         end
                         
-                        if targetMerge then
-                            safeFire(mergeReq, targetMerge)
-                            logAction("Auto Merge", true, "Menggabungkan Nuke [" .. tostring(heldVal) .. "] terdekat secara nirkabel")
-                            _G_State.LastPickedUpVal = nil
-                            task.wait(0.2)
-                        else
-                            -- Jika memegang bom tapi pasangannya tidak ketemu (mungkin diambil orang/hilang)
-                            if dropRemote then
-                                safeFire(dropRemote)
-                                logAction("Auto Merge", false, "Membuang Nuke [" .. tostring(heldVal) .. "] karena pasangannya hilang")
-                                _G_State.LastPickedUpVal = nil
-                                task.wait(0.5)
-                            end
-                        end
-                    else
-                        -- Kelompokkan bom di tanah
-                        local grouped = {}
-                        for _, n in ipairs(sortedNukes) do
-                            local val = getBombValue(n)
-                            if val ~= "?" then
-                                if not grouped[val] then grouped[val] = {} end
-                                table.insert(grouped[val], n)
-                            end
-                        end
-                        
-                        local targetPickUp = nil
-                        -- Prioritas 1: Ambil bom yang sudah ada pasangannya di tanah
-                        for val, list in pairs(grouped) do
-                            if #list >= 2 then
-                                targetPickUp = list[1]
-                                break
-                            end
-                        end
-                        
-                        -- Prioritas 2: Jika tidak ada pasangan, ambil bom apa saja untuk 'di-hold'
-                        if not targetPickUp then
-                            for val, list in pairs(grouped) do
-                                if #list == 1 then
-                                    targetPickUp = list[1]
-                                    break
+                        local groundNukes = {}
+                        for _, v in ipairs(workspace:GetDescendants()) do
+                            if v.Name == "Nuke" and v:IsA("BasePart") and v.Parent ~= char then
+                                local dist = (v.Position - hrp.Position).Magnitude
+                                if dist < 150 then
+                                    table.insert(groundNukes, {part = v, distance = dist})
                                 end
                             end
                         end
                         
-                        if targetPickUp then
-                            local val = getBombValue(targetPickUp)
-                            _G_State.LastPickedUpVal = val
-                            safeFire(pickUp, targetPickUp)
-                            logAction("Auto Merge", true, "Mengambil Nuke [" .. val .. "] terdekat")
+                        table.sort(groundNukes, function(a, b)
+                            return a.distance < b.distance
+                        end)
+                        
+                        local sortedNukes = {}
+                        for _, v in ipairs(groundNukes) do
+                            table.insert(sortedNukes, v.part)
+                        end
+                        
+                        if heldBomb then
+                            -- Selalu percayai ingatan terakhir kita ketimbang UI bom di tangan
+                            local heldVal = _G_State.LastPickedUpVal or getBombValue(heldBomb)
+                            
+                            local targetMerge = nil
+                            for _, n in ipairs(sortedNukes) do
+                                if getBombValue(n) == heldVal then
+                                    targetMerge = n
+                                    break
+                                end
+                            end
+                            
+                            if targetMerge then
+                                safeFire(mergeReq, targetMerge)
+                                logAction("Auto Merge", true, "Menggabungkan Nuke [" .. tostring(heldVal) .. "] terdekat secara nirkabel")
+                                _G_State.LastPickedUpVal = nil
+                                task.wait(0.2)
+                            else
+                                if dropRemote then
+                                    safeFire(dropRemote)
+                                    logAction("Auto Merge", false, "Membuang Nuke [" .. tostring(heldVal) .. "] karena pasangannya hilang")
+                                end
+                                _G_State.LastPickedUpVal = nil
+                                task.wait(0.5)
+                            end
+                        else
+                            local grouped = {}
+                            for _, n in ipairs(sortedNukes) do
+                                local val = getBombValue(n)
+                                if val ~= "?" then
+                                    if not grouped[val] then grouped[val] = {} end
+                                    table.insert(grouped[val], n)
+                                end
+                            end
+                            
+                            local targetPickUp = nil
+                            for val, list in pairs(grouped) do
+                                if #list >= 2 then
+                                    targetPickUp = list[1]
+                                    break
+                                end
+                            end
+                            
+                            if not targetPickUp then
+                                for val, list in pairs(grouped) do
+                                    if #list == 1 then
+                                        targetPickUp = list[1]
+                                        break
+                                    end
+                                end
+                            end
+                            
+                            if targetPickUp then
+                                local val = getBombValue(targetPickUp)
+                                _G_State.LastPickedUpVal = val
+                                safeFire(pickUp, targetPickUp)
+                                logAction("Auto Merge", true, "Mengambil Nuke [" .. tostring(val) .. "] terdekat")
+                            end
                         end
                     end
                 end
+            end)
+            
+            if not success then
+                logAction("Error", false, "Auto Merge macet/crash: " .. tostring(err))
             end
+        end
         end
     end
 end)
