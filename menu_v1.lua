@@ -226,14 +226,19 @@ pcall(function()
 end)
 
 -- ==================== GUI CREATION ====================
+local getHui = gethui or function() return CoreGui end
+local targetParent = nil
+pcall(function() targetParent = getHui() end)
+if not targetParent then targetParent = CoreGui end
+
 local existingUI = nil
-pcall(function() existingUI = CoreGui:FindFirstChild("PandaHelperUI") end)
+pcall(function() existingUI = targetParent:FindFirstChild("PandaHelperUI") end)
 if not existingUI then pcall(function() existingUI = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("PandaHelperUI") end) end
 if existingUI then existingUI:Destroy() end
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PandaHelperUI"
-local okCore = pcall(function() ScreenGui.Parent = CoreGui end)
+local okCore = pcall(function() ScreenGui.Parent = targetParent end)
 if not okCore or not ScreenGui.Parent then
     pcall(function() ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end)
 end
@@ -340,29 +345,26 @@ createToggle("Auto Merge", false, function(Value)
         while getgenv().autoMerge do
             wait(1)
             if not getgenv().isUnderAttack then
-                -- Safe fire helper with logging
                 local function safeFire(remote, ...)
-                    if not remote then
-                        sendLog("safeFire: remote is nil")
-                        return false
-                    end
+                    if not remote then return false end
                     local ok, err = pcall(function() remote:FireServer(...) end)
-                    if not ok then
-                        sendLog("FireServer failed for " .. tostring(remote.Name) .. ": " .. tostring(err))
-                    else
-                        sendLog("FireServer succeeded for " .. tostring(remote.Name))
-                    end
                     return ok
                 end
 
-                -- Search for any MergeRequest remote in ReplicatedStorage
                 local mergeRemotes = findInstancesByNames(ReplicatedStorage, {"MergeRequest", "RE/Merge/MergeRequest"})
-                if #mergeRemotes == 0 then
-                    sendLog("Auto Merge: no MergeRequest remote found in ReplicatedStorage")
-                else
+                if #mergeRemotes > 0 then
+                    local nukes = {}
+                    for _, v in pairs(workspace:GetDescendants()) do
+                        if v.Name == "Nuke" and v:IsA("BasePart") then
+                            table.insert(nukes, v)
+                        end
+                    end
+                    
                     for _, remote in ipairs(mergeRemotes) do
-                        sendLog("Auto Merge: firing remote " .. tostring(remote.Name) .. " at " .. getFullPath(remote))
-                        safeFire(remote)
+                        for _, nuke in ipairs(nukes) do
+                            safeFire(remote, nuke)
+                            if not getgenv().autoMerge then break end
+                        end
                     end
                 end
             end
