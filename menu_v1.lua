@@ -5,6 +5,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
 
 local getgenv = getgenv or function() return _G end
+local typeOf = typeof or type
+local hasHook = type(hookmetamethod) == "function" and type(getnamecallmethod) == "function"
 getgenv().autoMerge = false
 getgenv().autoCollect = false
 getgenv().autoDefense = false
@@ -50,7 +52,7 @@ if not getgenv().LogLoopStarted then
 end
 
 -- Spy / Hook untuk mendeteksi remote yang ditembakkan secara manual
-if not getgenv().PandaHooked then
+if hasHook and not getgenv().PandaHooked then
     getgenv().PandaHooked = true
     local oldNamecall
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
@@ -62,7 +64,7 @@ if not getgenv().PandaHooked then
                 local args = {...}
                 local argStr = ""
                 for i, v in ipairs(args) do
-                    if typeof(v) == "Instance" then
+                    if typeOf(v) == "table" and v.Name then
                         argStr = argStr .. "Instance("..v.Name.."), "
                     else
                         argStr = argStr .. tostring(v) .. ", "
@@ -75,6 +77,8 @@ if not getgenv().PandaHooked then
         end
         return oldNamecall(self, ...)
     end)
+elseif not hasHook then
+    sendLog("hookmetamethod/getnamecallmethod not available in this environment")
 end
 
 -- ==================== LOGIC FUNCTIONS ====================
@@ -91,6 +95,58 @@ local function getBestBombArg()
         end
     end
     return maxLvl, bestObj
+end
+
+local function getFullPath(inst)
+    local ok, fullName = pcall(function()
+        if inst and inst.GetFullName then
+            return inst:GetFullName()
+        end
+    end)
+    return (ok and fullName) or tostring(inst.Name)
+end
+
+local function isRemoteInstance(inst)
+    if not inst then
+        return false
+    end
+    local ok, isRemote = pcall(function()
+        return inst:IsA("RemoteEvent") or inst:IsA("RemoteFunction")
+    end)
+    return ok and isRemote
+end
+
+local function getAllRemotes(root, results)
+    results = results or {}
+    if not root or not root.GetChildren then
+        return results
+    end
+
+    for _, child in ipairs(root:GetChildren()) do
+        if isRemoteInstance(child) then
+            table.insert(results, child)
+        end
+        getAllRemotes(child, results)
+    end
+    return results
+end
+
+local function findInstancesByNames(root, names, results)
+    results = results or {}
+    if not root or not root.GetChildren then
+        return results
+    end
+
+    for _, child in ipairs(root:GetChildren()) do
+        for _, targetName in ipairs(names) do
+            if child.Name == targetName then
+                table.insert(results, child)
+                break
+            end
+        end
+        findInstancesByNames(child, names, results)
+    end
+    return results
 end
 
 local function toggleBomb(state)
@@ -261,40 +317,15 @@ createToggle("Auto Merge", false, function(Value)
                     return ok
                 end
 
-                -- Try NukeRemotes.MergeRequest
-                local nr = ReplicatedStorage:FindFirstChild("NukeRemotes")
-                if nr then
-                    local mr = nr:FindFirstChild("MergeRequest")
-                    if mr then
-                        safeFire(mr)
-                    else
-                        sendLog("NukeRemotes.MergeRequest not found")
-                    end
+                -- Search for any MergeRequest remote in ReplicatedStorage
+                local mergeRemotes = findInstancesByNames(ReplicatedStorage, {"MergeRequest", "RE/Merge/MergeRequest"})
+                if #mergeRemotes == 0 then
+                    sendLog("Auto Merge: no MergeRequest remote found in ReplicatedStorage")
                 else
-                    sendLog("NukeRemotes not found")
-                end
-
-                -- Try Packages -> Remotes -> Networking -> RE/Merge/MergeRequest
-                local pkgs = ReplicatedStorage:FindFirstChild("Packages")
-                if pkgs then
-                    local rems = pkgs:FindFirstChild("Remotes")
-                    if rems then
-                        local networking = rems:FindFirstChild("Networking")
-                        if networking then
-                            local req = networking:FindFirstChild("RE/Merge/MergeRequest")
-                            if req then
-                                safeFire(req)
-                            else
-                                sendLog("Packages.Remotes.Networking.RE/Merge/MergeRequest not found")
-                            end
-                        else
-                            sendLog("Packages.Remotes.Networking not found")
-                        end
-                    else
-                        sendLog("Packages.Remotes not found")
+                    for _, remote in ipairs(mergeRemotes) do
+                        sendLog("Auto Merge: firing remote " .. tostring(remote.Name) .. " at " .. getFullPath(remote))
+                        safeFire(remote)
                     end
-                else
-                    sendLog("Packages not found")
                 end
             end
         end
@@ -359,42 +390,37 @@ createButton("Rebuild Done", function()
     end)
 end)
 
+local function dumpInstance(inst, depth, lines)
+    depth = depth or 0
+    lines = lines or {}
+    local path = getFullPath(inst)
+    table.insert(lines, string.rep("  ", depth) .. "- " .. tostring(inst.Name) .. " (" .. tostring(inst.ClassName) .. ") [" .. tostring(path) .. "]")
+    for _, c in ipairs(inst:GetChildren()) do
+        dumpInstance(c, depth + 1, lines)
+    end
+    return lines
+end
+
+local function dumpRemote(remote)
+    local path = getFullPath(remote)
+    local class = tostring(remote.ClassName or "Unknown")
+    return string.format("- %s (%s) [%s]", tostring(remote.Name), class, tostring(path))
+end
+
 createButton("Dump Remotes", function()
     pcall(function()
-        local function dumpInstance(inst, depth, lines)
-            depth = depth or 0
-            lines = lines or {}
-            table.insert(lines, string.rep("  ", depth) .. "- " .. tostring(inst.Name) .. " (" .. tostring(inst.ClassName) .. ")")
-            for _, c in ipairs(inst:GetChildren()) do
-                dumpInstance(c, depth + 1, lines)
-            end
-            return lines
-        end
-
         local lines = {}
         local ok, err = pcall(function()
-            table.insert(lines, "== ReplicatedStorage ==")
-            for _, c in ipairs(ReplicatedStorage:GetChildren()) do
-                dumpInstance(c, 0, lines)
+            table.insert(lines, "=== ReplicatedStorage Remotes ===")
+            for _, remote in ipairs(getAllRemotes(ReplicatedStorage, {})) do
+                table.insert(lines, dumpRemote(remote))
             end
 
             local pkgs = ReplicatedStorage:FindFirstChild("Packages")
             if pkgs then
-                table.insert(lines, "== Packages ==")
-                local rems = pkgs:FindFirstChild("Remotes")
-                if rems then
-                    dumpInstance(rems, 0, lines)
-                    local networking = rems:FindFirstChild("Networking")
-                    if networking then
-                        table.insert(lines, "== Packages.Remotes.Networking ==")
-                        for _, c in ipairs(networking:GetChildren()) do
-                            dumpInstance(c, 0, lines)
-                        end
-                    else
-                        table.insert(lines, "Packages.Remotes.Networking not found")
-                    end
-                else
-                    table.insert(lines, "Packages.Remotes not found")
+                table.insert(lines, "=== Packages Remotes ===")
+                for _, remote in ipairs(getAllRemotes(pkgs, {})) do
+                    table.insert(lines, dumpRemote(remote))
                 end
             else
                 table.insert(lines, "Packages not found in ReplicatedStorage")
@@ -404,8 +430,50 @@ createButton("Dump Remotes", function()
         if not ok then
             sendLog("Dump Remotes failed: " .. tostring(err))
         else
-            -- prepend a header with timestamp for clarity
             sendLog("=== Dump Remotes ===\n" .. table.concat(lines, "\n"))
+        end
+    end)
+end)
+
+createButton("Scan All Remotes", function()
+    pcall(function()
+        local lines = {}
+        local remotes = getAllRemotes(game, {})
+        table.insert(lines, "=== All Active Remotes ===")
+        if #remotes == 0 then
+            table.insert(lines, "No remotes found")
+        else
+            for _, remote in ipairs(remotes) do
+                table.insert(lines, dumpRemote(remote))
+            end
+        end
+        sendLog(table.concat(lines, "\n"))
+    end)
+end)
+
+createButton("Test MergeRequest", function()
+    pcall(function()
+        local mergeRemotes = findInstancesByNames(ReplicatedStorage, {"MergeRequest", "RE/Merge/MergeRequest"})
+        if #mergeRemotes == 0 then
+            sendLog("Test MergeRequest: no MergeRequest remote found")
+            return
+        end
+
+        for _, remote in ipairs(mergeRemotes) do
+            local path = getFullPath(remote)
+            sendLog("Test MergeRequest: firing " .. tostring(remote.Name) .. " at " .. path)
+            local ok, err = pcall(function()
+                if remote:IsA("RemoteFunction") then
+                    remote:InvokeServer()
+                else
+                    remote:FireServer()
+                end
+            end)
+            if not ok then
+                sendLog("Test MergeRequest failed: " .. tostring(err))
+            else
+                sendLog("Test MergeRequest sent successfully to " .. path)
+            end
         end
     end)
 end)
