@@ -320,16 +320,8 @@ end)
 local function tweenTo(targetPos)
     local hrp = getHRP()
     if hrp then
-        local dist = (hrp.Position - targetPos).Magnitude
-        if dist < 5 then return true end -- Sudah dekat
-        local tInfo = TweenInfo.new(dist / 50, Enum.EasingStyle.Linear)
-        local tween = TweenService:Create(hrp, tInfo, {CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))})
-        tween:Play()
-        tween.Completed:Wait()
-        task.wait(0.1)
-        return true
+        hrp.CFrame = CFrame.new(targetPos)
     end
-    return false
 end
 
 -- Dihapus bringNukeTo karena menyebabkan ghosting (berbayang) di server
@@ -367,21 +359,28 @@ task.spawn(function()
                 -- Harus ada pasangan level yang sama untuk bisa di-merge
                 if n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent then
                     
-                    -- JALAN KE BOMB 1 (Wajib agar server tidak menganggapnya palsu/ghost)
-                    tweenTo(n1.pos)
+                    local hrp = getHRP()
+                    -- TELEPORT KE BOMB 1
+                    if hrp then hrp.CFrame = CFrame.new(n1.pos) end
                     
                     holdConfirmed = false
+                    
+                    -- Pancing event sentuhan agar LocalScript game mengelas (weld) bom ke karakter
+                    simulateTouch(n1.part)
                     safeFire(pickUpRE, n1.model)
                     
                     local waited = 0
-                    while not holdConfirmed and waited < 0.3 do
+                    while not holdConfirmed and waited < 0.5 do
                         task.wait(0.05)
                         waited = waited + 0.05
                     end
                     
                     if holdConfirmed then
-                        -- JALAN KE BOMB 2
-                        tweenTo(n2.pos)
+                        -- TELEPORT KE BOMB 2
+                        if hrp then hrp.CFrame = CFrame.new(n2.pos) end
+                        
+                        -- Pancing event sentuhan untuk memicu animasi gabung dari game
+                        simulateTouch(n2.part)
                         
                         -- Gabungkan Bomb 1 (di tangan) ke Bomb 2
                         safeFire(mergeRE, n2.model)
@@ -397,7 +396,8 @@ task.spawn(function()
             
             -- Setelah selesai merge, kembali ke titik kumpul (jika ada)
             if State.MergeGatherPos and merged > 0 then
-                tweenTo(State.MergeGatherPos)
+                local hrp = getHRP()
+                if hrp then hrp.CFrame = CFrame.new(State.MergeGatherPos) end
             end
             
             if merged > 0 then
