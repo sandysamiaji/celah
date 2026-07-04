@@ -381,6 +381,9 @@ task.spawn(function()
 
         local merged = 0
         local i = 1
+        
+        local dropRE = resolveRemote("Drop")
+        
         while i < #nukes do
             if not State.AutoMerge then break end
             local n1 = nukes[i]
@@ -389,6 +392,16 @@ task.spawn(function()
             if n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent then
                 local hrp = getHRP()
                 if not hrp then break end
+                
+                local pPos = hrp.Position
+                logAction("Scan", true, string.format("Player [%.1f, %.1f, %.1f] | Target: Lvl %d di [%.1f, %.1f, %.1f] & [%.1f, %.1f, %.1f]", 
+                    pPos.X, pPos.Y, pPos.Z, n1.level, n1.pos.X, n1.pos.Y, n1.pos.Z, n2.pos.X, n2.pos.Y, n2.pos.Z))
+                
+                -- Pastikan tangan kosong sebelum mencoba PickUp
+                if State.IsHolding and dropRE then
+                    safeFire(dropRE, pPos.X, pPos.Y, pPos.Z)
+                    task.wait(0.1)
+                end
 
                 -- Teleport ke bom 1
                 hrp.CFrame = CFrame.new(n1.pos)
@@ -414,6 +427,11 @@ task.spawn(function()
                     safeFire(mergeRE, n2.model)
                     merged = merged + 1
                     task.wait(0.15)
+                    
+                    -- Jatuhkan hasil merge agar tangan kosong untuk iterasi berikutnya
+                    if dropRE then
+                        safeFire(dropRE, hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+                    end
                 end
 
                 i = i + 2
