@@ -337,10 +337,18 @@ task.spawn(function()
         if State.IsUnderAttack then continue end
         
         local nukes = getAllNukes()
+        
+        -- [DIAG 1] Berapa nuke ditemukan?
+        logAction("Merge Diag", true, "Nuke ditemukan: " .. #nukes .. " | GatherPos: " .. tostring(State.MergeGatherPos ~= nil))
+        
         if #nukes == 0 then continue end
         
         local pickUpRE  = resolveRemote("PickUp")
         local mergeRE   = resolveRemote("MergeRequest")
+
+        -- [DIAG 2] Remote ditemukan?
+        logAction("Merge Diag", pickUpRE ~= nil, "PickUp RE: " .. tostring(pickUpRE and pickUpRE:GetFullName() or "NIL"))
+        logAction("Merge Diag", mergeRE ~= nil, "MergeReq RE: " .. tostring(mergeRE and mergeRE:GetFullName() or "NIL"))
 
         if pickUpRE and mergeRE then
             local merged = 0
@@ -350,6 +358,11 @@ task.spawn(function()
                 pullPos = hrp and (hrp.Position + hrp.CFrame.LookVector * 4) or Vector3.new(0,0,0)
             end
             
+            -- [DIAG 3] Level semua nuke
+            local levelStr = ""
+            for _, n in ipairs(nukes) do levelStr = levelStr .. n.level .. " " end
+            logAction("Merge Diag", true, "Level Nuke: [" .. levelStr .. "]")
+            
             local i = 1
             while i < #nukes do
                 if not State.AutoMerge or State.IsUnderAttack then break end
@@ -357,36 +370,38 @@ task.spawn(function()
                 local n1 = nukes[i]
                 local n2 = nukes[i+1]
                 
-                -- Harus ada pasangan level yang sama untuk bisa di-merge
-                if n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent then
-                    
+                -- [DIAG 4] Apakah ada pasangan?
+                local hasPair = n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent
+                logAction("Merge Diag", hasPair, "i=" .. i .. " lv=" .. n1.level .. " pair=" .. tostring(n2 and n2.level or "x"))
+                
+                if hasPair then
                     local hrp = getHRP()
                     -- TELEPORT KE BOMB 1
                     if hrp then hrp.CFrame = CFrame.new(n1.pos) end
+                    task.wait(0.05)
                     
                     holdConfirmed = false
-                    
-                    -- Pancing event sentuhan agar LocalScript game mengelas (weld) bom ke karakter
                     simulateTouch(n1.part)
                     safeFire(pickUpRE, n1.model)
                     
+                    -- [DIAG 5] Tunggu HoldStarted
                     local waited = 0
                     while not holdConfirmed and waited < 0.5 do
                         task.wait(0.05)
                         waited = waited + 0.05
                     end
+                    logAction("Merge Diag", holdConfirmed, "HoldConfirmed setelah " .. string.format("%.2f", waited) .. "s")
                     
                     if holdConfirmed then
                         -- TELEPORT KE BOMB 2
                         if hrp then hrp.CFrame = CFrame.new(n2.pos) end
-                        
-                        -- Pancing event sentuhan untuk memicu animasi gabung dari game
+                        task.wait(0.05)
                         simulateTouch(n2.part)
                         
-                        -- Gabungkan Bomb 1 (di tangan) ke Bomb 2
-                        safeFire(mergeRE, n2.model)
+                        local ok = safeFire(mergeRE, n2.model)
+                        logAction("Merge Diag", ok, "MergeRequest fired -> ok=" .. tostring(ok))
                         merged = merged + 1
-                        task.wait(0.15)
+                        task.wait(0.2)
                     end
                     
                     i = i + 2
