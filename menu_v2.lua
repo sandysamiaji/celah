@@ -29,6 +29,7 @@ local LocalPlayer = Players.LocalPlayer
 -- ============================================================
 local ExecutionID = tick()
 _G.PandaExecution = ExecutionID
+_G.NukeGameExecution = ExecutionID -- Mematikan loop dari script versi lama (v1) jika masih berjalan
 
 local State = {
     AutoMerge      = false,
@@ -191,36 +192,6 @@ local function getHRP()
     return char and char:FindFirstChild("HumanoidRootPart")
 end
 
--- Teleport karakter secara instan (bypass server distance check)
--- Metode: ubah CFrame HRP langsung. Server Roblox biasanya toleran
--- terhadap perbedaan posisi singkat asalkan ada gerakan yang valid.
-local function teleportTo(targetCF)
-    local hrp = getHRP()
-    if hrp then
-        hrp.CFrame = targetCF
-        task.wait(0.05) -- Beri jeda agar physics settle
-    end
-end
-
-local function teleportToPosition(pos)
-    teleportTo(CFrame.new(pos + Vector3.new(0, 3, 0)))
-end
-
--- Simpan posisi asli sebelum teleport
-local function saveAndTeleport(pos)
-    local hrp = getHRP()
-    local originalCF = hrp and hrp.CFrame
-    teleportToPosition(pos)
-    return originalCF
-end
-
-local function returnTo(cf)
-    if cf then
-        local hrp = getHRP()
-        if hrp then hrp.CFrame = cf end
-    end
-end
-
 -- ============================================================
 -- NUKE FINDER
 -- ============================================================
@@ -266,22 +237,17 @@ local function getNearestFreeNuke()
 end
 
 -- ============================================================
--- AUTO MERGE - LOGIC UTAMA (NO TELEPORT VERSI)
+-- AUTO MERGE - LOGIC UTAMA (BRING & MERGE BYPASS)
 -- ============================================================
--- Temuan dari spy: server menerima Model Nuke sebagai argumen.
--- Server handler kemungkinan besar melakukan:
---   1. Cek apakah player sedang "HoldStarted" (memegang nuke)
---   2. Cek distance antara player dan nuke yang dipegang
--- Strategi bypass:
---   a. Pertama kirim PickUp dengan Model nuke tertentu
---   b. Server balas HoldStarted jika valid → baru kirim MergeRequest
---   c. Jika PickUp gagal karena jauh, teleport singkat lalu balik
+-- Strategi bypass tanpa teleport karakter:
+-- 1. Pindahkan posisi Nuke (CFrame) ke posisi karakter secara lokal.
+-- 2. Pastikan karakter sedang memegang satu Nuke (HoldStarted).
+-- 3. Kirim MergeRequest untuk nuke lainnya.
 -- ============================================================
 
 local holdConfirmed = false
 local holdLevel     = 0
 
--- Dengarkan konfirmasi HoldStarted dari server
 pcall(function()
     local holdStartedRE = resolveRemote("HoldStarted") or (RS:WaitForChild("NukeRemotes", 5) and RS.NukeRemotes:FindFirstChild("HoldStarted"))
     if holdStartedRE and holdStartedRE:IsA("RemoteEvent") then
@@ -289,6 +255,7 @@ pcall(function()
             holdConfirmed = true
             holdLevel = level or 0
             State.IsHolding = true
+            logAction("Hold", true, "Memegang nuke level " .. tostring(level))
         end)
     end
 end)
@@ -303,72 +270,34 @@ pcall(function()
     end
 end)
 
--- Dengarkan MergeVFX untuk hitung sukses merge
 pcall(function()
     local mergeVFX = resolveRemote("MergeVFX")
     if mergeVFX and mergeVFX:IsA("RemoteEvent") then
         mergeVFX.OnClientEvent:Connect(function(pos, level)
             State.MergeCount = State.MergeCount + 1
             State.CurrentNukeLevel = level or State.CurrentNukeLevel
-            logAction("Merge Result", true, "Level " .. tostring(level) .. " | Total Merge: " .. State.MergeCount)
+            logAction("Merge Result", true, "Sukses level " .. tostring(level) .. " | Total: " .. State.MergeCount)
         end)
     end
 end)
 
--- Fungsi inti: ambil nuke + merge
-local function doPickUpAndMerge(nukeModel)
-    local pickUpRE  = resolveRemote("PickUp")
-    local mergeRE   = resolveRemote("MergeRequest")
-    if not pickUpRE or not mergeRE then return false end
-    
-    local primary = nukeModel.PrimaryPart or nukeModel:FindFirstChildWhichIsA("BasePart")
-    if not primary then return false end
-    
-    -- Cek apakah perlu teleport (jarak > 20 studs = kemungkinan server reject)
+local function bringNukeToPlayer(nukeModel)
     local hrp = getHRP()
-    local dist = hrp and (primary.Position - hrp.Position).Magnitude or 0
-    local originalCF = nil
-    
-    if dist > 18 then
-        -- Teleport singkat ke dekat nuke
-        originalCF = hrp and hrp.CFrame
-        teleportToPosition(primary.Position)
-    end
-    
-    -- Kirim PickUp
-    holdConfirmed = false
-    safeFire(pickUpRE, nukeModel)
-    
-    -- Tunggu HoldStarted (max 0.5 detik)
-    local waited = 0
-    while not holdConfirmed and waited < 0.5 do
+    local primary = nukeModel.PrimaryPart or nukeModel:FindFirstChildWhichIsA("BasePart")
+    if hrp and primary then
+        -- Pindahkan nuke ke dekat player secara lokal
+        primary.CFrame = hrp.CFrame * CFrame.new(0, 0, -3)
         task.wait(0.05)
-        waited = waited + 0.05
+        return true
     end
-    
-    if holdConfirmed then
-        -- Kirim MergeRequest
-        safeFire(mergeRE, nukeModel)
-        task.wait(0.1)
-    else
-        -- Fallback: coba langsung tanpa konfirmasi
-        safeFire(mergeRE, nukeModel)
-    end
-    
-    -- Kembali ke posisi asli jika sempat teleport
-    if originalCF then
-        task.wait(0.1)
-        returnTo(originalCF)
-    end
-    
-    return true
+    return false
 end
 
 -- ============================================================
 -- AUTO MERGE LOOP
 -- ============================================================
 task.spawn(function()
-    while task.wait(0.8) do
+    while task.wait(0.5) do
         if _G.PandaExecution ~= ExecutionID then break end
         if not State.AutoMerge then continue end
         if State.IsUnderAttack then continue end
@@ -377,13 +306,35 @@ task.spawn(function()
         if #nukes == 0 then continue end
         
         local merged = 0
-        for _, nukeInfo in ipairs(nukes) do
-            if not State.AutoMerge then break end
-            if nukeInfo.model and nukeInfo.model.Parent then
-                local ok = doPickUpAndMerge(nukeInfo.model)
-                if ok then
-                    merged = merged + 1
-                    task.wait(0.15)
+        local pickUpRE  = resolveRemote("PickUp")
+        local mergeRE   = resolveRemote("MergeRequest")
+
+        if pickUpRE and mergeRE then
+            for _, nukeInfo in ipairs(nukes) do
+                if not State.AutoMerge then break end
+                if nukeInfo.model and nukeInfo.model.Parent then
+                    -- Bypass teleport: pindahkan nuke ke dekat player
+                    bringNukeToPlayer(nukeInfo.model)
+                    
+                    holdConfirmed = false
+                    safeFire(pickUpRE, nukeInfo.model)
+                    
+                    -- Tunggu maksimal 0.3 detik untuk konfirmasi HoldStarted
+                    local waited = 0
+                    while not holdConfirmed and waited < 0.3 do
+                        task.wait(0.05)
+                        waited = waited + 0.05
+                    end
+                    
+                    -- Jika server memvalidasi PickUp, kirim Merge
+                    if holdConfirmed then
+                        safeFire(mergeRE, nukeInfo.model)
+                        merged = merged + 1
+                        task.wait(0.15)
+                    else
+                        -- Fallback paksa merge jika tidak ada respons HoldStarted
+                        safeFire(mergeRE, nukeInfo.model)
+                    end
                 end
             end
         end
@@ -670,8 +621,15 @@ TabLaunch:Button({
     Callback = function()
         local nuke, dist = getNearestFreeNuke()
         if nuke then
-            doPickUpAndMerge(nuke)
-            logAction("Manual Merge", true, "Merge nuke (jarak: " .. math.floor(dist) .. " studs)")
+            bringNukeToPlayer(nuke)
+            local pickUpRE = resolveRemote("PickUp")
+            local mergeRE = resolveRemote("MergeRequest")
+            if pickUpRE and mergeRE then
+                safeFire(pickUpRE, nuke)
+                task.wait(0.2)
+                safeFire(mergeRE, nuke)
+                logAction("Manual Merge", true, "Mencoba merge (Bypass Bring Nuke)")
+            end
         else
             logAction("Manual Merge", false, "Tidak ada nuke tersedia")
         end
