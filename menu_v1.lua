@@ -313,6 +313,10 @@ task.spawn(function()
                     
                     if heldBomb then
                         local heldVal = getBombValue(heldBomb)
+                        if heldVal == "?" and _G_State.LastPickedUpVal then
+                            heldVal = _G_State.LastPickedUpVal
+                        end
+                        
                         -- Cari bom di tanah dengan nilai yang sama (sudah urut dari terdekat)
                         local targetMerge = nil
                         for _, n in ipairs(sortedNukes) do
@@ -357,8 +361,10 @@ task.spawn(function()
                         end
                         
                         if targetPickUp then
+                            local val = getBombValue(targetPickUp)
+                            _G_State.LastPickedUpVal = val
                             safeFire(pickUp, targetPickUp)
-                            logAction("Auto Merge", true, "Mengambil Nuke [" .. getBombValue(targetPickUp) .. "] terdekat")
+                            logAction("Auto Merge", true, "Mengambil Nuke [" .. val .. "] terdekat")
                         end
                     end
                 end
