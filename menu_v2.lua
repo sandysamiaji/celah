@@ -200,22 +200,40 @@ end
 -- ============================================================
 local function getNukeLevel(nuke)
     if not nuke then return 0 end
-    local num = tonumber(nuke.Name)
-    if num then return num end
     
+    -- Prioritas 1: Roblox Attribute (paling akurat)
+    local attrLevel = nuke:GetAttribute("Level") or nuke:GetAttribute("Tier") or nuke:GetAttribute("NukeLevel")
+    if attrLevel then return tonumber(attrLevel) or 0 end
+    
+    -- Prioritas 2: IntValue / NumberValue dengan nama yang relevan
     for _, child in ipairs(nuke:GetChildren()) do
         if child:IsA("IntValue") or child:IsA("NumberValue") then
             local n = string.lower(child.Name)
-            if n == "level" or n == "tier" or n == "value" or n == "lvl" then
+            if n == "level" or n == "tier" or n == "nukelevel" or n == "lvl" then
                 return child.Value
             end
         end
     end
     
+    -- Prioritas 3: Nama model jika berupa angka
+    local numName = tonumber(nuke.Name)
+    if numName then return numName end
+    
+    -- Prioritas 4: TextLabel yang TIDAK dalam format [N] (bracket = UI counter bukan level)
+    -- Cari yang memiliki angka besar seperti "Level 22" atau hanya "22"
     for _, desc in ipairs(nuke:GetDescendants()) do
         if desc:IsA("TextLabel") then
-            local match = string.match(desc.Text, "%d+")
-            if match then return tonumber(match) end
+            -- Hindari format [N] yang merupakan UI counter
+            local text = desc.Text
+            if not string.match(text, "^%[%d+%]$") then
+                local match = string.match(text, "%d+")
+                if match then
+                    local num = tonumber(match)
+                    if num and num > 10 then -- Level game umumnya > 10
+                        return num
+                    end
+                end
+            end
         end
     end
     return 0
@@ -285,26 +303,41 @@ end
 local holdConfirmed = false
 local holdLevel     = 0
 
+local function onHoldStarted(level)
+    holdConfirmed = true
+    holdLevel = level or 0
+    State.IsHolding = true
+    logAction("Hold", true, "Memegang nuke level " .. tostring(level))
+end
+
+-- Dengarkan HoldStarted dari SEMUA path yang mungkin
 pcall(function()
-    local holdStartedRE = resolveRemote("HoldStarted") or (RS:WaitForChild("NukeRemotes", 5) and RS.NukeRemotes:FindFirstChild("HoldStarted"))
-    if holdStartedRE and holdStartedRE:IsA("RemoteEvent") then
-        holdStartedRE.OnClientEvent:Connect(function(level)
-            holdConfirmed = true
-            holdLevel = level or 0
-            State.IsHolding = true
-            logAction("Hold", true, "Memegang nuke level " .. tostring(level))
-        end)
-    end
+    local re = RS:WaitForChild("NukeRemotes", 3):FindFirstChild("HoldStarted")
+    if re then re.OnClientEvent:Connect(onHoldStarted) end
+end)
+pcall(function()
+    local networking = RS:WaitForChild("Packages", 3)
+        :WaitForChild("Remotes", 3)
+        :WaitForChild("Networking", 3)
+    local re = networking:FindFirstChild("RE/Pickup/HoldStarted")
+    if re then re.OnClientEvent:Connect(onHoldStarted) end
 end)
 
+local function onHoldEnded()
+    holdConfirmed = false
+    State.IsHolding = false
+end
+
 pcall(function()
-    local holdEndedRE = resolveRemote("HoldEnded") or (RS:WaitForChild("NukeRemotes", 5) and RS.NukeRemotes:FindFirstChild("HoldEnded"))
-    if holdEndedRE and holdEndedRE:IsA("RemoteEvent") then
-        holdEndedRE.OnClientEvent:Connect(function()
-            holdConfirmed = false
-            State.IsHolding = false
-        end)
-    end
+    local re = RS:WaitForChild("NukeRemotes", 3):FindFirstChild("HoldEnded")
+    if re then re.OnClientEvent:Connect(onHoldEnded) end
+end)
+pcall(function()
+    local networking = RS:WaitForChild("Packages", 3)
+        :WaitForChild("Remotes", 3)
+        :WaitForChild("Networking", 3)
+    local re = networking:FindFirstChild("RE/Pickup/HoldEnded")
+    if re then re.OnClientEvent:Connect(onHoldEnded) end
 end)
 
 pcall(function()
@@ -334,21 +367,13 @@ task.spawn(function()
     while task.wait(0.5) do
         if _G.PandaExecution ~= ExecutionID then break end
         if not State.AutoMerge then continue end
-        if State.IsUnderAttack then continue end
+        -- Catatan: AutoMerge boleh jalan meskipun base sedang terkunci
         
         local nukes = getAllNukes()
-        
-        -- [DIAG 1] Berapa nuke ditemukan?
-        logAction("Merge Diag", true, "Nuke ditemukan: " .. #nukes .. " | GatherPos: " .. tostring(State.MergeGatherPos ~= nil))
-        
         if #nukes == 0 then continue end
         
         local pickUpRE  = resolveRemote("PickUp")
         local mergeRE   = resolveRemote("MergeRequest")
-
-        -- [DIAG 2] Remote ditemukan?
-        logAction("Merge Diag", pickUpRE ~= nil, "PickUp RE: " .. tostring(pickUpRE and pickUpRE:GetFullName() or "NIL"))
-        logAction("Merge Diag", mergeRE ~= nil, "MergeReq RE: " .. tostring(mergeRE and mergeRE:GetFullName() or "NIL"))
 
         if pickUpRE and mergeRE then
             local merged = 0
@@ -358,48 +383,37 @@ task.spawn(function()
                 pullPos = hrp and (hrp.Position + hrp.CFrame.LookVector * 4) or Vector3.new(0,0,0)
             end
             
-            -- [DIAG 3] Level semua nuke
-            local levelStr = ""
-            for _, n in ipairs(nukes) do levelStr = levelStr .. n.level .. " " end
-            logAction("Merge Diag", true, "Level Nuke: [" .. levelStr .. "]")
-            
             local i = 1
             while i < #nukes do
-                if not State.AutoMerge or State.IsUnderAttack then break end
+                if not State.AutoMerge then break end
                 
                 local n1 = nukes[i]
                 local n2 = nukes[i+1]
                 
-                -- [DIAG 4] Apakah ada pasangan?
-                local hasPair = n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent
-                logAction("Merge Diag", hasPair, "i=" .. i .. " lv=" .. n1.level .. " pair=" .. tostring(n2 and n2.level or "x"))
-                
-                if hasPair then
+                if n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent then
                     local hrp = getHRP()
-                    -- TELEPORT KE BOMB 1
                     if hrp then hrp.CFrame = CFrame.new(n1.pos) end
                     task.wait(0.05)
                     
                     holdConfirmed = false
                     simulateTouch(n1.part)
+                    
+                    -- Fire PickUp ke KEDUA path agar pasti salah satu diterima server
+                    local pickUpOld = RS:FindFirstChild("NukeRemotes") and RS.NukeRemotes:FindFirstChild("PickUp")
+                    if pickUpOld then pcall(function() pickUpOld:FireServer(n1.model) end) end
                     safeFire(pickUpRE, n1.model)
                     
-                    -- [DIAG 5] Tunggu HoldStarted
                     local waited = 0
                     while not holdConfirmed and waited < 0.5 do
                         task.wait(0.05)
                         waited = waited + 0.05
                     end
-                    logAction("Merge Diag", holdConfirmed, "HoldConfirmed setelah " .. string.format("%.2f", waited) .. "s")
                     
                     if holdConfirmed then
-                        -- TELEPORT KE BOMB 2
                         if hrp then hrp.CFrame = CFrame.new(n2.pos) end
                         task.wait(0.05)
                         simulateTouch(n2.part)
-                        
-                        local ok = safeFire(mergeRE, n2.model)
-                        logAction("Merge Diag", ok, "MergeRequest fired -> ok=" .. tostring(ok))
+                        safeFire(mergeRE, n2.model)
                         merged = merged + 1
                         task.wait(0.2)
                     end
@@ -410,7 +424,7 @@ task.spawn(function()
                 end
             end
             
-            -- Setelah selesai merge, kembali ke titik kumpul (jika ada)
+            -- Kembali ke titik kumpul setelah selesai
             if State.MergeGatherPos and merged > 0 then
                 local hrp = getHRP()
                 if hrp then hrp.CFrame = CFrame.new(State.MergeGatherPos) end
@@ -529,12 +543,12 @@ pcall(function()
     if lockRE and lockRE:IsA("RemoteEvent") then
         lockRE.OnClientEvent:Connect(function(state, value)
             logAction("Lock State", true, tostring(state) .. " | " .. tostring(value))
+            -- 'locked' = base kamu dikunci/diamankan, BUKAN berarti diserang
+            -- IsUnderAttack hanya untuk fitur Defense, TIDAK memblokir Auto Merge
             if State.AutoDefense then
                 if state == "locked" then
-                    State.IsUnderAttack = true
                     triggerDefense(true)
                 else
-                    State.IsUnderAttack = false
                     triggerDefense(false)
                 end
             end
