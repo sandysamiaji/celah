@@ -425,9 +425,14 @@ task.spawn(function()
                 State.HeldNukeModel = targetNuke.model
                 task.wait(0.2)
             else
+                -- Buat log isi nukes untuk dianalisis
+                local isi = ""
+                for _, nk in ipairs(nukes) do isi = isi .. nk.level .. "," end
+                logAction("Diag", false, "Gagal menemukan level " .. currentTargetLevel .. " | Isi nukes: [" .. isi .. "] | Melakukan Drop.")
+                
                 -- Tidak ada pasangan lagi untuk level ini, JATUHKAN!
-                pcall(function() RS.NukeRemotes.Drop:FireServer(pPos.X, pPos.Y, pPos.Z) end)
-                if dropRE then safeFire(dropRE, pPos.X, pPos.Y, pPos.Z) end
+                pcall(function() RS.NukeRemotes.Drop:FireServer() end)
+                if dropRE then safeFire(dropRE) end
                 currentTargetLevel = nil
                 State.IsHolding = false
                 State.HeldNukeModel = nil
@@ -442,8 +447,8 @@ task.spawn(function()
         else
             -- Tangan kosong (atau kita paksa kosongkan jika sinkronisasi salah)
             if State.IsHolding then
-                pcall(function() RS.NukeRemotes.Drop:FireServer(pPos.X, pPos.Y, pPos.Z) end)
-                if dropRE then safeFire(dropRE, pPos.X, pPos.Y, pPos.Z) end
+                pcall(function() RS.NukeRemotes.Drop:FireServer() end)
+                if dropRE then safeFire(dropRE) end
                 State.IsHolding = false
                 State.HeldNukeModel = nil
                 task.wait(0.2)
@@ -475,7 +480,7 @@ task.spawn(function()
                 safeFire(pickUpRE, firstNuke.model)
                 
                 local w = 0
-                while not holdConfirmed and w < 0.3 do
+                while not holdConfirmed and w < 1.0 do
                     task.wait(0.1); w = w + 0.1
                 end
                 
@@ -483,9 +488,10 @@ task.spawn(function()
                     currentTargetLevel = targetPairLvl
                     State.HeldNukeModel = firstNuke.model
                 else
+                    logAction("Diag", false, "Timeout menunggu HoldStarted. Membatalkan PickUp.")
                     -- Gagal PickUp, reset
-                    pcall(function() RS.NukeRemotes.Drop:FireServer(pPos.X, pPos.Y, pPos.Z) end)
-                    if dropRE then safeFire(dropRE, pPos.X, pPos.Y, pPos.Z) end
+                    pcall(function() RS.NukeRemotes.Drop:FireServer() end)
+                    if dropRE then safeFire(dropRE) end
                     State.IsHolding = false
                     State.HeldNukeModel = nil
                 end
