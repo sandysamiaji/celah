@@ -364,118 +364,76 @@ end
 -- Dihapus bringNukeTo karena menyebabkan ghosting (berbayang) di server
 
 -- ============================================================
--- AUTO MERGE LOOP (GATHER + MERGE)
--- Fase 1: Kumpulkan semua bom ke titik awal (teleport→ambil→kembali→drop)
--- Fase 2: Gabungkan pasangan bom yang ada di titik kumpul
+-- AUTO MERGE LOOP
+-- Teleport ke bom 1 → PickUp → Teleport ke bom 2 → MergeRequest
 -- ============================================================
 task.spawn(function()
-    while task.wait(1) do
+    while task.wait(0.3) do
         if _G.PandaExecution ~= ExecutionID then break end
         if not State.AutoMerge then continue end
 
         local pickUpRE = resolveRemote("PickUp")
-        local dropRE   = resolveRemote("Drop")
         local mergeRE  = resolveRemote("MergeRequest")
-        if not pickUpRE or not dropRE or not mergeRE then continue end
+        if not pickUpRE or not mergeRE then continue end
 
-        local gatherPos = State.MergeGatherPos
-        if not gatherPos then
-            local hrp = getHRP()
-            if not hrp then continue end
-            gatherPos = hrp.Position
-            State.MergeGatherPos = gatherPos
-        end
-
-        -- ── FASE 1: GATHER (kumpulkan semua bom ke gatherPos) ──
         local nukes = getAllNukes()
-        local gathered = 0
-        for _, nk in ipairs(nukes) do
-            if not State.AutoMerge then break end
-            if not nk.model.Parent then continue end
+        if #nukes < 2 then continue end
 
-            -- Abaikan bom yang sudah ada di dekat titik kumpul
-            if (nk.pos - gatherPos).Magnitude < 8 then continue end
-
-            local hrp = getHRP()
-            if not hrp then break end
-
-            -- Teleport ke posisi bom
-            hrp.CFrame = CFrame.new(nk.pos)
-            task.wait(0.08)
-
-            -- Ambil bom
-            holdConfirmed = false
-            simulateTouch(nk.part)
-            pcall(function() RS.NukeRemotes.PickUp:FireServer(nk.model) end)
-            safeFire(pickUpRE, nk.model)
-
-            -- Tunggu HoldStarted (maks 0.6 detik)
-            local w = 0
-            while not holdConfirmed and w < 0.6 do task.wait(0.05); w = w + 0.05 end
-
-            if holdConfirmed then
-                -- Teleport kembali ke titik kumpul
-                hrp.CFrame = CFrame.new(gatherPos)
-                task.wait(0.08)
-
-                -- Drop bom di titik kumpul
-                safeFire(dropRE, gatherPos.X, gatherPos.Y, gatherPos.Z)
-                gathered = gathered + 1
-                task.wait(0.2)
-            end
-        end
-
-        if gathered > 0 then
-            logAction("Gather", true, "Dikumpulkan " .. gathered .. " bom ke titik merge")
-            task.wait(0.5) -- Beri waktu semua bom mendarat
-        end
-
-        -- ── FASE 2: MERGE (gabungkan pasangan di titik kumpul) ──
-        local hrp = getHRP()
-        if hrp then hrp.CFrame = CFrame.new(gatherPos) end
-
-        local freshNukes = getAllNukes()
         local merged = 0
         local i = 1
-        while i < #freshNukes do
+        while i < #nukes do
             if not State.AutoMerge then break end
-            local n1 = freshNukes[i]
-            local n2 = freshNukes[i+1]
+            local n1 = nukes[i]
+            local n2 = nukes[i + 1]
 
             if n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent then
-                if hrp then hrp.CFrame = CFrame.new(n1.pos) end
+                local hrp = getHRP()
+                if not hrp then break end
+
+                -- Teleport ke bom 1
+                hrp.CFrame = CFrame.new(n1.pos)
                 task.wait(0.05)
 
+                -- Ambil bom 1
                 holdConfirmed = false
                 simulateTouch(n1.part)
                 pcall(function() RS.NukeRemotes.PickUp:FireServer(n1.model) end)
                 safeFire(pickUpRE, n1.model)
 
+                -- Tunggu HoldStarted server
                 local w = 0
-                while not holdConfirmed and w < 0.5 do task.wait(0.05); w = w + 0.05 end
+                while not holdConfirmed and w < 0.5 do
+                    task.wait(0.05); w = w + 0.05
+                end
 
                 if holdConfirmed then
-                    if hrp then hrp.CFrame = CFrame.new(n2.pos) end
+                    -- Teleport ke bom 2 lalu merge
+                    hrp.CFrame = CFrame.new(n2.pos)
                     task.wait(0.05)
                     simulateTouch(n2.part)
                     safeFire(mergeRE, n2.model)
                     merged = merged + 1
-                    task.wait(0.2)
+                    task.wait(0.15)
                 end
+
                 i = i + 2
             else
                 i = i + 1
             end
         end
 
-        if merged > 0 then
-            logAction("Auto Merge", true, "Berhasil merge " .. merged .. " pasang bom")
+        -- Kembali ke titik kumpul
+        if State.MergeGatherPos then
+            local hrp = getHRP()
+            if hrp then hrp.CFrame = CFrame.new(State.MergeGatherPos) end
         end
 
-        -- Kembali ke titik kumpul
-        if hrp then hrp.CFrame = CFrame.new(gatherPos) end
+        if merged > 0 then
+            logAction("Auto Merge", true, "Berhasil merge " .. merged .. " pasang")
+        end
     end
 end)
+
 
 -- ============================================================
 -- AUTO COLLECT (TOUCH DROP ITEMS)
