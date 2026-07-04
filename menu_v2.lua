@@ -252,6 +252,13 @@ local function getAllNukes()
         if v:IsA("Model") and v.Name == "Nuke" then
             local primary = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")
             if primary then
+                local distToPlayer = hrpPos and (primary.Position - hrpPos).Magnitude or math.huge
+                
+                -- Abaikan bom yang sedang dipegang oleh karakter kita sendiri (jarak < 3)
+                if State.IsHolding and distToPlayer < 10 then
+                    continue
+                end
+                
                 local dist = (primary.Position - centerPos).Magnitude
                 local lvl = getNukeLevel(v)
                 -- Jika StealNukes OFF, hanya ambil nuke dalam radius 80 studs (area base sendiri)
@@ -368,86 +375,112 @@ end
 -- Teleport ke bom 1 → PickUp → Teleport ke bom 2 → MergeRequest
 -- ============================================================
 task.spawn(function()
-    while task.wait(0.3) do
+    local currentTargetLevel = nil
+
+    while task.wait(0.2) do
         if _G.PandaExecution ~= ExecutionID then break end
         if not State.AutoMerge then continue end
 
         local pickUpRE = resolveRemote("PickUp")
         local mergeRE  = resolveRemote("MergeRequest")
+        local dropRE   = resolveRemote("Drop")
         if not pickUpRE or not mergeRE then continue end
+        
+        local hrp = getHRP()
+        if not hrp then continue end
+        local pPos = hrp.Position
 
         local nukes = getAllNukes()
-        if #nukes < 2 then continue end
-
-        local merged = 0
-        local i = 1
         
-        local dropRE = resolveRemote("Drop")
-        
-        while i < #nukes do
-            if not State.AutoMerge then break end
-            local n1 = nukes[i]
-            local n2 = nukes[i + 1]
-
-            if n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent then
-                local hrp = getHRP()
-                if not hrp then break end
-                
-                local pPos = hrp.Position
-                logAction("Scan", true, string.format("Player [%.1f, %.1f, %.1f] | Target: Lvl %d di [%.1f, %.1f, %.1f] & [%.1f, %.1f, %.1f]", 
-                    pPos.X, pPos.Y, pPos.Z, n1.level, n1.pos.X, n1.pos.Y, n1.pos.Z, n2.pos.X, n2.pos.Y, n2.pos.Z))
-                
-                -- Pastikan tangan kosong sebelum mencoba PickUp
-                if State.IsHolding and dropRE then
-                    safeFire(dropRE, pPos.X, pPos.Y, pPos.Z)
-                    task.wait(0.1)
+        if State.IsHolding and currentTargetLevel then
+            -- Cari apakah ada pasangan untuk bom yang sedang kita pegang
+            local targetNuke = nil
+            for _, nk in ipairs(nukes) do
+                if nk.level == currentTargetLevel then
+                    targetNuke = nk
+                    break
                 end
-
-                -- Teleport ke bom 1
-                hrp.CFrame = CFrame.new(n1.pos)
-                task.wait(0.05)
-
-                -- Ambil bom 1
-                holdConfirmed = false
-                simulateTouch(n1.part)
-                pcall(function() RS.NukeRemotes.PickUp:FireServer(n1.model) end)
-                safeFire(pickUpRE, n1.model)
-
-                -- Tunggu HoldStarted server
-                local w = 0
-                while not holdConfirmed and w < 0.5 do
-                    task.wait(0.05); w = w + 0.05
-                end
-
-                if holdConfirmed then
-                    -- Teleport ke bom 2 lalu merge
-                    hrp.CFrame = CFrame.new(n2.pos)
-                    task.wait(0.05)
-                    simulateTouch(n2.part)
-                    safeFire(mergeRE, n2.model)
-                    merged = merged + 1
-                    task.wait(0.15)
-                    
-                    -- Jatuhkan hasil merge agar tangan kosong untuk iterasi berikutnya
-                    if dropRE then
-                        safeFire(dropRE, hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
-                    end
-                end
-
-                i = i + 2
-            else
-                i = i + 1
             end
-        end
+            
+            if targetNuke then
+                -- Ada pasangan! Teleport ke sana dan Merge (offset 3 stud agar tidak ngambang)
+                hrp.CFrame = CFrame.new(targetNuke.pos + Vector3.new(3, 0, 0))
+                task.wait(0.2)
+                
+                logAction("Scan", true, string.format("Player [%.1f, %.1f, %.1f] | Chained Target: Lvl %d di [%.1f, %.1f, %.1f]", 
+                    hrp.Position.X, hrp.Position.Y, hrp.Position.Z, targetNuke.level, targetNuke.pos.X, targetNuke.pos.Y, targetNuke.pos.Z))
 
-        -- Kembali ke titik kumpul
-        if State.MergeGatherPos then
-            local hrp = getHRP()
-            if hrp then hrp.CFrame = CFrame.new(State.MergeGatherPos) end
-        end
+                simulateTouch(targetNuke.part)
+                pcall(function() RS.NukeRemotes.MergeRequest:FireServer(targetNuke.model) end)
+                safeFire(mergeRE, targetNuke.model)
+                
+                -- Setelah merge sukses, server akan meng-hold bom yang levelnya naik 1
+                currentTargetLevel = currentTargetLevel + 1
+                task.wait(0.2)
+            else
+                -- Tidak ada pasangan lagi untuk level ini, JATUHKAN!
+                pcall(function() RS.NukeRemotes.Drop:FireServer(pPos.X, pPos.Y, pPos.Z) end)
+                if dropRE then safeFire(dropRE, pPos.X, pPos.Y, pPos.Z) end
+                currentTargetLevel = nil
+                
+                -- Kembali ke titik kumpul jika ada
+                if State.MergeGatherPos then 
+                    hrp.CFrame = CFrame.new(State.MergeGatherPos) 
+                end
+                task.wait(0.2)
+            end
+            
+        else
+            -- Tangan kosong (atau kita paksa kosongkan jika sinkronisasi salah)
+            if State.IsHolding then
+                pcall(function() RS.NukeRemotes.Drop:FireServer(pPos.X, pPos.Y, pPos.Z) end)
+                if dropRE then safeFire(dropRE, pPos.X, pPos.Y, pPos.Z) end
+                task.wait(0.2)
+            end
+            currentTargetLevel = nil
+            
+            -- Cari pasangan level terkecil yang tersedia
+            local targetPairLvl = nil
+            local firstNuke = nil
+            for i = 1, #nukes - 1 do
+                if nukes[i].level == nukes[i+1].level then
+                    targetPairLvl = nukes[i].level
+                    firstNuke = nukes[i]
+                    break
+                end
+            end
+            
+            if targetPairLvl and firstNuke then
+                logAction("Scan", true, string.format("Player [%.1f, %.1f, %.1f] | New Pair Target: Lvl %d di [%.1f, %.1f, %.1f]", 
+                    pPos.X, pPos.Y, pPos.Z, targetPairLvl, firstNuke.pos.X, firstNuke.pos.Y, firstNuke.pos.Z))
 
-        if merged > 0 then
-            logAction("Auto Merge", true, "Berhasil merge " .. merged .. " pasang")
+                -- Ambil bom pertama (offset 3 stud agar tidak ngambang)
+                hrp.CFrame = CFrame.new(firstNuke.pos + Vector3.new(3, 0, 0))
+                task.wait(0.2)
+                
+                holdConfirmed = false
+                simulateTouch(firstNuke.part)
+                pcall(function() RS.NukeRemotes.PickUp:FireServer(firstNuke.model) end)
+                safeFire(pickUpRE, firstNuke.model)
+                
+                local w = 0
+                while not holdConfirmed and w < 0.3 do
+                    task.wait(0.1); w = w + 0.1
+                end
+                
+                if holdConfirmed then
+                    currentTargetLevel = targetPairLvl
+                else
+                    -- Gagal PickUp, reset
+                    pcall(function() RS.NukeRemotes.Drop:FireServer(pPos.X, pPos.Y, pPos.Z) end)
+                    if dropRE then safeFire(dropRE, pPos.X, pPos.Y, pPos.Z) end
+                end
+            else
+                -- Tidak ada pasangan sama sekali, diam di titik kumpul
+                if State.MergeGatherPos and (pPos - State.MergeGatherPos).Magnitude > 5 then
+                    hrp.CFrame = CFrame.new(State.MergeGatherPos)
+                end
+            end
         end
     end
 end)
@@ -688,11 +721,14 @@ task.spawn(function()
         if _G.PandaExecution ~= ExecutionID then break end
         pcall(function()
             local nukes = getAllNukes()
+            local hrp = getHRP()
+            local posStr = hrp and string.format("[%.1f, %.1f, %.1f]", hrp.Position.X, hrp.Position.Y, hrp.Position.Z) or "Tidak ada"
             local statusText = string.format(
-                "Nukes: %d | Merges: %d | Level: %d\nHolding: %s | Attack: %s",
+                "Nukes: %d | Merges: %d | Level: %d\nHolding: %s | Attack: %s\nPosisi: %s",
                 #nukes, State.MergeCount, State.CurrentNukeLevel,
                 State.IsHolding and "Ya" or "Tidak",
-                State.IsUnderAttack and "⚠️ YA" or "Aman"
+                State.IsUnderAttack and "⚠️ YA" or "Aman",
+                posStr
             )
             if statusPara and statusPara.SetDesc then
                 statusPara:SetDesc(statusText)
@@ -766,6 +802,37 @@ TabLaunch:Button({
 -- =====================
 -- TAB TOOLS
 -- =====================
+TabTools:Button({
+    Title    = "📍 Print Koordinat Sekarang ke Log",
+    Callback = function()
+        local hrp = getHRP()
+        if hrp then
+            logAction("Info", true, string.format("Koordinat: %.1f, %.1f, %.1f", hrp.Position.X, hrp.Position.Y, hrp.Position.Z))
+            windui:Notify({ Title = "Info", Content = "Koordinat dicetak ke log!", Duration = 3 })
+        end
+    end
+})
+
+TabTools:Input({
+    Title       = "🚀 Teleport ke Koordinat (X, Y, Z)",
+    Placeholder = "Contoh: 100, 20, -50",
+    Callback    = function(txt)
+        local x, y, z = string.match(txt, "([%-%.%d]+)%s*,%s*([%-%.%d]+)%s*,%s*([%-%.%d]+)")
+        if x and y and z then
+            local hrp = getHRP()
+            if hrp then
+                hrp.CFrame = CFrame.new(tonumber(x), tonumber(y), tonumber(z))
+                logAction("Teleport", true, "Ke: " .. txt)
+                windui:Notify({ Title = "Teleport", Content = "Berhasil teleport!", Duration = 3 })
+            end
+        else
+            windui:Notify({ Title = "Error", Content = "Format salah! Gunakan: X, Y, Z", Duration = 3 })
+        end
+    end
+})
+
+TabTools:Divider()
+
 TabTools:Button({
     Title    = "💵 Claim Offline Earnings",
     Callback = function()
