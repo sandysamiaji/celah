@@ -81,29 +81,36 @@ local function formatArgs(...)
 end
 
 if hasHook and not getgenv().PandaHooked then
-    getgenv().PandaHooked = true
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        local method = getnamecallmethod()
-        
-        if method == "FireServer" or method == "InvokeServer" then
-            if getgenv().spyAllRemotes and not getgenv().ignoreSpam[self.Name] then
-                local argStr = formatArgs(...)
-                local ok, ts = pcall(function() return os.date("%Y-%m-%d %H:%M:%S") end)
-                ts = (ok and ts) or "unknown-time"
-                local logMsg = string.format("[%s] [SPY] %s | %s\n      Args: %s", ts, method, self.Name, argStr)
-                
-                -- Tampilkan langsung di F9 (Developer Console)
-                print(logMsg)
-                
-                -- Kirim ke Webhook jika fitur dinyalakan
-                if getgenv().logToWebhook then
-                    sendLog(logMsg)
+    local ok, err = pcall(function()
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            local method = getnamecallmethod()
+            
+            if method == "FireServer" or method == "InvokeServer" then
+                local okName, name = pcall(function() return self.Name end)
+                if okName and getgenv().spyAllRemotes and not getgenv().ignoreSpam[name] then
+                    local argStr = formatArgs(...)
+                    local okTs, ts = pcall(function() return os.date("%Y-%m-%d %H:%M:%S") end)
+                    ts = (okTs and ts) or "unknown-time"
+                    local logMsg = string.format("[%s] [SPY] %s | %s\n      Args: %s", ts, method, name, argStr)
+                    
+                    -- Tampilkan langsung di F9 (Developer Console)
+                    print(logMsg)
+                    
+                    -- Kirim ke Webhook jika fitur dinyalakan
+                    if getgenv().logToWebhook then
+                        sendLog(logMsg)
+                    end
                 end
             end
-        end
-        return oldNamecall(self, ...)
+            return oldNamecall(self, ...)
+        end)
     end)
+    if ok then
+        getgenv().PandaHooked = true
+    else
+        sendLog("Failed to hook namecall: " .. tostring(err))
+    end
 elseif not hasHook then
     sendLog("hookmetamethod/getnamecallmethod not available in this environment")
 end
@@ -219,9 +226,10 @@ pcall(function()
 end)
 
 -- ==================== GUI CREATION ====================
-if CoreGui:FindFirstChild("PandaHelperUI") then
-    CoreGui.PandaHelperUI:Destroy()
-end
+local existingUI = nil
+pcall(function() existingUI = CoreGui:FindFirstChild("PandaHelperUI") end)
+if not existingUI then pcall(function() existingUI = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("PandaHelperUI") end) end
+if existingUI then existingUI:Destroy() end
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PandaHelperUI"
