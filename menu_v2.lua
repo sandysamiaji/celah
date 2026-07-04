@@ -362,38 +362,44 @@ task.spawn(function()
                 pullPos = hrp and (hrp.Position + hrp.CFrame.LookVector * 4) or Vector3.new(0,0,0)
             end
             
-            for i = 1, #nukes do
-                local nukeInfo = nukes[i]
+            local i = 1
+            while i < #nukes do
                 if not State.AutoMerge or State.IsUnderAttack then break end
                 
-                if nukeInfo.model and nukeInfo.model.Parent then
-                    -- Jika nuke jauh (di base orang lain), kita HARUS jalan ke sana agar server percaya
-                    if nukeInfo.dist > 80 then
-                        tweenTo(nukeInfo.pos)
+                local n1 = nukes[i]
+                local n2 = nukes[i+1]
+                
+                -- Hanya bisa merge jika ada pasangan nuke dengan level yang SAMA
+                if n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent then
+                    
+                    if n1.dist > 80 or n2.dist > 80 then
+                        tweenTo(n1.pos)
                     else
-                        -- Jika nuke di base sendiri, kita tarik paksa (gather) ke 1 titik di depan karakter
-                        bringNukeTo(nukeInfo.model, pullPos)
+                        bringNukeTo(n1.model, pullPos)
+                        bringNukeTo(n2.model, pullPos)
                     end
                     
                     holdConfirmed = false
-                    safeFire(pickUpRE, nukeInfo.model)
+                    safeFire(pickUpRE, n1.model)
                     
-                    -- Tunggu konfirmasi hold
                     local waited = 0
                     while not holdConfirmed and waited < 0.3 do
                         task.wait(0.05)
                         waited = waited + 0.05
                     end
                     
-                    -- Merge
                     if holdConfirmed then
-                        safeFire(mergeRE, nukeInfo.model)
+                        -- Gabungkan nuke 1 yang sedang dipegang ke nuke 2
+                        safeFire(mergeRE, n2.model)
                         merged = merged + 1
-                        task.wait(0.15) -- Beri waktu sedikit lebih lama agar server memproses
-                    else
-                        safeFire(mergeRE, nukeInfo.model)
                         task.wait(0.15)
                     end
+                    
+                    -- Lompati n2 karena sudah dipakai
+                    i = i + 2
+                else
+                    -- Jika level tidak sama, lanjut ke nuke berikutnya
+                    i = i + 1
                 end
             end
             
