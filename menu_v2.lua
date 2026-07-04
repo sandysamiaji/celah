@@ -98,26 +98,43 @@ end)
 -- ============================================================
 -- Semua kemungkinan path berdasarkan spy report
 local REMOTE_PATHS = {
+    -- === PICKUP ===
     PickUp          = { "Packages.Remotes.Networking.RE/Pickup/PickUp",         "NukeRemotes.PickUp" },
     Drop            = { "Packages.Remotes.Networking.RE/Pickup/Drop",            "NukeRemotes.Drop" },
     HoldStarted     = { "Packages.Remotes.Networking.RE/Pickup/HoldStarted",    "NukeRemotes.HoldStarted" },
     HoldEnded       = { "Packages.Remotes.Networking.RE/Pickup/HoldEnded",      "NukeRemotes.HoldEnded" },
+    -- === MERGE ===
     MergeRequest    = { "Packages.Remotes.Networking.RE/Merge/MergeRequest",   "NukeRemotes.MergeRequest" },
     MergeVFX        = { "Packages.Remotes.Networking.RE/Merge/MergeVFX",       "NukeRemotes.MergeVFX" },
     MergeSound      = { "Packages.Remotes.Networking.RE/Merge/MergeSound",     "NukeRemotes.MergeSound" },
-    LaunchRequest   = { "Packages.Remotes.Networking.RE/Launch/LaunchRequest" },
-    LaunchConfirm   = { "Packages.Remotes.Networking.RE/Launch/LaunchConfirm",  "NukeRemotes.LaunchConfirm" },
-    ConfirmOPLaunch = { "Packages.Remotes.Networking.RE/Launch/ConfirmOPLaunch","NukeRemotes.ConfirmOPLaunch" },
-    LockStateUpdate = { "NukeRemotes.LockStateUpdate","Packages.Remotes.Networking.RE/Combat/LockStateUpdate" },
+    RebirthBlocked  = { "Packages.Remotes.Networking.RE/Merge/RebirthBlocked", "NukeRemotes.RebirthBlocked" },
+    -- === LAUNCH ===
+    LaunchRequest        = { "Packages.Remotes.Networking.RE/Launch/LaunchRequest" },
+    LaunchAllowed        = { "Packages.Remotes.Networking.RE/Launch/LaunchAllowed",         "NukeRemotes.LaunchAllowed" },
+    LaunchConfirm        = { "Packages.Remotes.Networking.RE/Launch/LaunchConfirm",         "NukeRemotes.LaunchConfirm" },
+    StartOPTargeting     = { "Packages.Remotes.Networking.RE/Launch/StartOPTargeting",      "NukeRemotes.StartOPTargeting" },
+    ConfirmOPLaunch      = { "Packages.Remotes.Networking.RE/Launch/ConfirmOPLaunch",       "NukeRemotes.ConfirmOPLaunch" },
+    StartLaunchAll       = { "Packages.Remotes.Networking.RE/Launch/StartLaunchAllTargeting" },
+    ConfirmLaunchAll     = { "Packages.Remotes.Networking.RE/Launch/ConfirmLaunchAll" },
+    EnableForcefield     = { "Packages.Remotes.Networking.RE/Launch/EnableNukeForcefield" },
+    -- === COMBAT ===
+    LockStateUpdate = { "NukeRemotes.LockStateUpdate", "Packages.Remotes.Networking.RE/Combat/LockStateUpdate" },
+    AttackFeed      = { "Packages.Remotes.Networking.RE/Combat/AttackFeed", "NukeRemotes.AttackFeed" },
     RequestLockBase = { "NukeRemotes.RequestLockBase" },
+    -- === REBIRTH ===
     RequestRebirth  = { "NukeRemotes.RequestRebirth" },
     RebirthSuccess  = { "NukeRemotes.RebirthSuccess" },
+    -- === MISC ===
     OfflineEarnings = { "NukeRemotes.OfflineEarnings" },
     ClaimGroupReward= { "NukeRemotes.ClaimGroupReward" },
     RedeemCode      = { "NukeRemotes.RedeemCode" },
     GetLeaderboard  = { "NukeRemotes.GetLeaderboard" },
     RebuildDone     = { "NukeRemotes.RebuildDone" },
-    AttackFeed      = { "NukeRemotes.AttackFeed",     "Packages.Remotes.Networking.RE/Combat/AttackFeed" },
+    PurchaseUpgrade = { "NukeRemotes.PurchaseUpgrade" },
+    -- === SUPPLY DROP (BARU) ===
+    SpawnSupplyDrop  = { "SupplyDrop.RE.SpawnSupplyDrop" },
+    UpdateSupplyDrop = { "SupplyDrop.RE.UpdateSupplyDrop" },
+    DestroySupplyDrop= { "SupplyDrop.RE.DestroySupplyDrop" },
 }
 
 -- Cache remote yang sudah ditemukan
@@ -201,11 +218,18 @@ end
 local function getNukeLevel(nuke)
     if not nuke then return 0 end
     
-    -- Prioritas 1: Roblox Attribute (paling akurat)
+    -- Prioritas 1: Nama part RMB_XX.YYY - PALING AKURAT dari spy log!
+    -- Contoh: RMB_25.007 → level 25, RMB_13.008 → level 13
+    for _, desc in ipairs(nuke:GetDescendants()) do
+        local lvl = string.match(desc.Name, "^RMB_(%d+)%.") 
+        if lvl then return tonumber(lvl) end
+    end
+    
+    -- Prioritas 2: Roblox Attribute
     local attrLevel = nuke:GetAttribute("Level") or nuke:GetAttribute("Tier") or nuke:GetAttribute("NukeLevel")
     if attrLevel then return tonumber(attrLevel) or 0 end
     
-    -- Prioritas 2: IntValue / NumberValue dengan nama yang relevan
+    -- Prioritas 3: IntValue / NumberValue
     for _, child in ipairs(nuke:GetChildren()) do
         if child:IsA("IntValue") or child:IsA("NumberValue") then
             local n = string.lower(child.Name)
@@ -215,27 +239,6 @@ local function getNukeLevel(nuke)
         end
     end
     
-    -- Prioritas 3: Nama model jika berupa angka
-    local numName = tonumber(nuke.Name)
-    if numName then return numName end
-    
-    -- Prioritas 4: TextLabel yang TIDAK dalam format [N] (bracket = UI counter bukan level)
-    -- Cari yang memiliki angka besar seperti "Level 22" atau hanya "22"
-    for _, desc in ipairs(nuke:GetDescendants()) do
-        if desc:IsA("TextLabel") then
-            -- Hindari format [N] yang merupakan UI counter
-            local text = desc.Text
-            if not string.match(text, "^%[%d+%]$") then
-                local match = string.match(text, "%d+")
-                if match then
-                    local num = tonumber(match)
-                    if num and num > 10 then -- Level game umumnya > 10
-                        return num
-                    end
-                end
-            end
-        end
-    end
     return 0
 end
 
@@ -361,79 +364,116 @@ end
 -- Dihapus bringNukeTo karena menyebabkan ghosting (berbayang) di server
 
 -- ============================================================
--- AUTO MERGE LOOP
+-- AUTO MERGE LOOP (GATHER + MERGE)
+-- Fase 1: Kumpulkan semua bom ke titik awal (teleport→ambil→kembali→drop)
+-- Fase 2: Gabungkan pasangan bom yang ada di titik kumpul
 -- ============================================================
 task.spawn(function()
-    while task.wait(0.5) do
+    while task.wait(1) do
         if _G.PandaExecution ~= ExecutionID then break end
         if not State.AutoMerge then continue end
-        -- Catatan: AutoMerge boleh jalan meskipun base sedang terkunci
-        
-        local nukes = getAllNukes()
-        if #nukes == 0 then continue end
-        
-        local pickUpRE  = resolveRemote("PickUp")
-        local mergeRE   = resolveRemote("MergeRequest")
 
-        if pickUpRE and mergeRE then
-            local merged = 0
-            local pullPos = State.MergeGatherPos
-            if not pullPos then
-                local hrp = getHRP()
-                pullPos = hrp and (hrp.Position + hrp.CFrame.LookVector * 4) or Vector3.new(0,0,0)
-            end
-            
-            local i = 1
-            while i < #nukes do
-                if not State.AutoMerge then break end
-                
-                local n1 = nukes[i]
-                local n2 = nukes[i+1]
-                
-                if n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent then
-                    local hrp = getHRP()
-                    if hrp then hrp.CFrame = CFrame.new(n1.pos) end
-                    task.wait(0.05)
-                    
-                    holdConfirmed = false
-                    simulateTouch(n1.part)
-                    
-                    -- Fire PickUp ke KEDUA path agar pasti salah satu diterima server
-                    local pickUpOld = RS:FindFirstChild("NukeRemotes") and RS.NukeRemotes:FindFirstChild("PickUp")
-                    if pickUpOld then pcall(function() pickUpOld:FireServer(n1.model) end) end
-                    safeFire(pickUpRE, n1.model)
-                    
-                    local waited = 0
-                    while not holdConfirmed and waited < 0.5 do
-                        task.wait(0.05)
-                        waited = waited + 0.05
-                    end
-                    
-                    if holdConfirmed then
-                        if hrp then hrp.CFrame = CFrame.new(n2.pos) end
-                        task.wait(0.05)
-                        simulateTouch(n2.part)
-                        safeFire(mergeRE, n2.model)
-                        merged = merged + 1
-                        task.wait(0.2)
-                    end
-                    
-                    i = i + 2
-                else
-                    i = i + 1
-                end
-            end
-            
-            -- Kembali ke titik kumpul setelah selesai
-            if State.MergeGatherPos and merged > 0 then
-                local hrp = getHRP()
-                if hrp then hrp.CFrame = CFrame.new(State.MergeGatherPos) end
-            end
-            
-            if merged > 0 then
-                logAction("Auto Merge", true, "Berhasil memproses " .. merged .. " nuke(s)")
+        local pickUpRE = resolveRemote("PickUp")
+        local dropRE   = resolveRemote("Drop")
+        local mergeRE  = resolveRemote("MergeRequest")
+        if not pickUpRE or not dropRE or not mergeRE then continue end
+
+        local gatherPos = State.MergeGatherPos
+        if not gatherPos then
+            local hrp = getHRP()
+            if not hrp then continue end
+            gatherPos = hrp.Position
+            State.MergeGatherPos = gatherPos
+        end
+
+        -- ── FASE 1: GATHER (kumpulkan semua bom ke gatherPos) ──
+        local nukes = getAllNukes()
+        local gathered = 0
+        for _, nk in ipairs(nukes) do
+            if not State.AutoMerge then break end
+            if not nk.model.Parent then continue end
+
+            -- Abaikan bom yang sudah ada di dekat titik kumpul
+            if (nk.pos - gatherPos).Magnitude < 8 then continue end
+
+            local hrp = getHRP()
+            if not hrp then break end
+
+            -- Teleport ke posisi bom
+            hrp.CFrame = CFrame.new(nk.pos)
+            task.wait(0.08)
+
+            -- Ambil bom
+            holdConfirmed = false
+            simulateTouch(nk.part)
+            pcall(function() RS.NukeRemotes.PickUp:FireServer(nk.model) end)
+            safeFire(pickUpRE, nk.model)
+
+            -- Tunggu HoldStarted (maks 0.6 detik)
+            local w = 0
+            while not holdConfirmed and w < 0.6 do task.wait(0.05); w = w + 0.05 end
+
+            if holdConfirmed then
+                -- Teleport kembali ke titik kumpul
+                hrp.CFrame = CFrame.new(gatherPos)
+                task.wait(0.08)
+
+                -- Drop bom di titik kumpul
+                safeFire(dropRE, gatherPos.X, gatherPos.Y, gatherPos.Z)
+                gathered = gathered + 1
+                task.wait(0.2)
             end
         end
+
+        if gathered > 0 then
+            logAction("Gather", true, "Dikumpulkan " .. gathered .. " bom ke titik merge")
+            task.wait(0.5) -- Beri waktu semua bom mendarat
+        end
+
+        -- ── FASE 2: MERGE (gabungkan pasangan di titik kumpul) ──
+        local hrp = getHRP()
+        if hrp then hrp.CFrame = CFrame.new(gatherPos) end
+
+        local freshNukes = getAllNukes()
+        local merged = 0
+        local i = 1
+        while i < #freshNukes do
+            if not State.AutoMerge then break end
+            local n1 = freshNukes[i]
+            local n2 = freshNukes[i+1]
+
+            if n2 and n1.level == n2.level and n1.model.Parent and n2.model.Parent then
+                if hrp then hrp.CFrame = CFrame.new(n1.pos) end
+                task.wait(0.05)
+
+                holdConfirmed = false
+                simulateTouch(n1.part)
+                pcall(function() RS.NukeRemotes.PickUp:FireServer(n1.model) end)
+                safeFire(pickUpRE, n1.model)
+
+                local w = 0
+                while not holdConfirmed and w < 0.5 do task.wait(0.05); w = w + 0.05 end
+
+                if holdConfirmed then
+                    if hrp then hrp.CFrame = CFrame.new(n2.pos) end
+                    task.wait(0.05)
+                    simulateTouch(n2.part)
+                    safeFire(mergeRE, n2.model)
+                    merged = merged + 1
+                    task.wait(0.2)
+                end
+                i = i + 2
+            else
+                i = i + 1
+            end
+        end
+
+        if merged > 0 then
+            logAction("Auto Merge", true, "Berhasil merge " .. merged .. " pasang bom")
+        end
+
+        -- Kembali ke titik kumpul
+        if hrp then hrp.CFrame = CFrame.new(gatherPos) end
     end
 end)
 
