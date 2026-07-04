@@ -152,7 +152,7 @@ local function formatArgs(...)
         elseif typeV == "Vector3" then
             str = str .. string.format("%.6f, %.6f, %.2f", v.X, v.Y, v.Z)
         elseif typeV == "table" then
-            str = str .. "table: " .. tostring(v)
+            str = str .. tostring(v)
         else
             str = str .. tostring(v)
         end
@@ -342,14 +342,19 @@ task.spawn(function()
                             end
                             
                             if targetMerge then
+                                -- Teleport karakter ke bom target sebelum merge
+                                local targetPos = targetMerge:IsA("Model") and targetMerge:GetPivot().Position or targetMerge.Position
+                                hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+                                task.wait(0.1)
+
                                 -- Gabungkan! Sesuai log: [C2S] RE/Merge/MergeRequest | [Model:Nuke]
                                 mergeReq:FireServer(targetMerge)
-                                logAction("Auto Merge", true, "Menggabungkan Nuke [" .. tostring(heldVal) .. "]")
+                                logAction("Auto Merge", true, "Menggabungkan Nuke [" .. tostring(heldVal) .. "] via Teleport")
                                 _G.LastVal = nil
                                 task.wait(0.2)
                             else
-                                -- Pasangan tidak ada, buang bom! Sesuai log: [C2S] Drop | 551.8, 17.8, 242.1
-                                drop:FireServer(hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+                                -- Pasangan tidak ada, buang bom! Sesuai log: [C2S] Drop | 12 angka CFrame
+                                drop:FireServer(hrp.CFrame:GetComponents())
                                 logAction("Auto Merge", false, "Membuang Nuke [" .. tostring(heldVal) .. "] (pasangan hilang)")
                                 _G.LastVal = nil
                                 task.wait(0.5)
@@ -376,9 +381,15 @@ task.spawn(function()
                             if targetPickUp then
                                 local val = getBombValue(targetPickUp)
                                 _G.LastVal = val
+                                
+                                -- Teleport karakter ke bom kembar sebelum ambil
+                                local targetPos = targetPickUp:IsA("Model") and targetPickUp:GetPivot().Position or targetPickUp.Position
+                                hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+                                task.wait(0.1)
+
                                 -- Pungut bom! Sesuai log: [C2S] PickUp | [Model:Nuke]
                                 pickUp:FireServer(targetPickUp)
-                                logAction("Auto Merge", true, "Mengambil Nuke [" .. tostring(val) .. "]")
+                                logAction("Auto Merge", true, "Teleport & Mengambil Nuke [" .. tostring(val) .. "]")
                             end
                         end
                     end
