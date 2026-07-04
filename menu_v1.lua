@@ -3,12 +3,13 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
-
 local getgenv = getgenv or function() return _G end
 getgenv().autoMerge = false
 getgenv().autoCollect = false
 getgenv().autoDefense = false
 getgenv().isUnderAttack = false
+
+rubah test
 
 -- ==================== WEBHOOK LOGGER ====================
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
