@@ -42,12 +42,10 @@ local State = {
     IsUnderAttack  = false,
     CurrentNukeLevel = 0,
     MergeCount     = 0,
-    MaxReachedLevel = math.huge,
+    MergeGatherPos = nil,
     LiveLogs       = "=== NUKE GAME LIVE LOGS ===\n",
     LogEnabled     = true,
 }
-
-local MergeAttempts = {}
 
 -- ============================================================
 -- WEBHOOK & LOGGING
@@ -226,19 +224,17 @@ local function getAllNukes()
     local nukes = {}
     local hrp = getHRP()
     local hrpPos = hrp and hrp.Position or Vector3.new(0,0,0)
+    local centerPos = State.MergeGatherPos or hrpPos
     
     for _, v in ipairs(workspace:GetDescendants()) do
         if v:IsA("Model") and v.Name == "Nuke" then
             local primary = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")
             if primary then
-                local dist = (primary.Position - hrpPos).Magnitude
+                local dist = (primary.Position - centerPos).Magnitude
                 local lvl = getNukeLevel(v)
-                -- Jika StealNukes OFF, hanya ambil nuke dalam radius 250 studs (area base sendiri)
-                if State.StealNukes or dist <= 250 then
-                    -- Abaikan nuke yang sudah mencapai level mentok (Max Level)
-                    if lvl < State.MaxReachedLevel then
-                        table.insert(nukes, { model = v, part = primary, pos = primary.Position, dist = dist, level = lvl })
-                    end
+                -- Jika StealNukes OFF, hanya ambil nuke dalam radius 80 studs (area base sendiri)
+                if State.StealNukes or dist <= 80 then
+                    table.insert(nukes, { model = v, part = primary, pos = primary.Position, dist = dist, level = lvl })
                 end
             end
         end
@@ -355,41 +351,24 @@ task.spawn(function()
         local nukes = getAllNukes()
         if #nukes == 0 then continue end
         
-        -- Hitung jumlah nuke per level untuk mendeteksi limit mentok
-        local levelCounts = {}
-        for _, n in ipairs(nukes) do
-            levelCounts[n.level] = (levelCounts[n.level] or 0) + 1
-        end
-        
         local pickUpRE  = resolveRemote("PickUp")
         local mergeRE   = resolveRemote("MergeRequest")
 
         if pickUpRE and mergeRE then
             local merged = 0
-            local hrp = getHRP()
-            local pullPos = hrp and (hrp.Position + hrp.CFrame.LookVector * 4) or Vector3.new(0,0,0)
+            local pullPos = State.MergeGatherPos
+            if not pullPos then
+                local hrp = getHRP()
+                pullPos = hrp and (hrp.Position + hrp.CFrame.LookVector * 4) or Vector3.new(0,0,0)
+            end
             
             for i = 1, #nukes do
                 local nukeInfo = nukes[i]
                 if not State.AutoMerge or State.IsUnderAttack then break end
                 
                 if nukeInfo.model and nukeInfo.model.Parent then
-                    
-                    -- Deteksi Nuke Mentok: jika ada >= 2 nuke di level yang sama, tapi gagal di-merge berkali-kali
-                    if levelCounts[nukeInfo.level] >= 2 then
-                        if MergeAttempts[nukeInfo.model] and MergeAttempts[nukeInfo.model] >= 4 then
-                            State.MaxReachedLevel = nukeInfo.level
-                            logAction("Limit Detected", false, "Nuke level " .. nukeInfo.level .. " mentok! Butuh Rebirth.")
-                            for k,v in pairs(MergeAttempts) do MergeAttempts[k] = nil end
-                            break
-                        end
-                        MergeAttempts[nukeInfo.model] = (MergeAttempts[nukeInfo.model] or 0) + 1
-                    else
-                        MergeAttempts[nukeInfo.model] = 0
-                    end
-                    
                     -- Jika nuke jauh (di base orang lain), kita HARUS jalan ke sana agar server percaya
-                    if nukeInfo.dist > 150 then
+                    if nukeInfo.dist > 80 then
                         tweenTo(nukeInfo.pos)
                     else
                         -- Jika nuke di base sendiri, kita tarik paksa (gather) ke 1 titik di depan karakter
@@ -401,19 +380,19 @@ task.spawn(function()
                     
                     -- Tunggu konfirmasi hold
                     local waited = 0
-                    while not holdConfirmed and waited < 0.2 do
-                        task.wait(0.02)
-                        waited = waited + 0.02
+                    while not holdConfirmed and waited < 0.3 do
+                        task.wait(0.05)
+                        waited = waited + 0.05
                     end
                     
                     -- Merge
                     if holdConfirmed then
                         safeFire(mergeRE, nukeInfo.model)
                         merged = merged + 1
-                        task.wait(0.05) -- Sangat singkat!
+                        task.wait(0.15) -- Beri waktu sedikit lebih lama agar server memproses
                     else
                         safeFire(mergeRE, nukeInfo.model)
-                        task.wait(0.05)
+                        task.wait(0.15)
                     end
                 end
             end
@@ -478,9 +457,7 @@ pcall(function()
     local rebirthSuccessRE = resolveRemote("RebirthSuccess")
     if rebirthSuccessRE and rebirthSuccessRE:IsA("RemoteEvent") then
         rebirthSuccessRE.OnClientEvent:Connect(function(a, b)
-            State.MaxReachedLevel = math.huge
-            for k,v in pairs(MergeAttempts) do MergeAttempts[k] = nil end
-            logAction("Rebirth", true, "Sukses! Limit level nuke di-reset. Arg: " .. tostring(a))
+            logAction("Rebirth", true, "Sukses! Arg: " .. tostring(a) .. ", " .. tostring(b))
         end)
     end
 end)
@@ -597,6 +574,16 @@ TabMain:Toggle({
     Default  = false,
     Callback = function(v)
         State.AutoMerge = v
+        if v then
+            local hrp = getHRP()
+            if hrp then
+                State.MergeGatherPos = hrp.Position + hrp.CFrame.LookVector * 4
+            else
+                State.MergeGatherPos = nil
+            end
+        else
+            State.MergeGatherPos = nil
+        end
         logAction("Menu", true, "Auto Merge " .. (v and "ON" or "OFF"))
     end
 })
@@ -642,16 +629,6 @@ TabMain:Toggle({
 })
 
 TabMain:Divider()
-
-TabMain:Button({
-    Title    = "🔄 Reset Limit Mentok (Max Level)",
-    Callback = function()
-        State.MaxReachedLevel = math.huge
-        for k,v in pairs(MergeAttempts) do MergeAttempts[k] = nil end
-        logAction("Menu", true, "Limit Max Level Nuke di-reset secara manual.")
-        windui:Notify({ Title = "Reset", Content = "Batas level nuke telah di-reset!", Duration = 3 })
-    end
-})
 
 TabMain:Label({ Title = "📊 Status" })
 local statusPara = TabMain:Paragraph({ Title = "Game Status", Desc = "Idle" })
