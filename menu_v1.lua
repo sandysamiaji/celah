@@ -276,60 +276,93 @@ task.spawn(function()
             end
             
             if pickUp and mergeReq then
-                local allNukes = {}
-                for _, v in ipairs(workspace:GetDescendants()) do
-                    if v.Name == "Nuke" and v:IsA("BasePart") then
-                        table.insert(allNukes, v)
-                    end
-                end
+                local char = Players.LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 
-                -- Kelompokkan berdasarkan teks nilai Nuke
-                local nukeGroups = {}
-                for _, n in ipairs(allNukes) do
-                    local val = getBombValue(n)
-                    if val ~= "?" then
-                        if not nukeGroups[val] then nukeGroups[val] = {} end
-                        table.insert(nukeGroups[val], n)
+                if hrp then
+                    -- Cek apakah kita sedang memegang bom di tangan
+                    local heldBomb = nil
+                    for _, v in ipairs(char:GetDescendants()) do
+                        if v.Name == "Nuke" and v:IsA("BasePart") then
+                            heldBomb = v
+                            break
+                        end
                     end
-                end
-                
-                local firedCount = 0
-                for val, group in pairs(nukeGroups) do
-                    local unmerged = {}
-                    for _, v in ipairs(group) do table.insert(unmerged, v) end
                     
-                    while #unmerged >= 2 do
-                        local n1 = table.remove(unmerged, 1)
-                        local pairedIndex = nil
-                        
-                        -- Pastikan dua bom ini berdekatan (satu base) untuk mencegah error merge beda base
-                        for i, n2 in ipairs(unmerged) do
-                            if (n1.Position - n2.Position).Magnitude < 200 then
-                                pairedIndex = i
+                    -- Kumpulkan semua bom di tanah (bukan di tangan) dalam radius 150
+                    local groundNukes = {}
+                    for _, v in ipairs(workspace:GetDescendants()) do
+                        if v.Name == "Nuke" and v:IsA("BasePart") and v.Parent ~= char then
+                            if (v.Position - hrp.Position).Magnitude < 150 then
+                                table.insert(groundNukes, v)
+                            end
+                        end
+                    end
+                    
+                    if heldBomb then
+                        local heldVal = getBombValue(heldBomb)
+                        -- Cari bom di tanah dengan nilai yang sama
+                        local targetMerge = nil
+                        for _, n in ipairs(groundNukes) do
+                            if getBombValue(n) == heldVal then
+                                targetMerge = n
                                 break
                             end
                         end
                         
-                        if pairedIndex then
-                            local n2 = table.remove(unmerged, pairedIndex)
-                            
-                            -- Proses Ambil
-                            safeFire(pickUp, n1)
-                            task.wait(0.2) -- Jeda aman agar server mendaftarkan HoldStarted
-                            
-                            -- Proses Gabung
-                            safeFire(mergeReq, n2)
-                            
-                            firedCount = firedCount + 1
-                            if not _G_State.AutoMerge then break end
-                            task.wait(_G_State.MergeDelay or 0.5)
+                        if targetMerge then
+                            local origCFrame = hrp.CFrame
+                            hrp.Anchored = true
+                            hrp.CFrame = targetMerge.CFrame + Vector3.new(0, 3, 0)
+                            task.wait(0.25) -- Tunggu sinkronisasi server (bypass anti-cheat jarak)
+                            safeFire(mergeReq, targetMerge)
+                            task.wait(0.1)
+                            hrp.CFrame = origCFrame
+                            hrp.Anchored = false
+                            logAction("Auto Merge", true, "Menggabungkan Nuke [" .. heldVal .. "] dari jarak jauh")
+                        end
+                    else
+                        -- Kelompokkan bom di tanah
+                        local grouped = {}
+                        for _, n in ipairs(groundNukes) do
+                            local val = getBombValue(n)
+                            if val ~= "?" then
+                                if not grouped[val] then grouped[val] = {} end
+                                table.insert(grouped[val], n)
+                            end
+                        end
+                        
+                        local targetPickUp = nil
+                        -- Prioritas 1: Ambil bom yang sudah ada pasangannya di tanah
+                        for val, list in pairs(grouped) do
+                            if #list >= 2 then
+                                targetPickUp = list[1]
+                                break
+                            end
+                        end
+                        
+                        -- Prioritas 2: Jika tidak ada pasangan, ambil bom apa saja untuk 'di-hold'
+                        if not targetPickUp then
+                            for val, list in pairs(grouped) do
+                                if #list == 1 then
+                                    targetPickUp = list[1]
+                                    break
+                                end
+                            end
+                        end
+                        
+                        if targetPickUp then
+                            local origCFrame = hrp.CFrame
+                            hrp.Anchored = true
+                            hrp.CFrame = targetPickUp.CFrame + Vector3.new(0, 3, 0)
+                            task.wait(0.25) -- Tunggu sinkronisasi server
+                            safeFire(pickUp, targetPickUp)
+                            task.wait(0.1)
+                            hrp.CFrame = origCFrame
+                            hrp.Anchored = false
+                            logAction("Auto Merge", true, "Mengambil Nuke [" .. getBombValue(targetPickUp) .. "] ke tangan")
                         end
                     end
-                    if not _G_State.AutoMerge then break end
-                end
-                
-                if firedCount > 0 then
-                    logAction("Auto Merge", true, "Berhasil menembakkan " .. tostring(firedCount) .. " pasang Nuke.")
                 end
             end
         end
@@ -356,10 +389,21 @@ task.spawn(function()
                             local isButton = string.find(n, "rmb") or string.find(n, "neon") or string.find(n, "coin") or string.find(n, "cash") or string.find(n, "money") or string.find(n, "drop") or string.find(n, "collect") or string.find(n, "claim") or string.find(n, "giver") or string.find(n, "reward")
                             
                             if isDrop or isButton then
+                                local origCFrame = hrp.CFrame
+                                hrp.Anchored = true
+                                -- Blink teleport ke objek uang
+                                hrp.CFrame = obj.CFrame + Vector3.new(0, 1, 0)
+                                task.wait(0.1) -- Tunggu server mendaftarkan posisi baru
+                                
                                 firetouchinterest(hrp, obj, 0)
                                 task.wait(0.01)
                                 firetouchinterest(hrp, obj, 1)
+                                
+                                -- Kembali ke posisi awal
+                                hrp.CFrame = origCFrame
+                                hrp.Anchored = false
                                 collectCount = collectCount + 1
+                                task.wait(0.1) -- Jeda antar koleksi
                             end
                         end
                     end
@@ -573,9 +617,33 @@ TabMain:Button({
             local baseLvl = maxLvl > 0 and maxLvl or 1000
             local massiveMoney = baseLvl
             
-            -- Kirimkan permintaan hadiah sebanyak 8 kali secara terpisah (seolah-olah 8 kali hit)
+            -- Fungsi untuk mendapatkan jumlah uang pemain saat ini
+            local function getCurrentMoney()
+                local p = Players.LocalPlayer
+                if p and p:FindFirstChild("leaderstats") then
+                    for _, stat in ipairs(p.leaderstats:GetChildren()) do
+                        if stat:IsA("IntValue") or stat:IsA("NumberValue") then
+                            local n = string.lower(stat.Name)
+                            if string.find(n, "cash") or string.find(n, "money") or string.find(n, "coin") or string.find(n, "point") or string.find(n, "nuke") then
+                                return stat.Value
+                            end
+                        end
+                    end
+                end
+                return 0 -- Return 0 jika leaderstats tidak ditemukan
+            end
+            
+            local startingMoney = getCurrentMoney()
+            
+            -- Kirimkan permintaan hadiah sebanyak 900 kali secara terpisah (seolah-olah 900 kali hit beruntun)
             task.spawn(function()
-                for i = 1, 8 do
+                logAction("Eksploit", true, "Memulai eksploit uang (900x hit beruntun)... Saldo Awal: " .. tostring(startingMoney))
+                
+                for i = 1, 900 do
+                    if not _G_State.SpyRemotes then -- Opsional: Tambahkan kill-switch ke depannya jika butuh
+                        -- Kita jalankan loop tanpa kill switch khusus, tapi biarkan player tetap bisa main
+                    end
+                    
                     if offline then
                         safeFire(offline, massiveMoney)
                         safeFire(offline, tostring(massiveMoney))
@@ -589,13 +657,21 @@ TabMain:Button({
                         safeFire(city, massiveMoney)
                     end
                     
-                    task.wait(0.1) -- Sedikit jeda agar tidak terdeteksi spam oleh server
+                    task.wait(0.01) -- Jeda super cepat agar 900 hit selesai dalam 9 detik
                 end
                 
-                logAction("Eksploit", true, "Selesai menyuntikkan uang " .. tostring(baseLvl) .. " sebanyak 8 kali (Hit beruntun).")
+                -- Tunggu sebentar agar server memproses sisa antrian
+                task.wait(1)
+                
+                local endingMoney = getCurrentMoney()
+                local profit = endingMoney - startingMoney
+                
+                if profit > 0 then
+                    logAction("Eksploit", true, "BERHASIL! 🤑 Uang Bertambah: " .. tostring(profit) .. " | Saldo Akhir: " .. tostring(endingMoney))
+                else
+                    logAction("Eksploit", false, "GAGAL! ❌ Server Anti-Cheat menolak eksploit. Saldo tetap: " .. tostring(endingMoney))
+                end
             end)
-            
-            logAction("Eksploit", true, "Memulai eksploit uang (8x hit beruntun)...")
         end)
     end
 })
