@@ -431,8 +431,9 @@ task.spawn(function()
                 logAction("Diag", false, "Gagal menemukan level " .. currentTargetLevel .. " | Isi nukes: [" .. isi .. "] | Melakukan Drop.")
                 
                 -- Tidak ada pasangan lagi untuk level ini, JATUHKAN!
-                pcall(function() RS.NukeRemotes.Drop:FireServer() end)
-                if dropRE then safeFire(dropRE) end
+                local heldObj = State.HeldNukeModel
+                pcall(function() RS.NukeRemotes.Drop:FireServer(heldObj) end)
+                if dropRE then safeFire(dropRE, heldObj) end
                 currentTargetLevel = nil
                 State.IsHolding = false
                 State.HeldNukeModel = nil
@@ -447,8 +448,9 @@ task.spawn(function()
         else
             -- Tangan kosong (atau kita paksa kosongkan jika sinkronisasi salah)
             if State.IsHolding then
-                pcall(function() RS.NukeRemotes.Drop:FireServer() end)
-                if dropRE then safeFire(dropRE) end
+                local heldObj = State.HeldNukeModel
+                pcall(function() RS.NukeRemotes.Drop:FireServer(heldObj) end)
+                if dropRE then safeFire(dropRE, heldObj) end
                 State.IsHolding = false
                 State.HeldNukeModel = nil
                 task.wait(0.2)
@@ -490,8 +492,9 @@ task.spawn(function()
                 else
                     logAction("Diag", false, "Timeout menunggu HoldStarted. Membatalkan PickUp.")
                     -- Gagal PickUp, reset
-                    pcall(function() RS.NukeRemotes.Drop:FireServer() end)
-                    if dropRE then safeFire(dropRE) end
+                    local heldObj = State.HeldNukeModel
+                    pcall(function() RS.NukeRemotes.Drop:FireServer(heldObj) end)
+                    if dropRE then safeFire(dropRE, heldObj) end
                     State.IsHolding = false
                     State.HeldNukeModel = nil
                 end
