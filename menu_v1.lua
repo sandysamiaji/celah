@@ -146,6 +146,16 @@ local function formatArgs(...)
     return str
 end
 
+local function getFullPath(obj)
+    local path = obj.Name
+    local p = obj.Parent
+    while p and p ~= game do
+        path = p.Name .. "." .. path
+        p = p.Parent
+    end
+    return path
+end
+
 if hasHook and not _G.NukeHooked then
     local ok, err = pcall(function()
         local oldNamecall
@@ -155,7 +165,8 @@ if hasHook and not _G.NukeHooked then
                 local okName, name = pcall(function() return self.Name end)
                 if okName and _G_State.SpyRemotes and not ignoreSpam[name] then
                     local argStr = formatArgs(...)
-                    local logMsg = string.format("[SPY] C2S (%s) | %s | %s", method, name, argStr)
+                    local fullPath = pcall(getFullPath, self) and getFullPath(self) or name
+                    local logMsg = string.format("[SPY] C2S (%s) | %s | %s", method, fullPath, argStr)
                     logAction("REMOTE", true, logMsg)
                 end
             end
@@ -180,7 +191,8 @@ local function setupS2CSpy(remote)
                 local name = remote.Name
                 if not ignoreSpam[name] then
                     local argStr = formatArgs(...)
-                    local logMsg = string.format("[SPY] S2C (OnClientEvent) | %s | %s", name, argStr)
+                    local fullPath = pcall(getFullPath, remote) and getFullPath(remote) or name
+                    local logMsg = string.format("[SPY] S2C (OnClientEvent) | %s | %s", fullPath, argStr)
                     logAction("REMOTE", true, logMsg)
                 end
             end
@@ -247,9 +259,6 @@ task.spawn(function()
             local pickupRemotes = findInstancesByNames(RS, {"PickUp", "RE/Pickup/PickUp"})
             
             if #mergeRemotes > 0 and #pickupRemotes > 0 then
-                local pickUp = pickupRemotes[1]
-                local mergeRemote = mergeRemotes[1]
-                
                 -- Kumpulkan dan kelompokkan berdasarkan Nilai (Teks di Nuke)
                 local nukeGroups = {}
                 for _, v in ipairs(workspace:GetDescendants()) do
@@ -271,12 +280,17 @@ task.spawn(function()
                             local nukeHand = group[i * 2 - 1]
                             local nukeTarget = group[i * 2]
                             
-                            -- Ambil Nuke Pertama (Tangan)
-                            safeFire(pickUp, nukeHand)
+                            -- Tembak semua varian PickUp (jaga-jaga ada fake remote)
+                            for _, pRemote in ipairs(pickupRemotes) do
+                                safeFire(pRemote, nukeHand)
+                            end
+                            
                             task.wait(0.2) -- Jeda penting agar server mencatat kita memegang bom
                             
-                            -- Gabungkan dengan Nuke Kedua (Target di lantai)
-                            safeFire(mergeRemote, nukeTarget)
+                            -- Tembak semua varian MergeRequest
+                            for _, mRemote in ipairs(mergeRemotes) do
+                                safeFire(mRemote, nukeTarget)
+                            end
                             
                             firedCount = firedCount + 1
                             if not _G_State.AutoMerge then break end
