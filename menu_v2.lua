@@ -986,8 +986,19 @@ TabTools:Button({
 })
 
 -- =====================
+-- =====================
 -- TAB LOGS
 -- =====================
+TabLogs:Toggle({
+    Title    = "🕵️ Enable Remote Spy",
+    Default  = true,
+    Callback = function(state)
+        State.RemoteSpyEnabled = state
+        logAction("Spy Toggle", true, "Remote Spy " .. (state and "ON" or "OFF"))
+        windui:Notify({ Title = "Remote Spy", Content = "Remote Spy is " .. (state and "ON" or "OFF"), Duration = 3 })
+    end
+})
+
 local LogDisplay = TabLogs:Paragraph({ Title = "Live Logs", Desc = "Menunggu aktivitas..." })
 
 State.UpdateUIDisplay = function(msg)
@@ -1017,18 +1028,10 @@ TabLogs:Input({
 })
 
 -- ============================================================
+-- ============================================================
 -- REMOTE SPY (HOOKMETAMETHOD)
 -- ============================================================
-TabTools:Toggle({
-    Title    = "🕵️ Enable Remote Spy",
-    Default  = false,
-    Callback = function(state)
-        State.RemoteSpyEnabled = state
-        logAction("Spy Toggle", true, "Remote Spy " .. (state and "ON" or "OFF"))
-        windui:Notify({ Title = "Remote Spy", Content = "Remote Spy is " .. (state and "ON" or "OFF"), Duration = 3 })
-    end
-})
-
+State.RemoteSpyEnabled = true
 local oldNamecall
 if hookmetamethod then
     oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
