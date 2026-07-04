@@ -342,6 +342,7 @@ task.spawn(function()
                             end
                             
                             if targetMerge then
+                                local originalPos = hrp.CFrame
                                 -- Teleport karakter ke bom target sebelum merge
                                 local targetPos = targetMerge:IsA("Model") and targetMerge:GetPivot().Position or targetMerge.Position
                                 hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
@@ -352,6 +353,10 @@ task.spawn(function()
                                 logAction("Auto Merge", true, "Menggabungkan Nuke [" .. tostring(heldVal) .. "] via Teleport")
                                 _G.LastVal = nil
                                 task.wait(0.2)
+                                
+                                -- Kembali ke base/tempat semula
+                                hrp.CFrame = originalPos
+                                task.wait(0.1)
                             else
                                 -- Pasangan tidak ada, buang bom! Sesuai log: [C2S] Drop | 12 angka CFrame
                                 drop:FireServer(hrp.CFrame:GetComponents())
@@ -382,6 +387,7 @@ task.spawn(function()
                                 local val = getBombValue(targetPickUp)
                                 _G.LastVal = val
                                 
+                                local originalPos = hrp.CFrame
                                 -- Teleport karakter ke bom kembar sebelum ambil
                                 local targetPos = targetPickUp:IsA("Model") and targetPickUp:GetPivot().Position or targetPickUp.Position
                                 hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
@@ -390,6 +396,11 @@ task.spawn(function()
                                 -- Pungut bom! Sesuai log: [C2S] PickUp | [Model:Nuke]
                                 pickUp:FireServer(targetPickUp)
                                 logAction("Auto Merge", true, "Teleport & Mengambil Nuke [" .. tostring(val) .. "]")
+                                
+                                task.wait(0.1)
+                                -- Kembali ke base/tempat semula
+                                hrp.CFrame = originalPos
+                                task.wait(0.1)
                             end
                         end
                     end
