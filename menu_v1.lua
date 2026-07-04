@@ -275,6 +275,14 @@ task.spawn(function()
                 mergeReq = RS.NukeRemotes:FindFirstChild("MergeRequest")
             end
             
+            local dropRemote
+            if RS:FindFirstChild("NukeRemotes") then
+                dropRemote = RS.NukeRemotes:FindFirstChild("Drop")
+            end
+            if not dropRemote and pkgNet then
+                dropRemote = pkgNet:FindFirstChild("RE/Pickup/Drop")
+            end
+            
             if pickUp and mergeReq then
                 local char = Players.LocalPlayer.Character
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -312,8 +320,10 @@ task.spawn(function()
                     end
                     
                     if heldBomb then
-                        local heldVal = getBombValue(heldBomb)
-                        if heldVal == "?" and _G_State.LastPickedUpVal then
+                        local uiVal = getBombValue(heldBomb)
+                        local heldVal = uiVal
+                        
+                        if (uiVal == "?" or uiVal == "" or uiVal == "Nuke" or not uiVal) and _G_State.LastPickedUpVal then
                             heldVal = _G_State.LastPickedUpVal
                         end
                         
@@ -328,7 +338,17 @@ task.spawn(function()
                         
                         if targetMerge then
                             safeFire(mergeReq, targetMerge)
-                            logAction("Auto Merge", true, "Menggabungkan Nuke [" .. heldVal .. "] terdekat secara nirkabel")
+                            logAction("Auto Merge", true, "Menggabungkan Nuke [" .. tostring(heldVal) .. "] terdekat secara nirkabel")
+                            _G_State.LastPickedUpVal = nil
+                            task.wait(0.2)
+                        else
+                            -- Jika memegang bom tapi pasangannya tidak ketemu (mungkin diambil orang/hilang)
+                            if dropRemote then
+                                safeFire(dropRemote)
+                                logAction("Auto Merge", false, "Membuang Nuke [" .. tostring(heldVal) .. "] karena pasangannya hilang")
+                                _G_State.LastPickedUpVal = nil
+                                task.wait(0.5)
+                            end
                         end
                     else
                         -- Kelompokkan bom di tanah
