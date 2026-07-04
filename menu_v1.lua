@@ -323,15 +323,8 @@ task.spawn(function()
                         end
                         
                         if targetMerge then
-                            local origCFrame = hrp.CFrame
-                            hrp.Anchored = true
-                            hrp.CFrame = targetMerge.CFrame + Vector3.new(0, 3, 0)
-                            task.wait(0.25) -- Tunggu sinkronisasi server (bypass anti-cheat jarak)
                             safeFire(mergeReq, targetMerge)
-                            task.wait(0.1)
-                            hrp.CFrame = origCFrame
-                            hrp.Anchored = false
-                            logAction("Auto Merge", true, "Menggabungkan Nuke [" .. heldVal .. "] terdekat")
+                            logAction("Auto Merge", true, "Menggabungkan Nuke [" .. heldVal .. "] terdekat secara nirkabel")
                         end
                     else
                         -- Kelompokkan bom di tanah
@@ -364,15 +357,8 @@ task.spawn(function()
                         end
                         
                         if targetPickUp then
-                            local origCFrame = hrp.CFrame
-                            hrp.Anchored = true
-                            hrp.CFrame = targetPickUp.CFrame + Vector3.new(0, 3, 0)
-                            task.wait(0.25) -- Tunggu sinkronisasi server
                             safeFire(pickUp, targetPickUp)
-                            task.wait(0.1)
-                            hrp.CFrame = origCFrame
-                            hrp.Anchored = false
-                            logAction("Auto Merge", true, "Mengambil Nuke [" .. getBombValue(targetPickUp) .. "] ke tangan")
+                            logAction("Auto Merge", true, "Mengambil Nuke [" .. getBombValue(targetPickUp) .. "] terdekat")
                         end
                     end
                 end
@@ -401,19 +387,10 @@ task.spawn(function()
                             local isButton = string.find(n, "rmb") or string.find(n, "neon") or string.find(n, "coin") or string.find(n, "cash") or string.find(n, "money") or string.find(n, "drop") or string.find(n, "collect") or string.find(n, "claim") or string.find(n, "giver") or string.find(n, "reward")
                             
                             if isDrop or isButton then
-                                local origCFrame = hrp.CFrame
-                                hrp.Anchored = true
-                                -- Blink teleport ke objek uang
-                                hrp.CFrame = obj.CFrame + Vector3.new(0, 1, 0)
-                                task.wait(0.1) -- Tunggu server mendaftarkan posisi baru
-                                
                                 firetouchinterest(hrp, obj, 0)
                                 task.wait(0.01)
                                 firetouchinterest(hrp, obj, 1)
                                 
-                                -- Kembali ke posisi awal
-                                hrp.CFrame = origCFrame
-                                hrp.Anchored = false
                                 collectCount = collectCount + 1
                                 task.wait(0.1) -- Jeda antar koleksi
                             end
