@@ -76,10 +76,19 @@ local logBuffer = {}
 local function sendBufferedLogs()
     if #logBuffer == 0 then return end
     if not http_request then return end
+    
     local combinedLogs = table.concat(logBuffer, "\n")
     logBuffer = {}
+    
     task.spawn(function()
-        pcall(function() http_request({ Url = WEBHOOK_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = HttpService:JSONEncode({content = combinedLogs}) }) end)
+        pcall(function() 
+            http_request({ 
+                Url = WEBHOOK_URL, 
+                Method = "POST", 
+                Headers = {["Content-Type"] = "text/plain"}, 
+                Body = combinedLogs 
+            }) 
+        end)
     end)
 end
 
@@ -131,6 +140,19 @@ local function getBombValue(nuke)
         if tl then return tl.Text end
     end
     return "?"
+end
+
+local function parseValue(str)
+    if not str or str == "?" then return 0 end
+    local num = tonumber(string.match(str, "[%d%.]+")) or 0
+    if string.find(str, "K") then num = num * 1e3
+    elseif string.find(str, "M") then num = num * 1e6
+    elseif string.find(str, "B") then num = num * 1e9
+    elseif string.find(str, "T") then num = num * 1e12
+    elseif string.find(str, "Qa") then num = num * 1e15
+    elseif string.find(str, "Qi") then num = num * 1e18
+    end
+    return num
 end
 
 -- ============================================================
@@ -226,7 +248,7 @@ local function getAllRemotes(root, results)
     return results
 end
 
-DumpBtn.MouseButton1Click:Connect(function()
+local function dumpRemotes()
     pcall(function()
         local remotes = getAllRemotes(RS, {})
         local grouped = {}
@@ -245,6 +267,7 @@ DumpBtn.MouseButton1Click:Connect(function()
         table.insert(lines, "===============================================")
         table.insert(lines, "")
         table.insert(lines, "PlaceId: " .. tostring(game.PlaceId))
+        table.insert(lines, "Player: " .. tostring(LocalPlayer.Name))
         table.insert(lines, "Waktu: " .. os.date("%Y-%m-%d %H:%M:%S"))
         table.insert(lines, "")
         table.insert(lines, "=== 1. STRUKTUR REMOTE (LOKASI) ===")
@@ -270,14 +293,19 @@ DumpBtn.MouseButton1Click:Connect(function()
                 http_request({
                     Url = WEBHOOK_URL,
                     Method = "POST",
-                    Headers = {["Content-Type"] = "application/json"},
-                    Body = HttpService:JSONEncode({content = fullText})
+                    Headers = {["Content-Type"] = "text/plain"},
+                    Body = fullText
                 })
             end)
             logAction("DUMP", true, "Dump " .. tostring(#remotes) .. " remotes sukses dikirim ke webhook")
         end
     end)
-end)
+end
+
+DumpBtn.MouseButton1Click:Connect(dumpRemotes)
+
+-- Langsung jalankan Dump saat script dieksekusi
+task.spawn(dumpRemotes)
 
 -- Mencegah dobel loop jika di-execute ulang
 local ExecutionID = tick()
@@ -285,7 +313,7 @@ _G.NukeLoopID = ExecutionID
 _G.LastVal = nil
 
 task.spawn(function()
-    while task.wait(0.5) do
+    while task.wait(0.1) do
         if _G.NukeLoopID ~= ExecutionID then break end
         
         if _G.AutoMergeStatus then
@@ -352,7 +380,7 @@ task.spawn(function()
                                 mergeReq:FireServer(targetMerge)
                                 logAction("Auto Merge", true, "Menggabungkan Nuke [" .. tostring(heldVal) .. "] via Teleport")
                                 _G.LastVal = nil
-                                task.wait(0.2)
+                                task.wait(0.1)
                                 
                                 -- Kembali ke base/tempat semula
                                 hrp.CFrame = originalPos
@@ -375,12 +403,18 @@ task.spawn(function()
                                 end
                             end
                             
-                            local targetPickUp = nil
+                            local valKeys = {}
                             for val, list in pairs(grouped) do
                                 if #list >= 2 then
-                                    targetPickUp = list[1]
-                                    break
+                                    table.insert(valKeys, val)
                                 end
+                            end
+                            
+                            table.sort(valKeys, function(a, b) return parseValue(a) < parseValue(b) end)
+                            
+                            local targetPickUp = nil
+                            if #valKeys > 0 then
+                                targetPickUp = grouped[valKeys[1]][1]
                             end
                             
                             if targetPickUp then
