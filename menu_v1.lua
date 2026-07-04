@@ -11,6 +11,15 @@ getgenv().autoMerge = false
 getgenv().autoCollect = false
 getgenv().autoDefense = false
 getgenv().isUnderAttack = false
+getgenv().spyAllRemotes = false
+getgenv().logToWebhook = false
+getgenv().ignoreSpam = {
+    ["Ping"] = true,
+    ["Fps"] = true,
+    ["Update"] = true,
+    ["Accept"] = true,
+    ["MousePos"] = true
+}
 
 -- ==================== WEBHOOK LOGGER ====================
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
@@ -19,9 +28,7 @@ local http_request = request or http_request or (http and http.request) or syn a
 getgenv().logBuffer = getgenv().logBuffer or {}
 
 local function sendLog(logText)
-    local ok, ts = pcall(function() return os.date("%Y-%m-%d %H:%M:%S") end)
-    ts = (ok and ts) or "unknown-time"
-    table.insert(getgenv().logBuffer, "[" .. ts .. "] " .. tostring(logText))
+    table.insert(getgenv().logBuffer, tostring(logText))
 end
 
 if not getgenv().LogLoopStarted then
@@ -52,6 +59,27 @@ if not getgenv().LogLoopStarted then
 end
 
 -- Spy / Hook untuk mendeteksi remote yang ditembakkan secara manual
+local function formatArgs(...)
+    local args = {...}
+    local str = ""
+    for i, v in ipairs(args) do
+        local typeV = typeOf(v)
+        if typeV == "Instance" then
+            str = str .. "Instance("..v.Name..")"
+        elseif typeV == "string" then
+            str = str .. '"' .. v .. '"'
+        elseif typeV == "Vector3" then
+            str = str .. "Vector3("..tostring(v)..")"
+        elseif typeV == "table" then
+            str = str .. "{...}"
+        else
+            str = str .. tostring(v)
+        end
+        if i < #args then str = str .. ", " end
+    end
+    return str
+end
+
 if hasHook and not getgenv().PandaHooked then
     getgenv().PandaHooked = true
     local oldNamecall
@@ -59,20 +87,19 @@ if hasHook and not getgenv().PandaHooked then
         local method = getnamecallmethod()
         
         if method == "FireServer" or method == "InvokeServer" then
-            -- Hanya melog remote MergeRequest, PickUp, dan Drop agar tidak spam
-            if self.Name == "MergeRequest" or self.Name == "PickUp" or self.Name == "Drop" then
-                local args = {...}
-                local argStr = ""
-                for i, v in ipairs(args) do
-                    if typeOf(v) == "table" and v.Name then
-                        argStr = argStr .. "Instance("..v.Name.."), "
-                    else
-                        argStr = argStr .. tostring(v) .. ", "
-                    end
-                end
+            if getgenv().spyAllRemotes and not getgenv().ignoreSpam[self.Name] then
+                local argStr = formatArgs(...)
+                local ok, ts = pcall(function() return os.date("%Y-%m-%d %H:%M:%S") end)
+                ts = (ok and ts) or "unknown-time"
+                local logMsg = string.format("[%s] [SPY] %s | %s\n      Args: %s", ts, method, self.Name, argStr)
                 
-                -- Kirim via webhook
-                sendLog("[C2S] " .. self.Name .. " | Args: " .. argStr)
+                -- Tampilkan langsung di F9 (Developer Console)
+                print(logMsg)
+                
+                -- Kirim ke Webhook jika fitur dinyalakan
+                if getgenv().logToWebhook then
+                    sendLog(logMsg)
+                end
             end
         end
         return oldNamecall(self, ...)
@@ -198,7 +225,10 @@ end
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PandaHelperUI"
-ScreenGui.Parent = CoreGui
+local okCore = pcall(function() ScreenGui.Parent = CoreGui end)
+if not okCore or not ScreenGui.Parent then
+    pcall(function() ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end)
+end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
@@ -361,6 +391,14 @@ createToggle("Auto Defense (Bomb)", false, function(Value)
         getgenv().isUnderAttack = false
         toggleBomb(false)
     end
+end)
+
+createToggle("Enable Remote Spy (F9)", false, function(Value)
+    getgenv().spyAllRemotes = Value
+end)
+
+createToggle("Send Spy Logs to Webhook", false, function(Value)
+    getgenv().logToWebhook = Value
 end)
 
 createButton("Confirm OP Launch", function()
