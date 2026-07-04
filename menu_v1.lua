@@ -379,7 +379,6 @@ task.spawn(function()
                 logAction("Error", false, "Auto Merge macet/crash: " .. tostring(err))
             end
         end
-        end
     end
 end)
 
