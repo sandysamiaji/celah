@@ -223,7 +223,7 @@ if not _G.S2CHooked_List then
 end
 
 local function getBombValue(nuke)
-    local gui = nuke:FindFirstChildWhichIsA("SurfaceGui") or nuke:FindFirstChildWhichIsA("BillboardGui")
+    local gui = nuke:FindFirstChildWhichIsA("SurfaceGui", true) or nuke:FindFirstChildWhichIsA("BillboardGui", true)
     if gui then
         local tl = gui:FindFirstChildWhichIsA("TextLabel", true)
         if tl then return tl.Text end
@@ -286,7 +286,7 @@ task.spawn(function()
                     if hrp then
                         local heldBomb = nil
                         for _, v in ipairs(char:GetDescendants()) do
-                            if v.Name == "Nuke" and v:IsA("BasePart") then
+                            if v.Name == "Nuke" and (v:IsA("BasePart") or v:IsA("Model")) then
                                 heldBomb = v
                                 break
                             end
@@ -294,8 +294,9 @@ task.spawn(function()
                         
                         local groundNukes = {}
                         for _, v in ipairs(workspace:GetDescendants()) do
-                            if v.Name == "Nuke" and v:IsA("BasePart") and v.Parent ~= char then
-                                local dist = (v.Position - hrp.Position).Magnitude
+                            if v.Name == "Nuke" and (v:IsA("BasePart") or v:IsA("Model")) and v.Parent ~= char then
+                                local pos = v:IsA("Model") and v:GetPivot().Position or v.Position
+                                local dist = (pos - hrp.Position).Magnitude
                                 if dist < 150 then
                                     table.insert(groundNukes, {part = v, distance = dist})
                                 end
@@ -330,7 +331,7 @@ task.spawn(function()
                                 task.wait(0.2)
                             else
                                 if dropRemote then
-                                    safeFire(dropRemote)
+                                    safeFire(dropRemote, hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
                                     logAction("Auto Merge", false, "Membuang Nuke [" .. tostring(heldVal) .. "] karena pasangannya hilang")
                                 end
                                 _G_State.LastPickedUpVal = nil
