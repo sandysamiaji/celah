@@ -293,17 +293,29 @@ task.spawn(function()
                     local groundNukes = {}
                     for _, v in ipairs(workspace:GetDescendants()) do
                         if v.Name == "Nuke" and v:IsA("BasePart") and v.Parent ~= char then
-                            if (v.Position - hrp.Position).Magnitude < 150 then
-                                table.insert(groundNukes, v)
+                            local dist = (v.Position - hrp.Position).Magnitude
+                            if dist < 150 then
+                                table.insert(groundNukes, {part = v, distance = dist})
                             end
                         end
                     end
                     
+                    -- Urutkan bom dari yang terdekat dengan pemain
+                    table.sort(groundNukes, function(a, b)
+                        return a.distance < b.distance
+                    end)
+                    
+                    -- Ekstrak kembali part-nya agar loop di bawah tidak error
+                    local sortedNukes = {}
+                    for _, v in ipairs(groundNukes) do
+                        table.insert(sortedNukes, v.part)
+                    end
+                    
                     if heldBomb then
                         local heldVal = getBombValue(heldBomb)
-                        -- Cari bom di tanah dengan nilai yang sama
+                        -- Cari bom di tanah dengan nilai yang sama (sudah urut dari terdekat)
                         local targetMerge = nil
-                        for _, n in ipairs(groundNukes) do
+                        for _, n in ipairs(sortedNukes) do
                             if getBombValue(n) == heldVal then
                                 targetMerge = n
                                 break
@@ -319,12 +331,12 @@ task.spawn(function()
                             task.wait(0.1)
                             hrp.CFrame = origCFrame
                             hrp.Anchored = false
-                            logAction("Auto Merge", true, "Menggabungkan Nuke [" .. heldVal .. "] dari jarak jauh")
+                            logAction("Auto Merge", true, "Menggabungkan Nuke [" .. heldVal .. "] terdekat")
                         end
                     else
                         -- Kelompokkan bom di tanah
                         local grouped = {}
-                        for _, n in ipairs(groundNukes) do
+                        for _, n in ipairs(sortedNukes) do
                             local val = getBombValue(n)
                             if val ~= "?" then
                                 if not grouped[val] then grouped[val] = {} end
@@ -498,6 +510,7 @@ local Window = windui:CreateWindow({
 })
 
 local TabMain = Window:Tab({ Title = "Main Features", Icon = "home" })
+local TabMoney = Window:Tab({ Title = "Economy & Money", Icon = "wallet" })
 local TabRemotes = Window:Tab({ Title = "Remote Spy & Action", Icon = "terminal" })
 local TabLogs = Window:Tab({ Title = "Live Logs", Icon = "book" })
 
@@ -592,9 +605,41 @@ TabMain:Button({
     end
 })
 
-TabMain:Divider()
+-- TAB MONEY
+local function getCurrentMoney()
+    local p = Players.LocalPlayer
+    if p and p:FindFirstChild("leaderstats") then
+        for _, stat in ipairs(p.leaderstats:GetChildren()) do
+            if stat:IsA("IntValue") or stat:IsA("NumberValue") then
+                local n = string.lower(stat.Name)
+                if string.find(n, "cash") or string.find(n, "money") or string.find(n, "coin") or string.find(n, "point") or string.find(n, "nuke") then
+                    return stat.Value, stat.Name
+                end
+            end
+        end
+        -- Fallback ambil stat pertama
+        local firstStat = p.leaderstats:GetChildren()[1]
+        if firstStat then return firstStat.Value, firstStat.Name end
+    end
+    return 0, "Unknown"
+end
 
-TabMain:Button({
+local MoneyDisplay = TabMoney:Paragraph({ Title = "Saldo Anda Saat Ini", Desc = "Memuat data keuangan..." })
+
+-- Loop update saldo uang di UI setiap 1 detik
+task.spawn(function()
+    while task.wait(1) do
+        if _G.NukeGameExecution ~= ExecutionID then break end
+        if MoneyDisplay and MoneyDisplay.SetDesc then
+            local currentMoney, moneyName = getCurrentMoney()
+            MoneyDisplay:SetDesc("💳 " .. tostring(moneyName) .. ": " .. tostring(currentMoney))
+        end
+    end
+end)
+
+TabMoney:Divider()
+
+TabMoney:Button({
     Title = "💰 Force Infinite Money (Eksploit) ⚠️",
     Callback = function()
         pcall(function()
@@ -602,48 +647,20 @@ TabMain:Button({
             local group = RS:FindFirstChild("NukeRemotes") and RS.NukeRemotes:FindFirstChild("ClaimGroupReward")
             local city = RS:FindFirstChild("NukeRemotes") and RS.NukeRemotes:FindFirstChild("CityRewardPaid")
             
-            -- Cari bom dengan level tertinggi di workspace (berdasarkan atribut/nama angka)
-            local maxLvl = 0
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("Model") and tonumber(v.Name) then
-                    local lvl = tonumber(v.Name)
-                    if lvl > maxLvl then
-                        maxLvl = lvl
-                    end
-                end
+            local startingMoney, _ = getCurrentMoney()
+            
+            -- Sesuai permintaan: Hitung 20x dari saldo saat ini
+            local massiveMoney = startingMoney * 20
+            
+            -- Fallback jika saldo 0 agar eksploit tetap berjalan
+            if massiveMoney <= 0 then 
+                massiveMoney = 1000000 
             end
             
-            -- Jika tidak ada bom, gunakan default 1000
-            local baseLvl = maxLvl > 0 and maxLvl or 1000
-            local massiveMoney = baseLvl
-            
-            -- Fungsi untuk mendapatkan jumlah uang pemain saat ini
-            local function getCurrentMoney()
-                local p = Players.LocalPlayer
-                if p and p:FindFirstChild("leaderstats") then
-                    for _, stat in ipairs(p.leaderstats:GetChildren()) do
-                        if stat:IsA("IntValue") or stat:IsA("NumberValue") then
-                            local n = string.lower(stat.Name)
-                            if string.find(n, "cash") or string.find(n, "money") or string.find(n, "coin") or string.find(n, "point") or string.find(n, "nuke") then
-                                return stat.Value
-                            end
-                        end
-                    end
-                end
-                return 0 -- Return 0 jika leaderstats tidak ditemukan
-            end
-            
-            local startingMoney = getCurrentMoney()
-            
-            -- Kirimkan permintaan hadiah sebanyak 900 kali secara terpisah (seolah-olah 900 kali hit beruntun)
             task.spawn(function()
                 logAction("Eksploit", true, "Memulai eksploit uang (900x hit beruntun)... Saldo Awal: " .. tostring(startingMoney))
                 
                 for i = 1, 900 do
-                    if not _G_State.SpyRemotes then -- Opsional: Tambahkan kill-switch ke depannya jika butuh
-                        -- Kita jalankan loop tanpa kill switch khusus, tapi biarkan player tetap bisa main
-                    end
-                    
                     if offline then
                         safeFire(offline, massiveMoney)
                         safeFire(offline, tostring(massiveMoney))
@@ -657,13 +674,12 @@ TabMain:Button({
                         safeFire(city, massiveMoney)
                     end
                     
-                    task.wait(0.01) -- Jeda super cepat agar 900 hit selesai dalam 9 detik
+                    task.wait(0.01)
                 end
                 
-                -- Tunggu sebentar agar server memproses sisa antrian
                 task.wait(1)
                 
-                local endingMoney = getCurrentMoney()
+                local endingMoney, _ = getCurrentMoney()
                 local profit = endingMoney - startingMoney
                 
                 if profit > 0 then
