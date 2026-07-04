@@ -268,12 +268,7 @@ task.spawn(function()
                     local allNukes = {}
                     for _, v in ipairs(workspace:GetDescendants()) do
                         if v.Name == "Nuke" and v:IsA("BasePart") then
-                            -- Hanya kumpulkan Nuke di sekitar pemain (radius 150) agar tidak mencuri dari tetangga
-                            if hrp and (v.Position - hrp.Position).Magnitude < 150 then
-                                table.insert(allNukes, v)
-                            elseif not hrp then
-                                table.insert(allNukes, v)
-                            end
+                            table.insert(allNukes, v)
                         end
                     end
                     
@@ -289,20 +284,35 @@ task.spawn(function()
                     
                     local firedCount = 0
                     for val, group in pairs(nukeGroups) do
-                        while #group >= 2 do
-                            local n1 = table.remove(group, 1)
-                            local n2 = table.remove(group, 1)
+                        local unmerged = {}
+                        for _, v in ipairs(group) do table.insert(unmerged, v) end
+                        
+                        while #unmerged >= 2 do
+                            local n1 = table.remove(unmerged, 1)
+                            local pairedIndex = nil
                             
-                            -- Proses Ambil
-                            safeFire(pickUp, n1)
-                            task.wait(0.15) -- Waktu paling stabil agar tidak nyangkut
+                            -- Pastikan dua bom ini berdekatan (satu base) untuk mencegah error merge beda base
+                            for i, n2 in ipairs(unmerged) do
+                                if (n1.Position - n2.Position).Magnitude < 200 then
+                                    pairedIndex = i
+                                    break
+                                end
+                            end
                             
-                            -- Proses Gabung
-                            safeFire(mergeReq, n2)
-                            
-                            firedCount = firedCount + 1
-                            if not _G_State.AutoMerge then break end
-                            task.wait(_G_State.MergeDelay or 0.5)
+                            if pairedIndex then
+                                local n2 = table.remove(unmerged, pairedIndex)
+                                
+                                -- Proses Ambil
+                                safeFire(pickUp, n1)
+                                task.wait(0.15) -- Waktu paling stabil agar tidak nyangkut
+                                
+                                -- Proses Gabung
+                                safeFire(mergeReq, n2)
+                                
+                                firedCount = firedCount + 1
+                                if not _G_State.AutoMerge then break end
+                                task.wait(_G_State.MergeDelay or 0.5)
+                            end
                         end
                         if not _G_State.AutoMerge then break end
                     end
