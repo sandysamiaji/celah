@@ -22,6 +22,8 @@ local State = {
     OneHitExploit = false,
     FakeDamage = 100,
     AutoGift = false,
+    SpeedMultiplier = 5,
+    MinCollectValue = 200000000,
 }
 
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
@@ -29,6 +31,11 @@ local logQueue = {}
 local lastLogSend = tick()
 
 local function processLogQueue()
+    if not State.EnableLogs then
+        logQueue = {} -- Bersihkan antrean agar tidak menumpuk di memori
+        return
+    end
+    
     if #logQueue > 0 and tick() - lastLogSend >= 5 then
         local payload = table.concat(logQueue, "\n")
         logQueue = {}
@@ -99,7 +106,7 @@ task.spawn(function()
         if _G.PandaGaliExecution ~= ExecutionID then break end
         
         if State.AutoClick then
-            for i = 1, 5 do
+            for i = 1, State.SpeedMultiplier do
                 if State.OneHitExploit then
                     safeFire(Remotes.Click, 1, State.FakeDamage)
                 else
@@ -110,7 +117,7 @@ task.spawn(function()
             if clickCount % 1000 == 0 then logAction("Farm", "Berhasil Click/Swing 1000x") end
         end
         if State.AutoHitWall then
-            for i = 1, 5 do
+            for i = 1, State.SpeedMultiplier do
                 if State.OneHitExploit then
                     safeFire(Remotes.HitWall, 1, State.FakeDamage)
                 else
@@ -158,13 +165,35 @@ task.spawn(function()
                 pcall(function()
                     for _, obj in pairs(workspace:GetDescendants()) do
                         if obj:IsA("ProximityPrompt") and obj.ActionText == "Pickup?" then
-                            if fireproximityprompt then
-                                fireproximityprompt(obj, 1, true)
-                            else
-                                -- Fallback: Pindahkan loot ke kaki karakter
-                                local p = obj.Parent
-                                if p and p:IsA("BasePart") then
-                                    p.CFrame = hrp.CFrame
+                            -- Ekstrak nilai uang dari ObjectText, contoh: "[Coal] [Common] [$14]" atau "[$200M]"
+                            local value = 0
+                            local moneyStr = string.match(obj.ObjectText, "%$([%d%.,kKmMbBtT]+)")
+                            if moneyStr then
+                                -- Parse multiplier
+                                local mult = 1
+                                local lastChar = string.lower(string.sub(moneyStr, -1))
+                                if lastChar == "k" then mult = 1e3
+                                elseif lastChar == "m" then mult = 1e6
+                                elseif lastChar == "b" then mult = 1e9
+                                elseif lastChar == "t" then mult = 1e12
+                                end
+                                
+                                local numStr = string.match(moneyStr, "[%d%.,]+")
+                                if numStr then
+                                    numStr = string.gsub(numStr, ",", "")
+                                    value = tonumber(numStr) * mult
+                                end
+                            end
+                            
+                            if value >= State.MinCollectValue then
+                                if fireproximityprompt then
+                                    fireproximityprompt(obj, 1, true)
+                                else
+                                    -- Fallback: Pindahkan loot ke kaki karakter
+                                    local p = obj.Parent
+                                    if p and p:IsA("BasePart") then
+                                        p.CFrame = hrp.CFrame
+                                    end
                                 end
                             end
                         end
@@ -287,6 +316,19 @@ TabMain:Toggle({
     Callback = function(v) State.AutoCollect = v end
 })
 
+TabMain:Input({
+    Title    = "💰 Minimal Harga Collect",
+    Desc     = "Contoh: 200000000 (Untuk 200M). Barang di bawah harga ini akan diabaikan.",
+    Default  = "200000000",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num then
+            State.MinCollectValue = num
+            logAction("System", "Minimal Auto Collect diatur ke: " .. tostring(num))
+        end
+    end
+})
+
 TabMain:Toggle({
     Title    = "🔄 Auto Rebirth",
     Default  = false,
@@ -326,6 +368,20 @@ TabMain:Input({
         end
     end
 })
+
+pcall(function()
+    TabMain:Slider({
+        Title    = "⚡ Kecepatan Pukulan / Klik",
+        Desc     = "Jumlah pukulan per frame. Semakin tinggi semakin cepat (bisa lag).",
+        Step     = 1,
+        Min      = 1,
+        Max      = 100,
+        Default  = 5,
+        Callback = function(value)
+            State.SpeedMultiplier = value
+        end
+    })
+end)
 
 local TabLogs = Window:Tab({ Title = "📋 Logs", Icon = "book" })
 
