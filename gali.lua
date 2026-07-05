@@ -75,6 +75,7 @@ pcall(function()
         Remotes.GotoSurface = serverRemotes:WaitForChild("GotoSurface", 2)
         Remotes.PurchaseAura = serverRemotes:WaitForChild("PurchaseAura", 2)
         Remotes.EquipAura = serverRemotes:WaitForChild("EquipAura", 2)
+        Remotes.GiftLoot = serverRemotes:WaitForChild("GiftLoot", 2)
     end
 end)
 
@@ -328,6 +329,58 @@ State.UpdateUIDisplay = function()
         LogDisplay:SetDesc(table.concat(logLines, "\n"))
     end
 end
+
+-- =====================
+-- TAB EXPLOITS (DANGER)
+-- =====================
+local TabExploit = Window:Tab({ Title = "⚠️ Exploits", Icon = "alert-triangle" })
+
+TabExploit:Input({
+    Title    = "🎯 Target Dupe (Nama Pemain)",
+    Desc     = "Ketik nama temanmu yang akan menerima barang dupe.",
+    Default  = "",
+    Callback = function(text)
+        State.DupeTargetName = text
+        logAction("System", "Target Dupe di-set: " .. text)
+    end
+})
+
+TabExploit:Button({
+    Title    = "💥 EKSEKUSI DUPE (RACE CONDITION)",
+    Callback = function()
+        if not State.DupeTargetName or State.DupeTargetName == "" then
+            windui:Notify({Title = "Error", Content = "Isi nama target dulu di kotak atas!", Duration = 3})
+            return
+        end
+        
+        -- Cari target berdasarkan nama
+        local targetPlayer = nil
+        for _, p in pairs(Players:GetPlayers()) do
+            if string.find(string.lower(p.Name), string.lower(State.DupeTargetName)) or 
+               string.find(string.lower(p.DisplayName), string.lower(State.DupeTargetName)) then
+                targetPlayer = p
+                break
+            end
+        end
+        
+        if not targetPlayer then
+            windui:Notify({Title = "Error", Content = "Pemain tidak ditemukan di server!", Duration = 3})
+            return
+        end
+        
+        local uid = targetPlayer.UserId
+        logAction("Exploit", "Memulai Serangan Dupe ke " .. targetPlayer.Name)
+        windui:Notify({Title = "RACE CONDITION", Content = "Menembakkan 1000 paket GiftLoot...", Duration = 3})
+        
+        -- Eksekusi brutal dalam hitungan milidetik
+        task.spawn(function()
+            for i = 1, 1000 do
+                safeFire(Remotes.GiftLoot, uid)
+            end
+            logAction("Exploit", "Serangan selesai! Cek tasmu dan tas temanmu.")
+        end)
+    end
+})
 
 Window:SelectTab(1)
 windui:Notify({
