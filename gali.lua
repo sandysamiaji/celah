@@ -21,6 +21,7 @@ local State = {
     AutoAura = false,
     OneHitExploit = false,
     FakeDamage = 100,
+    AutoGift = false,
 }
 
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
@@ -98,7 +99,7 @@ task.spawn(function()
         if _G.PandaGaliExecution ~= ExecutionID then break end
         
         if State.AutoClick then
-            for i = 1, 50 do
+            for i = 1, 5 do
                 if State.OneHitExploit then
                     safeFire(Remotes.Click, 1, State.FakeDamage)
                 else
@@ -106,10 +107,10 @@ task.spawn(function()
                 end
                 clickCount = clickCount + 1
             end
-            if clickCount % 5000 == 0 then logAction("Farm", "Berhasil Click/Swing 5000x") end
+            if clickCount % 1000 == 0 then logAction("Farm", "Berhasil Click/Swing 1000x") end
         end
         if State.AutoHitWall then
-            for i = 1, 50 do
+            for i = 1, 5 do
                 if State.OneHitExploit then
                     safeFire(Remotes.HitWall, 1, State.FakeDamage)
                 else
@@ -117,7 +118,7 @@ task.spawn(function()
                 end
                 hitCount = hitCount + 1
             end
-            if hitCount % 5000 == 0 then logAction("Farm", "Berhasil HitWall 5000x") end
+            if hitCount % 1000 == 0 then logAction("Farm", "Berhasil HitWall 1000x") end
         end
     end
 end)
@@ -193,6 +194,26 @@ task.spawn(function()
             if Remotes.PurchaseAura then safeFire(Remotes.PurchaseAura) end
             if Remotes.EquipAura then safeFire(Remotes.EquipAura) end
             logAction("Aura", "Mencoba Purchase & Equip Aura")
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if _G.PandaGaliExecution ~= ExecutionID then break end
+        
+        if State.AutoGift and State.DupeTargetName and State.DupeTargetName ~= "" then
+            local targetPlayer = nil
+            for _, p in pairs(Players:GetPlayers()) do
+                if string.find(string.lower(p.Name), string.lower(State.DupeTargetName)) or 
+                   string.find(string.lower(p.DisplayName), string.lower(State.DupeTargetName)) then
+                    targetPlayer = p
+                    break
+                end
+            end
+            if targetPlayer then
+                safeFire(Remotes.GiftLoot, targetPlayer.UserId)
+            end
         end
     end
 end)
@@ -366,6 +387,13 @@ TabExploit:Button({
             windui:Notify({Title = "Refresh", Content = "Daftar pemain diperbarui!", Duration = 2})
         end
     end
+})
+
+TabExploit:Toggle({
+    Title    = "🎁 Auto Transfer / Gift (Kirim Otomatis)",
+    Desc     = "Mengirimkan loot terus-menerus ke target yang dipilih di atas.",
+    Default  = false,
+    Callback = function(v) State.AutoGift = v end
 })
 
 TabExploit:Input({
