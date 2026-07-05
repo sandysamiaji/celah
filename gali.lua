@@ -98,6 +98,8 @@ end
 -- =====================
 local clickCount = 0
 local hitCount = 0
+local lastLoggedClick = 0
+local lastLoggedHit = 0
 
 task.spawn(function()
     local RunService = game:GetService("RunService")
@@ -114,7 +116,10 @@ task.spawn(function()
                 end
                 clickCount = clickCount + 1
             end
-            if clickCount % 1000 == 0 then logAction("Farm", "Berhasil Click/Swing 1000x") end
+            if clickCount - lastLoggedClick >= 1000 then 
+                logAction("Farm", "Berhasil Click/Swing " .. tostring(clickCount - lastLoggedClick) .. "x")
+                lastLoggedClick = clickCount
+            end
         end
         if State.AutoHitWall then
             for i = 1, State.SpeedMultiplier do
@@ -125,7 +130,10 @@ task.spawn(function()
                 end
                 hitCount = hitCount + 1
             end
-            if hitCount % 1000 == 0 then logAction("Farm", "Berhasil HitWall 1000x") end
+            if hitCount - lastLoggedHit >= 1000 then 
+                logAction("Farm", "Berhasil HitWall " .. tostring(hitCount - lastLoggedHit) .. "x") 
+                lastLoggedHit = hitCount
+            end
         end
     end
 end)
@@ -369,16 +377,33 @@ TabMain:Input({
     end
 })
 
+TabMain:Button({
+    Title    = "💥 Uji Coba: Pukul Tembok 10x Instan",
+    Desc     = "Menembakkan 10 request HitWall ke server dalam sekejap (tanpa harus on/off Auto Hit).",
+    Callback = function()
+        for i = 1, 10 do
+            if State.OneHitExploit then
+                safeFire(Remotes.HitWall, 1, State.FakeDamage)
+            else
+                safeFire(Remotes.HitWall, 1, 1)
+            end
+        end
+        logAction("System", "Berhasil menembakkan 10x HitWall (Uji Coba)")
+        windui:Notify({Title = "Uji Coba", Content = "10 Pukulan Tembok telah dikirim!", Duration = 2})
+    end
+})
+
 pcall(function()
-    TabMain:Slider({
-        Title    = "⚡ Kecepatan Pukulan / Klik",
-        Desc     = "Jumlah pukulan per frame. Semakin tinggi semakin cepat (bisa lag).",
-        Step     = 1,
-        Min      = 1,
-        Max      = 1000,
-        Default  = 5,
-        Callback = function(value)
-            State.SpeedMultiplier = value
+    TabMain:Input({
+        Title    = "⚡ Kecepatan Pukulan (Ketik Angka)",
+        Desc     = "Jumlah pukulan per frame (Default: 5). Ketik 50 atau 1000 untuk lebih cepat.",
+        Default  = "5",
+        Callback = function(text)
+            local num = tonumber(text)
+            if num then
+                State.SpeedMultiplier = num
+                logAction("System", "Kecepatan diubah ke: " .. tostring(num))
+            end
         end
     })
 end)
