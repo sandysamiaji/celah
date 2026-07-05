@@ -97,7 +97,7 @@ task.spawn(function()
         if _G.PandaGaliExecution ~= ExecutionID then break end
         
         if State.AutoClick then
-            for i = 1, 5 do
+            for i = 1, 50 do
                 if State.OneHitExploit then
                     safeFire(Remotes.Click, 1, State.FakeDamage)
                 else
@@ -105,10 +105,10 @@ task.spawn(function()
                 end
                 clickCount = clickCount + 1
             end
-            if clickCount % 1000 == 0 then logAction("Farm", "Berhasil Click/Swing 1000x") end
+            if clickCount % 5000 == 0 then logAction("Farm", "Berhasil Click/Swing 5000x") end
         end
         if State.AutoHitWall then
-            for i = 1, 5 do
+            for i = 1, 50 do
                 if State.OneHitExploit then
                     safeFire(Remotes.HitWall, 1, State.FakeDamage)
                 else
@@ -116,7 +116,7 @@ task.spawn(function()
                 end
                 hitCount = hitCount + 1
             end
-            if hitCount % 1000 == 0 then logAction("Farm", "Berhasil HitWall 1000x") end
+            if hitCount % 5000 == 0 then logAction("Farm", "Berhasil HitWall 5000x") end
         end
     end
 end)
