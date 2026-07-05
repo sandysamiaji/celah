@@ -326,13 +326,23 @@ TabMain:Toggle({
 
 TabMain:Input({
     Title    = "💰 Minimal Harga Collect",
-    Desc     = "Contoh: 200000000 (Untuk 200M). Barang di bawah harga ini akan diabaikan.",
-    Default  = "200000000",
+    Desc     = "Ketik angka mentah (200000000) atau pakai huruf (200M, 1.5B, 50k)",
+    Default  = "200M",
     Callback = function(text)
-        local num = tonumber(text)
+        local rawText = string.lower(string.gsub(text, " ", ""))
+        local mult = 1
+        if string.find(rawText, "k") then mult = 1e3
+        elseif string.find(rawText, "m") then mult = 1e6
+        elseif string.find(rawText, "b") then mult = 1e9
+        elseif string.find(rawText, "t") then mult = 1e12
+        end
+        
+        local numStr = string.match(rawText, "[%d%.]+")
+        local num = tonumber(numStr)
+        
         if num then
-            State.MinCollectValue = num
-            logAction("System", "Minimal Auto Collect diatur ke: " .. tostring(num))
+            State.MinCollectValue = num * mult
+            logAction("System", "Minimal Auto Collect diatur ke: " .. tostring(State.MinCollectValue))
         end
     end
 })
