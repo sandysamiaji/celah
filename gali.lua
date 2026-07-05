@@ -17,13 +17,44 @@ local State = {
     AutoRebirth = false,
     AutoEquip = false,
     EnableLogs = true,
+    SellCFrame = nil,
 }
+
+local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
+local logQueue = {}
+local lastLogSend = tick()
+
+local function processLogQueue()
+    if #logQueue > 0 and tick() - lastLogSend >= 5 then
+        local payload = table.concat(logQueue, "\n")
+        logQueue = {}
+        lastLogSend = tick()
+        
+        task.spawn(function()
+            pcall(function()
+                local requestFunc = request or http_request or (http and http.request)
+                if requestFunc then
+                    requestFunc({
+                        Url = WEBHOOK_URL,
+                        Method = "POST",
+                        Headers = { ["Content-Type"] = "application/json" },
+                        Body = game:GetService("HttpService"):JSONEncode({ content = payload })
+                    })
+                end
+            end)
+        end)
+    end
+end
 
 local logLines = {}
 local function logAction(action, text)
-    if not State.EnableLogs then return end
     local t = os.date("%H:%M:%S")
     local msg = string.format("[%s] %s | %s", t, action, text)
+    
+    if State.EnableLogs then
+        table.insert(logQueue, msg)
+    end
+    
     table.insert(logLines, 1, msg)
     if #logLines > 100 then table.remove(logLines, 101) end
     if State.UpdateUIDisplay then State.UpdateUIDisplay() end
@@ -38,6 +69,7 @@ pcall(function()
         Remotes.HitWall = serverRemotes:WaitForChild("HitWall", 2)
         Remotes.SellAllLoot = serverRemotes:WaitForChild("SellAllLoot", 2)
         Remotes.Rebirth = serverRemotes:WaitForChild("Rebirth", 2)
+        Remotes.GotoSurface = serverRemotes:WaitForChild("GotoSurface", 2)
     end
 end)
 
@@ -54,29 +86,42 @@ local clickCount = 0
 local hitCount = 0
 
 task.spawn(function()
-    while task.wait(0.05) do
+    while task.wait() do
         if _G.PandaGaliExecution ~= ExecutionID then break end
         
         if State.AutoClick then
             safeFire(Remotes.Click)
             clickCount = clickCount + 1
-            if clickCount % 100 == 0 then logAction("Farm", "Berhasil Click/Swing 100x") end
+            if clickCount % 200 == 0 then logAction("Farm", "Berhasil Click/Swing 200x") end
         end
         if State.AutoHitWall then
             safeFire(Remotes.HitWall)
             hitCount = hitCount + 1
-            if hitCount % 100 == 0 then logAction("Farm", "Berhasil HitWall 100x") end
+            if hitCount % 200 == 0 then logAction("Farm", "Berhasil HitWall 200x") end
         end
     end
 end)
 
 task.spawn(function()
-    while task.wait(1) do
+    while task.wait(0.1) do
         if _G.PandaGaliExecution ~= ExecutionID then break end
         
         if State.AutoSell then
-            safeFire(Remotes.SellAllLoot)
-            logAction("Sell", "Menjual semua loot")
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if State.SellCFrame and hrp then
+                local oldCFrame = hrp.CFrame
+                -- Teleport secepat kilat
+                hrp.CFrame = State.SellCFrame
+                task.wait() -- Jeda 1 frame agar server sadar kita di atas
+                safeFire(Remotes.SellAllLoot)
+                hrp.CFrame = oldCFrame -- Langsung balik ke lubang tambang!
+            else
+                -- Jika belum di-set, cara jadul
+                if Remotes.GotoSurface then safeFire(Remotes.GotoSurface) end
+                safeFire(Remotes.SellAllLoot)
+            end
         end
     end
 end)
@@ -114,6 +159,14 @@ task.spawn(function()
     end
 end)
 
+-- Webhook Processor Loop
+task.spawn(function()
+    while task.wait(1) do
+        if _G.PandaGaliExecution ~= ExecutionID then break end
+        processLogQueue()
+    end
+end)
+
 -- =====================
 -- GUI (WINDUI)
 -- =====================
@@ -145,6 +198,19 @@ TabMain:Toggle({
     Title    = "💰 Auto Sell All Loot",
     Default  = false,
     Callback = function(v) State.AutoSell = v end
+})
+
+TabMain:Button({
+    Title    = "📍 Set Lokasi Sell (Berdiri di tempat jual lalu klik)",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            State.SellCFrame = hrp.CFrame
+            windui:Notify({ Title = "Lokasi Diatur", Content = "Lokasi jual berhasil direkam!", Duration = 3 })
+            logAction("System", "Lokasi Sell ditetapkan")
+        end
+    end
 })
 
 TabMain:Toggle({
