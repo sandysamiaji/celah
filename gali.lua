@@ -24,6 +24,8 @@ local State = {
     AutoGift = false,
     SpeedMultiplier = 5,
     MinCollectValue = 200000000,
+    WallID = 1,
+    Noclip = false,
 }
 
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
@@ -116,6 +118,17 @@ task.spawn(function()
                 end
                 clickCount = clickCount + 1
             end
+            
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char then
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    if tool then
+                        tool:Activate()
+                    end
+                end
+            end)
+            
             if clickCount - lastLoggedClick >= 1000 then 
                 logAction("Farm", "Berhasil Click/Swing " .. tostring(clickCount - lastLoggedClick) .. "x")
                 lastLoggedClick = clickCount
@@ -124,18 +137,35 @@ task.spawn(function()
         if State.AutoHitWall then
             for i = 1, State.SpeedMultiplier do
                 if State.OneHitExploit then
-                    safeFire(Remotes.HitWall, 1, State.FakeDamage)
+                    safeFire(Remotes.HitWall, State.WallID, State.FakeDamage)
                 else
-                    safeFire(Remotes.HitWall, 1, 1)
+                    safeFire(Remotes.HitWall, State.WallID, 1)
                 end
                 hitCount = hitCount + 1
             end
             if hitCount - lastLoggedHit >= 1000 then 
-                logAction("Farm", "Berhasil HitWall " .. tostring(hitCount - lastLoggedHit) .. "x") 
+                logAction("Farm", "Berhasil HitWall " .. tostring(hitCount - lastLoggedHit) .. "x ke Wall " .. tostring(State.WallID)) 
                 lastLoggedHit = hitCount
             end
         end
     end
+end)
+
+task.spawn(function()
+    local RunService = game:GetService("RunService")
+    RunService.Stepped:Connect(function()
+        if _G.PandaGaliExecution ~= ExecutionID then return end
+        if State.Noclip then
+            local char = LocalPlayer.Character
+            if char then
+                for _, v in pairs(char:GetDescendants()) do
+                    if v:IsA("BasePart") and v.CanCollide then
+                        v.CanCollide = false
+                    end
+                end
+            end
+        end
+    end)
 end)
 
 task.spawn(function()
@@ -387,19 +417,32 @@ TabMain:Input({
     end
 })
 
+TabMain:Input({
+    Title    = "🧱 Target ID Tembok (Wall ID)",
+    Desc     = "Jika tembok tidak hancur, coba ubah ID ini (1, 2, 3, 4, dst).",
+    Default  = "1",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num then
+            State.WallID = num
+            logAction("Exploit", "Target Wall ID diubah ke: " .. tostring(num))
+        end
+    end
+})
+
 TabMain:Button({
     Title    = "💥 Uji Coba: Pukul Tembok 10x Instan",
     Desc     = "Menembakkan 10 request HitWall ke server dalam sekejap (tanpa harus on/off Auto Hit).",
     Callback = function()
         for i = 1, 10 do
             if State.OneHitExploit then
-                safeFire(Remotes.HitWall, 1, State.FakeDamage)
+                safeFire(Remotes.HitWall, State.WallID, State.FakeDamage)
             else
-                safeFire(Remotes.HitWall, 1, 1)
+                safeFire(Remotes.HitWall, State.WallID, 1)
             end
         end
-        logAction("System", "Berhasil menembakkan 10x HitWall (Uji Coba)")
-        windui:Notify({Title = "Uji Coba", Content = "10 Pukulan Tembok telah dikirim!", Duration = 2})
+        logAction("System", "Berhasil menembakkan 10x HitWall ke Wall " .. tostring(State.WallID))
+        windui:Notify({Title = "Uji Coba", Content = "10 Pukulan ke Wall " .. tostring(State.WallID) .. " telah dikirim!", Duration = 2})
     end
 })
 
@@ -485,6 +528,13 @@ TabExploit:Toggle({
     Desc     = "Mengirimkan loot terus-menerus ke target yang dipilih di atas.",
     Default  = false,
     Callback = function(v) State.AutoGift = v end
+})
+
+TabExploit:Toggle({
+    Title    = "👻 Noclip (Tembus Tembok)",
+    Desc     = "Bisa jalan menembus pintu/tembok yang bug atau terkunci.",
+    Default  = false,
+    Callback = function(v) State.Noclip = v end
 })
 
 TabExploit:Input({
