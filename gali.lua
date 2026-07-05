@@ -501,6 +501,28 @@ local function getPlayerNames()
     return names
 end
 
+TabExploit:Button({
+    Title    = "🚀 Teleport ke Zona x10 Strength",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = CFrame.new(91.0, 10.0, -9.6)
+            windui:Notify({Title = "Teleport", Content = "Berhasil pindah ke Zona x10!", Duration = 2})
+        end
+    end
+})
+
+TabExploit:Button({
+    Title    = "🚀 Teleport ke Zona x100 Strength",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = CFrame.new(91.9, 9.7, -37.5)
+            windui:Notify({Title = "Teleport", Content = "Berhasil pindah ke Zona x100!", Duration = 2})
+        end
+    end
+})
+
 local playerDropdown
 pcall(function()
     playerDropdown = TabExploit:Dropdown({
