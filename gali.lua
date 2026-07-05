@@ -375,7 +375,7 @@ pcall(function()
         Desc     = "Jumlah pukulan per frame. Semakin tinggi semakin cepat (bisa lag).",
         Step     = 1,
         Min      = 1,
-        Max      = 100,
+        Max      = 1000,
         Default  = 5,
         Callback = function(value)
             State.SpeedMultiplier = value
