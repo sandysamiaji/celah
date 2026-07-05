@@ -335,13 +335,46 @@ end
 -- =====================
 local TabExploit = Window:Tab({ Title = "⚠️ Exploits", Icon = "alert-triangle" })
 
+local function getPlayerNames()
+    local names = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(names, p.Name)
+        end
+    end
+    if #names == 0 then table.insert(names, "Tidak ada pemain lain") end
+    return names
+end
+
+local playerDropdown
+pcall(function()
+    playerDropdown = TabExploit:Dropdown({
+        Title    = "🎯 Pilih Target Dupe (Dropdown)",
+        Values   = getPlayerNames(),
+        Callback = function(value)
+            State.DupeTargetName = value
+            logAction("System", "Target Dupe dipilih: " .. tostring(value))
+        end
+    })
+end)
+
+TabExploit:Button({
+    Title    = "🔄 Refresh Daftar Pemain",
+    Callback = function()
+        if playerDropdown and playerDropdown.Refresh then
+            playerDropdown:Refresh(getPlayerNames())
+            windui:Notify({Title = "Refresh", Content = "Daftar pemain diperbarui!", Duration = 2})
+        end
+    end
+})
+
 TabExploit:Input({
-    Title    = "🎯 Target Dupe (Nama Pemain)",
-    Desc     = "Ketik nama temanmu yang akan menerima barang dupe.",
+    Title    = "🎯 Target Manual (Ketik Nama)",
+    Desc     = "Gunakan ini jika nama tidak muncul di Dropdown.",
     Default  = "",
     Callback = function(text)
         State.DupeTargetName = text
-        logAction("System", "Target Dupe di-set: " .. text)
+        logAction("System", "Target manual di-set: " .. text)
     end
 })
 
