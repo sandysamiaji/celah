@@ -5,6 +5,27 @@ local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- =================================================================
+-- PROTEKSI MULTIPLE EXECUTION & CLEANUP (Mencegah Ghost Loop/Log)
+-- =================================================================
+if _G.PandaBoogaHubConnections then
+    for _, conn in ipairs(_G.PandaBoogaHubConnections) do
+        pcall(function() conn:Disconnect() end)
+    end
+end
+_G.PandaBoogaHubConnections = {}
+
+local function track(conn)
+    table.insert(_G.PandaBoogaHubConnections, conn)
+    return conn
+end
+
+-- CLEANUP OLD GUI
+pcall(function()
+    if CoreGui:FindFirstChild("BoogaMultiHub") then CoreGui.BoogaMultiHub:Destroy() end
+    if gethui and gethui():FindFirstChild("BoogaMultiHub") then gethui().BoogaMultiHub:Destroy() end
+end)
+
 -- Konfigurasi Webhook
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
 local logQueue = {}
@@ -247,16 +268,16 @@ for _, obj in ipairs(workspace:GetDescendants()) do
     end
 end
 -- Otomatis tambah/hapus jika ada objek baru yang muncul di game
-workspace.DescendantAdded:Connect(function(obj)
+track(workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
         cachedPrompts[obj] = true
     end
-end)
-workspace.DescendantRemoving:Connect(function(obj)
+end))
+track(workspace.DescendantRemoving:Connect(function(obj)
     if cachedPrompts[obj] then
         cachedPrompts[obj] = nil
     end
-end)
+end))
 
 local function getNearbyPrompts(rootPos)
     local nearby = {}
@@ -342,7 +363,7 @@ end
 --------------------------------------------------------------------------------
 logAction("SYSTEM", "All-In-One Hub berhasil diluncurkan!")
 
-RunService.RenderStepped:Connect(function()
+track(RunService.RenderStepped:Connect(function()
     processLogQueue()
     local currentTime = tick()
     
@@ -421,10 +442,10 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
-end)
+end))
 
 -- 4. NOCLIP (Tembus Tembok)
-RunService.Stepped:Connect(function()
+track(RunService.Stepped:Connect(function()
     if State.Noclip then
         local char = LocalPlayer.Character
         if char then
@@ -497,6 +518,6 @@ local function setupCharacterTracker(char)
 end
 
 if LocalPlayer.Character then setupCharacterTracker(LocalPlayer.Character) end
-LocalPlayer.CharacterAdded:Connect(setupCharacterTracker)
+track(LocalPlayer.CharacterAdded:Connect(setupCharacterTracker))
 
 logAction("SYSTEM", "Universal Hook & Tracker diaktifkan!")
