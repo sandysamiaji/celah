@@ -17,7 +17,8 @@ local State = {
     AutoRespawn = false,
     AntiFallDamage = false,
     Noclip = false,
-    AuraRadius = 25,
+    SpyTrace = false,
+    AuraRadius = 50, -- Dikembalikan ke ukuran normal yang ideal
     AttackCooldown = 0.2
 }
 
@@ -67,13 +68,14 @@ else
 end
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 250, 0, 350)
+frame.Size = UDim2.new(0, 250, 0, 400)
 frame.AnchorPoint = Vector2.new(0.5, 0.5) -- Anchor di tengah
 frame.Position = UDim2.new(0.5, 0, 0.5, 0) -- Posisi persis di center layar
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 2
 frame.BorderColor3 = Color3.fromRGB(60, 60, 60)
 frame.Active = true
+frame.ClipsDescendants = true -- Agar menu tombol di bawahnya terpotong/disembunyikan saat diperkecil
 frame.Parent = gui
 
 local title = Instance.new("TextLabel")
@@ -98,6 +100,27 @@ spacer.BackgroundTransparency = 1
 spacer.LayoutOrder = 1
 spacer.Parent = frame
 title.Parent = spacer
+
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+minimizeBtn.Position = UDim2.new(1, -35, 0.5, -15)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.Text = "-"
+minimizeBtn.Parent = spacer
+
+local isMinimized = false
+minimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        frame.Size = UDim2.new(0, 250, 0, 40)
+        minimizeBtn.Text = "+"
+    else
+        frame.Size = UDim2.new(0, 250, 0, 400)
+        minimizeBtn.Text = "-"
+    end
+end)
 
 local function createToggle(name, text, stateKey, layoutOrder)
     local btn = Instance.new("TextButton")
@@ -130,6 +153,7 @@ createToggle("RewardToggle", "Auto Claim Reward", "AutoClaimReward", 3)
 createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 4)
 createToggle("FallDamageToggle", "Anti Fall Damage", "AntiFallDamage", 5)
 createToggle("NoclipToggle", "Noclip (Tembus Tembok)", "Noclip", 6)
+createToggle("SpyToggle", "Spy Trace (Log Semua)", "SpyTrace", 7)
 
 --------------------------------------------------------------------------------
 -- SISTEM DRAG GUI
@@ -176,6 +200,7 @@ local TARGET_PART_NAMES = {
     ["Hit"]=true, ["Trunk"]=true, ["TreeHingePart"]=true, ["Log"]=true, ["Soil"]=true, ["Bush"]=true,
     ["Wood"]=true, ["Stone"]=true, ["Fiber"]=true, ["Corn"]=true, ["Berries"]=true, ["Well"]=true, 
     ["Spring"]=true, ["Grill"]=true, ["Bed"]=true, ["Door"]=true, ["Forge"]=true, ["Cook Raw Meat"]=true, ["Save"]=true,
+    ["Rock"]=true, ["Iron"]=true, ["Gold"]=true, ["Leaves"]=true, ["Raw Meat"]=true, ["Cooked Meat"]=true, ["Plant"]=true,
     -- Tambahan untuk mendeteksi Hewan (NPC) & Pemain secara universal
     ["Head"]=true, ["Torso"]=true, ["UpperTorso"]=true, ["LowerTorso"]=true, ["HumanoidRootPart"]=true,
     ["Right Arm"]=true, ["Left Arm"]=true, ["Right Leg"]=true, ["Left Leg"]=true,
@@ -222,9 +247,24 @@ local function getTargetsInRadius()
 
     local parts = workspace:GetPartBoundsInRadius(rootPart.Position, State.AuraRadius, params)
     for _, part in ipairs(parts) do
-        -- Kita tidak lagi cuma cek TARGET_PART_NAMES, tapi juga SEMUA yang punya ProximityPrompt 
-        -- atau bisa di-klik untuk menggaransi semuanya ter-collect!
-        if TARGET_PART_NAMES[part.Name] or part:FindFirstChildOfClass("ProximityPrompt") or part:FindFirstChildOfClass("ClickDetector") then
+        local isTarget = false
+        
+        -- Cek nama part atau nama Parent (karena kadang item drop berupa Model bernama "Wood" yang berisi part bernama "Hitbox")
+        if TARGET_PART_NAMES[part.Name] or (part.Parent and TARGET_PART_NAMES[part.Parent.Name]) then
+            isTarget = true
+        end
+        
+        -- Deteksi jika itu adalah Tool yang jatuh (Handle)
+        if part.Name == "Handle" and part.Parent:IsA("Tool") then
+            isTarget = true
+        end
+        
+        -- Cek jika ada prompt interaksi
+        if part:FindFirstChildOfClass("ProximityPrompt") or part:FindFirstChildOfClass("ClickDetector") then
+            isTarget = true
+        end
+
+        if isTarget then
             table.insert(targetParts, part)
         end
     end
@@ -324,21 +364,56 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- 4. ANTI FALL DAMAGE (Hook/Disable)
+-- 5. UNIVERSAL NAMECALL HOOK (Anti Fall Damage & Spy Trace)
 -- Game ini menggunakan ReplicatedStorage.GUIs.Vitals.FallDamageEvent
 local fallDamageEvent = ReplicatedStorage:FindFirstChild("GUIs") 
     and ReplicatedStorage.GUIs:FindFirstChild("Vitals") 
     and ReplicatedStorage.GUIs.Vitals:FindFirstChild("FallDamageEvent")
 
-if fallDamageEvent then
-    -- Mencegah client mengirim damage jatuh ke server dengan menggunakan meta hook
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        local method = getnamecallmethod()
-        if State.AntiFallDamage and method == "FireServer" and self == fallDamageEvent then
-            return -- Block pengiriman damage
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    -- Blokir Fall Damage jika aktif
+    if State.AntiFallDamage and method == "FireServer" and self == fallDamageEvent then
+        return
+    end
+    
+    -- Sistem Trace & Logging
+    if State.SpyTrace and (method == "FireServer" or method == "InvokeServer") then
+        -- Hindari spam dari remote system/posisi
+        if self.Name ~= "Sync" and self.Name ~= "RequestSync" and self.Name ~= "Update" and self.Name ~= "Mouse" and self.Name ~= "Ping" then
+            local argsStr = ""
+            for i, v in ipairs(args) do
+                argsStr = argsStr .. tostring(v) .. (i < #args and ", " or "")
+            end
+            if string.len(argsStr) > 60 then argsStr = string.sub(argsStr, 1, 60) .. "..." end
+            logAction("SPY-REMOTE", string.format("%s | Args: [%s]", self.Name, argsStr))
         end
-        return oldNamecall(self, ...)
+    end
+    
+    return oldNamecall(self, ...)
+end)
+
+-- 6. EQUIP TOOL TRACKER
+local function setupCharacterTracker(char)
+    char.ChildAdded:Connect(function(child)
+        if State.SpyTrace and child:IsA("Tool") then
+            local durStr = "N/A"
+            local durability = child:FindFirstChild("Durability") or child:FindFirstChild("Health") or child:FindFirstChild("Toughness") or child:FindFirstChild("Resource")
+            if durability then
+                durStr = tostring(durability.Value)
+                if durability:IsA("NumberValue") or durability:IsA("IntValue") then
+                    durStr = durStr .. "%" -- Asumsi persen atau angka solid
+                end
+            end
+            logAction("SPY-ITEM", string.format("Memegang: %s | Sisa/Durability: %s", child.Name, durStr))
+        end
     end)
-    logAction("SYSTEM", "Anti Fall Damage siap digunakan (Hooked).")
 end
+
+if LocalPlayer.Character then setupCharacterTracker(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(setupCharacterTracker)
+
+logAction("SYSTEM", "Universal Hook & Tracker diaktifkan!")
