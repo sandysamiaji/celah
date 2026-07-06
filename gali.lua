@@ -506,8 +506,9 @@ TabExploit:Button({
     Callback = function()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
-            char.HumanoidRootPart.CFrame = CFrame.new(91.0, 10.0, -9.6)
-            windui:Notify({Title = "Teleport", Content = "Berhasil pindah ke Zona x10!", Duration = 2})
+            -- Ditinggikan sedikit (Y + 5) agar karakter jatuh dan memicu sistem sentuh (Touch) game
+            char.HumanoidRootPart.CFrame = CFrame.new(91.0, 15.0, -9.6)
+            windui:Notify({Title = "Teleport", Content = "Jatuh ke Zona x10...", Duration = 2})
         end
     end
 })
@@ -517,8 +518,9 @@ TabExploit:Button({
     Callback = function()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
-            char.HumanoidRootPart.CFrame = CFrame.new(91.9, 9.7, -37.5)
-            windui:Notify({Title = "Teleport", Content = "Berhasil pindah ke Zona x100!", Duration = 2})
+            -- Ditinggikan sedikit (Y + 5) agar karakter jatuh dan memicu sistem sentuh (Touch) game
+            char.HumanoidRootPart.CFrame = CFrame.new(91.9, 15.0, -37.5)
+            windui:Notify({Title = "Teleport", Content = "Jatuh ke Zona x100...", Duration = 2})
         end
     end
 })
