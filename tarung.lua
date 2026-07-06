@@ -18,7 +18,7 @@ local State = {
     AntiFallDamage = false,
     Noclip = false,
     SpyTrace = false,
-    AuraRadius = 50, -- Dikembalikan ke ukuran normal yang ideal
+    AuraRadius = 25, -- Dikembalikan ke 25 sesuai permintaan
     AttackCooldown = 0.2
 }
 
@@ -30,25 +30,8 @@ local function logAction(action, text)
 end
 
 local function processLogQueue()
-    if #logQueue > 0 and tick() - lastLogSend >= 5 then
-        local payload = table.concat(logQueue, "\n")
-        logQueue = {}
-        lastLogSend = tick()
-        
-        task.spawn(function()
-            pcall(function()
-                local requestFunc = request or http_request or (http and http.request)
-                if requestFunc then
-                    requestFunc({
-                        Url = WEBHOOK_URL,
-                        Method = "POST",
-                        Headers = { ["Content-Type"] = "application/json" },
-                        Body = HttpService:JSONEncode({ content = payload })
-                    })
-                end
-            end)
-        end)
-    end
+    -- Webhook dinonaktifkan sesuai permintaan agar tidak lag dari HTTP requests
+    logQueue = {}
 end
 
 --------------------------------------------------------------------------------
@@ -211,25 +194,30 @@ local TARGET_PART_NAMES = {
 local lastAttackTime = 0
 local lastLogTime = 0
 
--- Cache untuk semua objek yang bisa diklik (agar tidak berat)
+-- Cache pintar untuk semua objek yang bisa diklik (0 LAG)
 local cachedPrompts = {}
-local lastPromptCacheTime = 0
+
+-- Pencarian awal
+for _, obj in ipairs(workspace:GetDescendants()) do
+    if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
+        cachedPrompts[obj] = true
+    end
+end
+-- Otomatis tambah/hapus jika ada objek baru yang muncul di game
+workspace.DescendantAdded:Connect(function(obj)
+    if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
+        cachedPrompts[obj] = true
+    end
+end)
+workspace.DescendantRemoving:Connect(function(obj)
+    if cachedPrompts[obj] then
+        cachedPrompts[obj] = nil
+    end
+end)
 
 local function getNearbyPrompts(rootPos)
-    local currentTime = tick()
-    -- Perbarui cache setiap 3 detik
-    if currentTime - lastPromptCacheTime > 3 then
-        cachedPrompts = {}
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
-                table.insert(cachedPrompts, obj)
-            end
-        end
-        lastPromptCacheTime = currentTime
-    end
-    
     local nearby = {}
-    for _, obj in ipairs(cachedPrompts) do
+    for obj, _ in pairs(cachedPrompts) do
         if obj.Parent then
             local pos = nil
             local p = obj.Parent
