@@ -18,7 +18,8 @@ local State = {
     AntiFallDamage = false,
     Noclip = false,
     SpyTrace = false,
-    AuraRadius = 25, -- Dikembalikan ke 25 sesuai permintaan
+    InfiniteDrop = false,
+    AuraRadius = 35, -- Dikembalikan ke 25 sesuai permintaan
     AttackCooldown = 0.2
 }
 
@@ -51,7 +52,7 @@ else
 end
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 250, 0, 400)
+frame.Size = UDim2.new(0, 250, 0, 450)
 frame.AnchorPoint = Vector2.new(0.5, 0.5) -- Anchor di tengah
 frame.Position = UDim2.new(0.5, 0, 0.5, 0) -- Posisi persis di center layar
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -101,7 +102,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
         frame.Size = UDim2.new(0, 250, 0, 40)
         minimizeBtn.Text = "+"
     else
-        frame.Size = UDim2.new(0, 250, 0, 400)
+        frame.Size = UDim2.new(0, 250, 0, 450)
         minimizeBtn.Text = "-"
     end
 end)
@@ -133,11 +134,53 @@ local function createToggle(name, text, stateKey, layoutOrder)
 end
 
 createToggle("AuraToggle", "Aura Farm & Collect", "AuraEnabled", 2)
+
+-- INPUT RADIUS
+local radiusContainer = Instance.new("Frame")
+radiusContainer.Size = UDim2.new(0.9, 0, 0, 40)
+radiusContainer.BackgroundTransparency = 1
+radiusContainer.LayoutOrder = 2.5 -- Muncul tepat di bawah AuraToggle
+radiusContainer.Parent = frame
+
+local radiusLabel = Instance.new("TextLabel")
+radiusLabel.Size = UDim2.new(0.55, 0, 1, 0)
+radiusLabel.BackgroundTransparency = 1
+radiusLabel.Text = "Aura Radius:"
+radiusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+radiusLabel.Font = Enum.Font.GothamBold
+radiusLabel.TextSize = 14
+radiusLabel.TextXAlignment = Enum.TextXAlignment.Left
+radiusLabel.Parent = radiusContainer
+
+local radiusInput = Instance.new("TextBox")
+radiusInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+radiusInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+radiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+radiusInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+radiusInput.Font = Enum.Font.Gotham
+radiusInput.TextSize = 14
+radiusInput.Text = tostring(State.AuraRadius)
+radiusInput.PlaceholderText = "Radius"
+radiusInput.Parent = radiusContainer
+
+radiusInput.FocusLost:Connect(function()
+    local num = tonumber(radiusInput.Text)
+    if num then
+        if num < 5 then num = 5 end
+        if num > 1000 then num = 1000 end
+        State.AuraRadius = num
+        radiusInput.Text = tostring(num)
+    else
+        radiusInput.Text = tostring(State.AuraRadius)
+    end
+end)
+
 createToggle("RewardToggle", "Auto Claim Reward", "AutoClaimReward", 3)
 createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 4)
 createToggle("FallDamageToggle", "Anti Fall Damage", "AntiFallDamage", 5)
 createToggle("NoclipToggle", "Noclip (Tembus Tembok)", "Noclip", 6)
 createToggle("SpyToggle", "Spy Trace (Log Semua)", "SpyTrace", 7)
+createToggle("DropToggle", "Infinite Drop (Dup Exploit)", "InfiniteDrop", 8)
 
 --------------------------------------------------------------------------------
 -- SISTEM DRAG GUI
@@ -408,6 +451,16 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     -- Blokir Fall Damage jika aktif
     if State.AntiFallDamage and method == "FireServer" and self == fallDamageEvent then
         return
+    end
+    
+    -- Infinite Drop / Duplication Exploit (Spoofing Drop Amount)
+    if State.InfiniteDrop and method == "FireServer" and (self.Name == "Drop" or self.Name == "DropItem" or self.Name == "DropItems") then
+        for i, v in ipairs(args) do
+            if type(v) == "number" then
+                args[i] = -999999 -- Underflow hack: Coba tipu server bahwa kita nge-drop minus
+            end
+        end
+        return oldNamecall(self, unpack(args))
     end
     
     -- Sistem Trace & Logging
