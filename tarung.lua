@@ -104,9 +104,10 @@ title.Parent = spacer
 local minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
 minimizeBtn.Position = UDim2.new(1, -35, 0.5, -15)
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60) -- Diubah jadi MERAH terang agar terlihat
 minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.Font = Enum.Font.GothamBlack
+minimizeBtn.TextSize = 20
 minimizeBtn.Text = "-"
 minimizeBtn.Parent = spacer
 
@@ -210,6 +211,44 @@ local TARGET_PART_NAMES = {
 local lastAttackTime = 0
 local lastLogTime = 0
 
+-- Cache untuk semua objek yang bisa diklik (agar tidak berat)
+local cachedPrompts = {}
+local lastPromptCacheTime = 0
+
+local function getNearbyPrompts(rootPos)
+    local currentTime = tick()
+    -- Perbarui cache setiap 3 detik
+    if currentTime - lastPromptCacheTime > 3 then
+        cachedPrompts = {}
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
+                table.insert(cachedPrompts, obj)
+            end
+        end
+        lastPromptCacheTime = currentTime
+    end
+    
+    local nearby = {}
+    for _, obj in ipairs(cachedPrompts) do
+        if obj.Parent then
+            local pos = nil
+            local p = obj.Parent
+            if p:IsA("BasePart") then
+                pos = p.Position
+            elseif p:IsA("Model") and p.PrimaryPart then
+                pos = p.PrimaryPart.Position
+            elseif p:IsA("Attachment") then
+                pos = p.WorldPosition
+            end
+            
+            if pos and (pos - rootPos).Magnitude <= State.AuraRadius then
+                table.insert(nearby, obj)
+            end
+        end
+    end
+    return nearby
+end
+
 local function getEquippedWeapon()
     if not LocalPlayer.Character then return nil end
     local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
@@ -258,11 +297,6 @@ local function getTargetsInRadius()
         if part.Name == "Handle" and part.Parent:IsA("Tool") then
             isTarget = true
         end
-        
-        -- Cek jika ada prompt interaksi
-        if part:FindFirstChildOfClass("ProximityPrompt") or part:FindFirstChildOfClass("ClickDetector") then
-            isTarget = true
-        end
 
         if isTarget then
             table.insert(targetParts, part)
@@ -303,12 +337,6 @@ RunService.RenderStepped:Connect(function()
                 firetouchinterest(tPart, rootPart, 1)
             end
             
-            -- Trigger Prompt
-            if fireproximityprompt then
-                local prompt = tPart:FindFirstChildOfClass("ProximityPrompt")
-                if prompt then fireproximityprompt(prompt) end
-            end
-            
             -- Trigger Attack Remote bawaan Tool jika ada
             if weapon then
                 local atkEvt = weapon:FindFirstChild("AttackEvent")
@@ -316,6 +344,20 @@ RunService.RenderStepped:Connect(function()
             end
             
             hitCount = hitCount + 1
+        end
+        
+        -- Eksekusi SEMUA ProximityPrompt & ClickDetector di radius
+        if rootPart then
+            local nearbyPrompts = getNearbyPrompts(rootPart.Position)
+            for _, promptObj in ipairs(nearbyPrompts) do
+                if promptObj:IsA("ProximityPrompt") and fireproximityprompt then
+                    fireproximityprompt(promptObj)
+                    hitCount = hitCount + 1
+                elseif promptObj:IsA("ClickDetector") and fireclickdetector then
+                    fireclickdetector(promptObj)
+                    hitCount = hitCount + 1
+                end
+            end
         end
         
         if hitCount > 0 and (currentTime - lastLogTime > 4) then
