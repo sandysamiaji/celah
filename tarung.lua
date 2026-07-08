@@ -573,7 +573,7 @@ track(RunService.Stepped:Connect(function()
             end
         end
     end
-end)
+end))
 
 -- 5. UNIVERSAL NAMECALL HOOK (Anti Fall Damage & Spy Trace)
 -- Game ini menggunakan ReplicatedStorage.GUIs.Vitals.FallDamageEvent
