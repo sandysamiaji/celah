@@ -42,6 +42,7 @@ local State = {
     InfiniteDrop = false,
     Invisible = false,
     WebhookLogs = false, -- Default mati
+    CopyRadius = 500,
     AuraRadius = 35, -- Dikembalikan ke 25 sesuai permintaan
     AttackCooldown = 0.2
 }
@@ -472,15 +473,39 @@ end)
 -- BUILDER TAB
 local SavedBase = {}
 
+local builderRadiusInput = Instance.new("TextBox")
+builderRadiusInput.Size = UDim2.new(0.9, 0, 0, 30)
+builderRadiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+builderRadiusInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+builderRadiusInput.Font = Enum.Font.Gotham
+builderRadiusInput.TextSize = 13
+builderRadiusInput.Text = tostring(State.CopyRadius)
+builderRadiusInput.PlaceholderText = "Radius (Studs)"
+builderRadiusInput.LayoutOrder = 1
+builderRadiusInput.Parent = builderTab
+
 local copyBaseBtn = Instance.new("TextButton")
 copyBaseBtn.Size = UDim2.new(0.9, 0, 0, 35)
 copyBaseBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
 copyBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 copyBaseBtn.Font = Enum.Font.GothamBold
 copyBaseBtn.TextSize = 13
-copyBaseBtn.Text = "Copy Base (Radius 500)"
-copyBaseBtn.LayoutOrder = 1
+copyBaseBtn.Text = "Copy Base (Radius " .. State.CopyRadius .. ")"
+copyBaseBtn.LayoutOrder = 2
 copyBaseBtn.Parent = builderTab
+
+builderRadiusInput.FocusLost:Connect(function()
+    local num = tonumber(builderRadiusInput.Text)
+    if num then
+        if num < 10 then num = 10 end
+        if num > 5000 then num = 5000 end
+        State.CopyRadius = num
+        builderRadiusInput.Text = tostring(num)
+        copyBaseBtn.Text = "Copy Base (Radius " .. num .. ")"
+    else
+        builderRadiusInput.Text = tostring(State.CopyRadius)
+    end
+end)
 
 local pasteBaseBtn = Instance.new("TextButton")
 pasteBaseBtn.Size = UDim2.new(0.9, 0, 0, 35)
@@ -489,7 +514,7 @@ pasteBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 pasteBaseBtn.Font = Enum.Font.GothamBold
 pasteBaseBtn.TextSize = 13
 pasteBaseBtn.Text = "Paste Base (Auto Build)"
-pasteBaseBtn.LayoutOrder = 2
+pasteBaseBtn.LayoutOrder = 3
 pasteBaseBtn.Parent = builderTab
 
 local buildStatusLabel = Instance.new("TextLabel")
@@ -499,7 +524,7 @@ buildStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 buildStatusLabel.Font = Enum.Font.Gotham
 buildStatusLabel.TextSize = 11
 buildStatusLabel.Text = "0 Bangunan Tersimpan"
-buildStatusLabel.LayoutOrder = 3
+buildStatusLabel.LayoutOrder = 4
 buildStatusLabel.Parent = builderTab
 
 copyBaseBtn.MouseButton1Click:Connect(function()
@@ -517,7 +542,7 @@ copyBaseBtn.MouseButton1Click:Connect(function()
             local primary = obj.PrimaryPart or obj:FindFirstChild("Hitbox") or obj:FindFirstChildOfClass("BasePart")
             if primary then
                 local dist = (primary.Position - originCFrame.Position).Magnitude
-                if dist <= 500 then
+                if dist <= State.CopyRadius then
                     -- Simpan tipe bangunan (berdasarkan nama Model) dan posisi relatif
                     local relCFrame = originCFrame:ToObjectSpace(primary.CFrame)
                     table.insert(SavedBase, {
@@ -845,13 +870,14 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     
     -- Sistem Trace & Logging
     if State.SpyTrace and (method == "FireServer" or method == "InvokeServer") then
-        -- Hindari spam dari remote system/posisi
         if self.Name ~= "Sync" and self.Name ~= "RequestSync" and self.Name ~= "Update" and self.Name ~= "Mouse" and self.Name ~= "Ping" then
             local argsStr = ""
             for i, v in ipairs(args) do
-                argsStr = argsStr .. tostring(v) .. (i < #args and ", " or "")
+                -- Tangkap tipe data asli (berguna untuk melihat CFrame/Vector3/String)
+                local vStr = type(v) == "userdata" and typeof(v) .. "(" .. tostring(v) .. ")" or tostring(v)
+                argsStr = argsStr .. vStr .. (i < #args and ", " or "")
             end
-            if string.len(argsStr) > 60 then argsStr = string.sub(argsStr, 1, 60) .. "..." end
+            if string.len(argsStr) > 500 then argsStr = string.sub(argsStr, 1, 500) .. "..." end
             logAction("SPY-REMOTE", string.format("%s | Args: [%s]", self.Name, argsStr))
         end
     end
