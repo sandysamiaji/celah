@@ -564,8 +564,47 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
         return
     end
     
-    -- Membutuhkan Log Spy Trace dari User!
-    logAction("BUILDER", "MAAF! Sistem Paste belum aktif. Tolong berikan log Spy Trace saat kamu memasang bangunan!")
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local originCFrame = root.CFrame
+    
+    -- Cari remote PlaceBuild sekali saja
+    local placeEvent
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+        if desc.Name == "PlaceBuild" and (desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction")) then
+            placeEvent = desc
+            break
+        end
+    end
+    
+    if not placeEvent then
+        logAction("BUILDER", "Gagal! Remote 'PlaceBuild' tidak ditemukan!")
+        return
+    end
+    
+    logAction("BUILDER", "Memulai proses Paste " .. #SavedBase .. " bangunan...")
+    
+    -- Mulai proses Paste di background agar tidak hang
+    coroutine.wrap(function()
+        local count = 0
+        for _, data in ipairs(SavedBase) do
+            local targetCFrame = originCFrame * data.RelativeCFrame
+            
+            if placeEvent:IsA("RemoteEvent") then
+                placeEvent:FireServer(data.Name, targetCFrame)
+            else
+                placeEvent:InvokeServer(data.Name, targetCFrame)
+            end
+            
+            count = count + 1
+            if count % 3 == 0 then
+                wait(0.1) -- Jeda setiap 3 bangunan agar tidak terdeteksi spam/rate limit
+            end
+        end
+        logAction("BUILDER", "Berhasil Paste " .. count .. " bangunan!")
+    end)()
 end)
 
 --------------------------------------------------------------------------------
