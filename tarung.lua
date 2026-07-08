@@ -64,13 +64,8 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "BoogaMultiHub"
 gui.ResetOnSpawn = false
 
-local hui
-local success = pcall(function()
-    hui = gethui and gethui()
-end)
-
-if success and hui then
-    gui.Parent = hui
+if gethui then
+    gui.Parent = gethui()
 elseif syn and syn.protect_gui then
     syn.protect_gui(gui)
     gui.Parent = CoreGui
@@ -79,7 +74,7 @@ else
 end
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 250, 0, 380)
+frame.Size = UDim2.new(0, 330, 0, 380)
 frame.AnchorPoint = Vector2.new(0.5, 0) -- Anchor di atas tengah
 frame.Position = UDim2.new(0.5, 0, 0.5, -190) -- Posisi agar tetap center di awal (380 / 2)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -124,23 +119,34 @@ minimizeBtn.Parent = spacer
 
 local isMinimized = false
 
+local bodyFrame = Instance.new("Frame")
+bodyFrame.Size = UDim2.new(1, 0, 1, -45)
+bodyFrame.BackgroundTransparency = 1
+bodyFrame.LayoutOrder = 2
+bodyFrame.Parent = frame
+
+local bodyLayout = Instance.new("UIListLayout")
+bodyLayout.Parent = bodyFrame
+bodyLayout.FillDirection = Enum.FillDirection.Horizontal
+bodyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
 local navBar = Instance.new("Frame")
-navBar.Size = UDim2.new(1, 0, 0, 35)
+navBar.Size = UDim2.new(0, 75, 1, 0)
 navBar.BackgroundTransparency = 1
-navBar.LayoutOrder = 2
-navBar.Parent = frame
+navBar.LayoutOrder = 1
+navBar.Parent = bodyFrame
 
 local navLayout = Instance.new("UIListLayout")
 navLayout.Parent = navBar
-navLayout.FillDirection = Enum.FillDirection.Horizontal
+navLayout.FillDirection = Enum.FillDirection.Vertical
 navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 navLayout.Padding = UDim.new(0, 5)
 
 local contentContainer = Instance.new("Frame")
-contentContainer.Size = UDim2.new(1, 0, 1, -85)
+contentContainer.Size = UDim2.new(1, -75, 1, 0)
 contentContainer.BackgroundTransparency = 1
-contentContainer.LayoutOrder = 3
-contentContainer.Parent = frame
+contentContainer.LayoutOrder = 2
+contentContainer.Parent = bodyFrame
 
 local farmTab = Instance.new("Frame")
 farmTab.Size = UDim2.new(1, 0, 1, 0)
@@ -200,21 +206,20 @@ end
 minimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        frame.Size = UDim2.new(0, 250, 0, 40)
+        frame.Size = UDim2.new(0, 330, 0, 40)
         minimizeBtn.Text = "+"
-        contentContainer.Visible = false
-        navBar.Visible = false
+        bodyFrame.Visible = false
     else
-        frame.Size = UDim2.new(0, 250, 0, 380)
+        frame.Size = UDim2.new(0, 330, 0, 380)
         minimizeBtn.Text = "-"
-        contentContainer.Visible = true
-        navBar.Visible = true
+        bodyFrame.Visible = true
     end
 end)
 
 local function createNavBtn(text, tabToOpen)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 75, 1, 0)
+    btn.Size = UDim2.new(1, -4, 0, 35) -- Menyisakan sedikit margin
+
     btn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
@@ -562,7 +567,7 @@ local lastLogTime = 0
 local cachedPrompts = {}
 
 -- Pencarian awal dilakukan di background agar tidak membuat game freeze/crash saat script di-load
-task.spawn(function()
+coroutine.wrap(function()
     local count = 0
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
@@ -570,10 +575,10 @@ task.spawn(function()
         end
         count = count + 1
         if count % 1000 == 0 then
-            task.wait() -- Mencegah script timeout pada map Booga Booga yang sangat besar
+            wait() -- Mencegah script timeout pada map Booga Booga yang sangat besar
         end
     end
-end)
+end)()
 -- Otomatis tambah/hapus jika ada objek baru yang muncul di game
 track(workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
