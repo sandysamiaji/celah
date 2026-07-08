@@ -631,6 +631,11 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
             -- Posisi aman: 4 studs di belakang dan 2 studs di atas barang yang mau di-paste
             local targetPos = targetCFrame * CFrame.new(0, 2, 4) 
             
+            -- ANTI-VOID: Pastikan karakter tidak pernah ditarik ke bawah tanah tempat awal dia berdiri!
+            if targetPos.Y < baseOrigin.Position.Y then
+                targetPos = targetPos + Vector3.new(0, (baseOrigin.Position.Y - targetPos.Y) + 3, 0)
+            end
+            
             -- Gunakan Tween agar karakter terlihat terbang/berjalan mulus (lebih aman dari anti-cheat teleport)
             local dist = (root.Position - targetPos.Position).Magnitude
             local tweenTime = dist / 150 -- Kecepatan terbang 150 studs per detik
