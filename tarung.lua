@@ -571,6 +571,7 @@ copyBaseBtn.MouseButton1Click:Connect(function()
                         Name = obj.Name,
                         RelativeCFrame = relCFrame
                     })
+                    end
                 end
             end
         end
