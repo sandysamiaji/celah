@@ -636,23 +636,24 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
     
     -- Mulai proses Paste di background agar tidak hang
     coroutine.wrap(function()
-        local count = #SavedBase
-        -- Elevasi 35 studs ke udara (di atas kepala karakter) memanfaatkan radius wajar game tanpa bergerak
-        local baseOrigin = originCFrame * CFrame.new(0, 35, 0) 
+        local count = 0
+        -- Elevasi 20 studs ke udara (di atas kepala karakter) memanfaatkan radius wajar game tanpa bergerak
+        local baseOrigin = originCFrame * CFrame.new(0, 20, 0) 
         
         for _, data in ipairs(SavedBase) do
-            coroutine.wrap(function()
-                local targetCFrame = baseOrigin * data.RelativeCFrame
-                
-                if placeEvent:IsA("RemoteEvent") then
-                    placeEvent:FireServer(data.Name, targetCFrame)
-                else
-                    placeEvent:InvokeServer(data.Name, targetCFrame)
-                end
-            end)()
+            local targetCFrame = baseOrigin * data.RelativeCFrame
+            
+            if placeEvent:IsA("RemoteEvent") then
+                placeEvent:FireServer(data.Name, targetCFrame)
+            else
+                placeEvent:InvokeServer(data.Name, targetCFrame)
+            end
+            
+            count = count + 1
+            wait(0.3) -- Jeda kecepatan naruh barang agar tidak terdeteksi rate limit server
         end
         
-        logAction("BUILDER", "Berhasil menembakkan " .. count .. " bangunan secara BERSAMAAN (0 Detik)!")
+        logAction("BUILDER", "Berhasil membangun Skybase berisi " .. count .. " bangunan tepat di atas kepala!")
     end)()
 end)
 
