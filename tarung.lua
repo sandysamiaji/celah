@@ -73,9 +73,9 @@ else
 end
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 250, 0, 450)
-frame.AnchorPoint = Vector2.new(0.5, 0.5) -- Anchor di tengah
-frame.Position = UDim2.new(0.5, 0, 0.5, 0) -- Posisi persis di center layar
+frame.Size = UDim2.new(0, 250, 0, 520)
+frame.AnchorPoint = Vector2.new(0.5, 0) -- Anchor di atas tengah
+frame.Position = UDim2.new(0.5, 0, 0.5, -260) -- Posisi agar tetap center di awal
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 2
 frame.BorderColor3 = Color3.fromRGB(60, 60, 60)
@@ -123,7 +123,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
         frame.Size = UDim2.new(0, 250, 0, 40)
         minimizeBtn.Text = "+"
     else
-        frame.Size = UDim2.new(0, 250, 0, 450)
+        frame.Size = UDim2.new(0, 250, 0, 520)
         minimizeBtn.Text = "-"
     end
 end)
@@ -202,6 +202,123 @@ createToggle("FallDamageToggle", "Anti Fall Damage", "AntiFallDamage", 5)
 createToggle("NoclipToggle", "Noclip (Tembus Tembok)", "Noclip", 6)
 createToggle("SpyToggle", "Spy Trace (Log Semua)", "SpyTrace", 7)
 createToggle("DropToggle", "Infinite Drop (Dup Exploit)", "InfiniteDrop", 8)
+
+--------------------------------------------------------------------------------
+-- TELEPORT PEMAIN
+--------------------------------------------------------------------------------
+local tpContainer = Instance.new("Frame")
+tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
+tpContainer.BackgroundTransparency = 1
+tpContainer.LayoutOrder = 9
+tpContainer.Parent = frame
+
+local refreshBtn = Instance.new("TextButton")
+refreshBtn.Size = UDim2.new(0.48, 0, 0, 30)
+refreshBtn.Position = UDim2.new(0, 0, 0, 0)
+refreshBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+refreshBtn.Font = Enum.Font.GothamBold
+refreshBtn.TextSize = 12
+refreshBtn.Text = "Refresh Player"
+refreshBtn.Parent = tpContainer
+
+local tpBtn = Instance.new("TextButton")
+tpBtn.Size = UDim2.new(0.48, 0, 0, 30)
+tpBtn.Position = UDim2.new(0.52, 0, 0, 0)
+tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpBtn.Font = Enum.Font.GothamBold
+tpBtn.TextSize = 12
+tpBtn.Text = "Teleport"
+tpBtn.Parent = tpContainer
+
+local playerDropdown = Instance.new("TextButton")
+playerDropdown.Size = UDim2.new(1, 0, 0, 30)
+playerDropdown.Position = UDim2.new(0, 0, 0, 35)
+playerDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+playerDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+playerDropdown.Font = Enum.Font.Gotham
+playerDropdown.TextSize = 12
+playerDropdown.Text = "Pilih Pemain..."
+playerDropdown.Parent = tpContainer
+
+local playerList = Instance.new("ScrollingFrame")
+playerList.Size = UDim2.new(1, 0, 0, 100)
+playerList.Position = UDim2.new(0, 0, 0, 68)
+playerList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+playerList.ScrollBarThickness = 4
+playerList.Visible = false
+playerList.ZIndex = 10
+playerList.Parent = tpContainer
+
+local listLayoutTP = Instance.new("UIListLayout")
+listLayoutTP.Parent = playerList
+listLayoutTP.SortOrder = Enum.SortOrder.Name
+
+local selectedPlayer = nil
+
+local function updatePlayerList()
+    for _, child in ipairs(playerList:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    local ySize = 0
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 0, 25)
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 12
+            btn.Text = player.Name
+            btn.Name = player.Name
+            btn.ZIndex = 11
+            btn.Parent = playerList
+            
+            btn.MouseButton1Click:Connect(function()
+                selectedPlayer = player
+                playerDropdown.Text = player.Name
+                playerList.Visible = false
+                tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
+            end)
+            ySize = ySize + 25
+        end
+    end
+    playerList.CanvasSize = UDim2.new(0, 0, 0, ySize)
+end
+
+refreshBtn.MouseButton1Click:Connect(function()
+    updatePlayerList()
+    playerDropdown.Text = "Pilih Pemain..."
+    selectedPlayer = nil
+    if playerList.Visible then
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 170)
+    end
+end)
+
+playerDropdown.MouseButton1Click:Connect(function()
+    playerList.Visible = not playerList.Visible
+    if playerList.Visible then
+        updatePlayerList()
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 170)
+    else
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
+    end
+end)
+
+tpBtn.MouseButton1Click:Connect(function()
+    if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local myChar = LocalPlayer.Character
+        if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+            -- Teleport sedikit di belakang/samping agar tidak nyangkut
+            myChar.HumanoidRootPart.CFrame = selectedPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+            logAction("TELEPORT", "Berhasil teleport ke " .. selectedPlayer.Name)
+        end
+    end
+end)
 
 --------------------------------------------------------------------------------
 -- SISTEM DRAG GUI
