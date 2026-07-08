@@ -558,8 +558,8 @@ copyBaseBtn.MouseButton1Click:Connect(function()
     if not root then return end
 
     SavedBase = {}
-    -- Buang rotasi karakter agar bangunan tidak melenceng/miring mengikuti arah pandangan
-    local originCFrame = CFrame.new(root.Position)
+    -- Mengambil posisi murni karakter (XYZ)
+    local originPos = root.Position
 
     -- Cari bangunan di sekitar
     for _, obj in ipairs(workspace:GetDescendants()) do
@@ -589,14 +589,16 @@ copyBaseBtn.MouseButton1Click:Connect(function()
             if isBuilding then
                 local primary = obj.PrimaryPart or obj:FindFirstChild("Hitbox") or obj:FindFirstChildOfClass("BasePart")
                 if primary then
-                    local dist = (primary.Position - originCFrame.Position).Magnitude
+                    local dist = (primary.Position - originPos).Magnitude
                     if dist <= State.CopyRadius then
-                    -- Simpan tipe bangunan dan posisi relatif (berdasarkan dunia murni, bukan rotasi karakter)
-                    local relCFrame = originCFrame:ToObjectSpace(primary.CFrame)
-                    table.insert(SavedBase, {
-                        Name = obj.Name,
-                        RelativeCFrame = relCFrame
-                    })
+                        -- Simpan jarak (Offset) dari karakter dan rotasi murni bangunannya
+                        local offset = primary.Position - originPos
+                        local rotCFrame = primary.CFrame - primary.Position
+                        table.insert(SavedBase, {
+                            Name = obj.Name,
+                            Offset = offset,
+                            Rotation = rotCFrame
+                        })
                     end
                 end
             end
@@ -617,8 +619,8 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
-    -- Membuang data kemiringan/rotasi karakter agar spawn sejajar lurus dengan dunia
-    local originCFrame = CFrame.new(root.Position)
+    -- Mengambil titik posisi karakter saat tombol paste ditekan
+    local currentPos = root.Position
     
     -- Cari remote PlaceBuild sekali saja
     local placeEvent
@@ -647,8 +649,6 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
     -- Mulai proses Paste di background agar tidak hang
     coroutine.wrap(function()
         local count = 0
-        -- Elevasi 15 studs ke udara. Karena originCFrame sejajar dunia murni, offset sumbu Y ini akan lurus ke atas.
-        local baseOrigin = originCFrame * CFrame.new(0, 15, 0) 
         
         for _, data in ipairs(SavedBase) do
             -- TRIBE HOPPING: Reset Limit sebelum menyentuh 1200
@@ -661,7 +661,9 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
                 logAction("BUILDER", "Limit berhasil direset! Melanjutkan pembangunan...")
             end
 
-            local targetCFrame = baseOrigin * data.RelativeCFrame
+            -- Logika Murni: (Posisi Karakter Saat Ini) + (Naik 20 Studs) + (Jarak Bangunan Waktu Dicopy)
+            local targetPos = currentPos + Vector3.new(0, 20, 0) + data.Offset
+            local targetCFrame = CFrame.new(targetPos) * data.Rotation
             
             if placeEvent:IsA("RemoteEvent") then
                 placeEvent:FireServer(data.Name, targetCFrame)
