@@ -558,7 +558,8 @@ copyBaseBtn.MouseButton1Click:Connect(function()
     if not root then return end
 
     SavedBase = {}
-    local originCFrame = root.CFrame
+    -- Buang rotasi karakter agar bangunan tidak melenceng/miring mengikuti arah pandangan
+    local originCFrame = CFrame.new(root.Position)
 
     -- Cari bangunan di sekitar
     for _, obj in ipairs(workspace:GetDescendants()) do
@@ -616,7 +617,8 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
-    local originCFrame = root.CFrame
+    -- Membuang data kemiringan/rotasi karakter agar spawn sejajar lurus dengan dunia
+    local originCFrame = CFrame.new(root.Position)
     
     -- Cari remote PlaceBuild sekali saja
     local placeEvent
@@ -634,13 +636,31 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
     
     logAction("BUILDER", "Memulai proses Paste Skybase " .. #SavedBase .. " bangunan...")
     
+    local tribeEvents = ReplicatedStorage:FindFirstChild("TribeEvents")
+    local leaveTribe = tribeEvents and tribeEvents:FindFirstChild("LeaveTribe")
+    local createTribe = tribeEvents and tribeEvents:FindFirstChild("CreateTribe")
+    
+    if leaveTribe and createTribe then
+        logAction("BUILDER", "[INFO] Fitur Auto Tribe-Hop Ditemukan & Aktif!")
+    end
+
     -- Mulai proses Paste di background agar tidak hang
     coroutine.wrap(function()
         local count = 0
-        -- Elevasi 20 studs ke udara (di atas kepala karakter) memanfaatkan radius wajar game tanpa bergerak
-        local baseOrigin = originCFrame * CFrame.new(0, 20, 0) 
+        -- Elevasi diturunkan jadi 15 studs agar pas presisi di atas ubun-ubun
+        local baseOrigin = originCFrame * CFrame.new(0, 15, 0) 
         
         for _, data in ipairs(SavedBase) do
+            -- TRIBE HOPPING: Reset Limit sebelum menyentuh 1200
+            if count > 0 and count % 1155 == 0 and leaveTribe and createTribe then
+                logAction("BUILDER", "Limit hampir penuh (1150). Mengeksekusi Auto Tribe-Hop...")
+                leaveTribe:FireServer()
+                wait(0.5)
+                createTribe:FireServer("InfinityBase" .. tostring(math.random(100,999)))
+                wait(0.5)
+                logAction("BUILDER", "Limit berhasil direset! Melanjutkan pembangunan...")
+            end
+
             local targetCFrame = baseOrigin * data.RelativeCFrame
             
             if placeEvent:IsA("RemoteEvent") then
@@ -653,7 +673,7 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
             wait(0.3) -- Jeda kecepatan naruh barang agar tidak terdeteksi rate limit server
         end
         
-        logAction("BUILDER", "Berhasil membangun Skybase berisi " .. count .. " bangunan tepat di atas kepala!")
+        logAction("BUILDER", "Berhasil membangun Skybase berisi " .. count .. " bangunan (Limit By-passed)!")
     end)()
 end)
 
