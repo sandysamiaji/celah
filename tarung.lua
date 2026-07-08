@@ -537,12 +537,34 @@ copyBaseBtn.MouseButton1Click:Connect(function()
 
     -- Cari bangunan di sekitar
     for _, obj in ipairs(workspace:GetDescendants()) do
-        -- Filter kasar: biasanya bangunan punya Health atau Owner
-        if obj:IsA("Model") and (obj:FindFirstChild("Owner") or obj:FindFirstChild("Health")) then
-            local primary = obj.PrimaryPart or obj:FindFirstChild("Hitbox") or obj:FindFirstChildOfClass("BasePart")
-            if primary then
-                local dist = (primary.Position - originCFrame.Position).Magnitude
-                if dist <= State.CopyRadius then
+        if obj:IsA("Model") then
+            local isBuilding = false
+            
+            -- Indikator kuat: Jika punya Owner/Creator
+            if obj:FindFirstChild("Owner") or obj:FindFirstChild("Creator") or obj:FindFirstChild("Placer") then
+                isBuilding = true
+            end
+            
+            -- Filter berdasarkan kata kunci nama (Wall, Foundation, dll)
+            local n = obj.Name:lower()
+            if not isBuilding then
+                if (string.find(n, "wall") or string.find(n, "foundation") or string.find(n, "stairs") or 
+                    string.find(n, "door") or string.find(n, "window") or string.find(n, "bed") or 
+                    string.find(n, "fire") or string.find(n, "well") or string.find(n, "torch") or 
+                    string.find(n, "chest") or string.find(n, "gate") or string.find(n, "bridge")) then
+                    
+                    -- Pastikan BUKAN sumber daya alam
+                    if not string.find(n, "tree") and not string.find(n, "rock") and not string.find(n, "ore") and not string.find(n, "bush") then
+                        isBuilding = true
+                    end
+                end
+            end
+
+            if isBuilding then
+                local primary = obj.PrimaryPart or obj:FindFirstChild("Hitbox") or obj:FindFirstChildOfClass("BasePart")
+                if primary then
+                    local dist = (primary.Position - originCFrame.Position).Magnitude
+                    if dist <= State.CopyRadius then
                     -- Simpan tipe bangunan (berdasarkan nama Model) dan posisi relatif
                     local relCFrame = originCFrame:ToObjectSpace(primary.CFrame)
                     table.insert(SavedBase, {
@@ -589,8 +611,24 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
     -- Mulai proses Paste di background agar tidak hang
     coroutine.wrap(function()
         local count = 0
+        local baseOrigin = originCFrame -- Simpan titik awal karakter sebagai titik pusat Blueprint
+        
         for _, data in ipairs(SavedBase) do
-            local targetCFrame = originCFrame * data.RelativeCFrame
+            local targetCFrame = baseOrigin * data.RelativeCFrame
+            local TweenService = game:GetService("TweenService")
+            
+            -- Posisi aman: 4 studs di belakang dan 2 studs di atas barang yang mau di-paste
+            local targetPos = targetCFrame * CFrame.new(0, 2, 4) 
+            
+            -- Gunakan Tween agar karakter terlihat terbang/berjalan mulus (lebih aman dari anti-cheat teleport)
+            local dist = (root.Position - targetPos.Position).Magnitude
+            local tweenTime = dist / 150 -- Kecepatan terbang 150 studs per detik
+            if tweenTime < 0.05 then tweenTime = 0.05 end
+            
+            local tween = TweenService:Create(root, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetPos})
+            tween:Play()
+            tween.Completed:Wait() -- Tunggu sampai karakter sampai di lokasi
+            wait(0.05) -- Ekstra jeda sedikit untuk sinkronisasi server
             
             if placeEvent:IsA("RemoteEvent") then
                 placeEvent:FireServer(data.Name, targetCFrame)
@@ -600,9 +638,12 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
             
             count = count + 1
             if count % 3 == 0 then
-                wait(0.1) -- Jeda setiap 3 bangunan agar tidak terdeteksi spam/rate limit
+                wait(0.1) -- Jeda agar tidak terkena Rate Limit
             end
         end
+        
+        -- Kembalikan pemain ke posisi awal setelah selesai
+        root.CFrame = baseOrigin
         logAction("BUILDER", "Berhasil Paste " .. count .. " bangunan!")
     end)()
 end)
