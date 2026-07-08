@@ -659,6 +659,67 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
     end)()
 end)
 
+-- TOMBOL DUPE LIMIT (GLITCH SERVER)
+local dupeLimitBtn = Instance.new("TextButton")
+dupeLimitBtn.Size = UDim2.new(0.9, 0, 0, 35)
+dupeLimitBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+dupeLimitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+dupeLimitBtn.Font = Enum.Font.GothamBold
+dupeLimitBtn.TextSize = 13
+dupeLimitBtn.Text = "GLITCH / DUPE LIMIT (-3000)"
+dupeLimitBtn.LayoutOrder = 5
+dupeLimitBtn.Parent = builderTab
+
+dupeLimitBtn.MouseButton1Click:Connect(function()
+    local deleteEvent
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+        if desc.Name == "DeleteBuild" and (desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction")) then
+            deleteEvent = desc
+            break
+        end
+    end
+    
+    if not deleteEvent then
+        logAction("BUILDER", "Gagal! Remote 'DeleteBuild' tidak ditemukan!")
+        return
+    end
+
+    -- Cari SEMBARANG bangunan yang ada di map untuk dikorbankan sebagai tumbal spam
+    local tumbalObj = nil
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and (obj.Name == "Wood Wall" or obj.Name == "Stone Wall" or obj:FindFirstChild("Owner") or obj:FindFirstChild("Creator")) then
+            tumbalObj = obj
+            break
+        end
+    end
+
+    if not tumbalObj then
+        logAction("BUILDER", "Gagal! Kamu butuh minimal 1 bangunan (Wood Wall) di tanah sebagai tumbal.")
+        return
+    end
+
+    logAction("BUILDER", "Mengeksekusi EXTREME SPAM pada DeleteBuild (Menembus Limit)...")
+    
+    -- Ambil jumlah spam: 10000 atau sesuai dengan jumlah bangunan yang akan kita paste (agar pas angkanya terhapus 0)
+    local spamCount = 10000
+    if #SavedBase > 0 then
+        spamCount = #SavedBase + 10 -- Lebih sedikit buat jaga-jaga
+    end
+    
+    -- Eksekusi bom ratusan sinyal bersamaan TANPA JEDA (Race Condition)
+    for i = 1, spamCount do
+        coroutine.wrap(function()
+            if deleteEvent:IsA("RemoteEvent") then
+                deleteEvent:FireServer(tumbalObj)
+            else
+                deleteEvent:InvokeServer(tumbalObj)
+            end
+        end)()
+    end
+    
+    logAction("BUILDER", "Serangan " .. spamCount .. " request selesai! Jika beruntung, Limitmu sekarang Minus/Infinite!")
+end)
+
 --------------------------------------------------------------------------------
 -- SISTEM DRAG GUI
 --------------------------------------------------------------------------------
