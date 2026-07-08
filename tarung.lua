@@ -358,13 +358,13 @@ createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 6, cheatsTab)
 
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
-tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
+tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
 tpContainer.BackgroundTransparency = 1
 tpContainer.LayoutOrder = 1
 tpContainer.Parent = teleportTab
 
 local refreshBtn = Instance.new("TextButton")
-refreshBtn.Size = UDim2.new(1, 0, 0, 30)
+refreshBtn.Size = UDim2.new(0.48, 0, 0, 30)
 refreshBtn.Position = UDim2.new(0, 0, 0, 0)
 refreshBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
 refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -373,29 +373,19 @@ refreshBtn.TextSize = 12
 refreshBtn.Text = "Refresh Player"
 refreshBtn.Parent = tpContainer
 
-local tpInstanBtn = Instance.new("TextButton")
-tpInstanBtn.Size = UDim2.new(0.48, 0, 0, 30)
-tpInstanBtn.Position = UDim2.new(0, 0, 0, 35)
-tpInstanBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
-tpInstanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-tpInstanBtn.Font = Enum.Font.GothamBold
-tpInstanBtn.TextSize = 12
-tpInstanBtn.Text = "TP Instan"
-tpInstanBtn.Parent = tpContainer
-
-local tpFlyBtn = Instance.new("TextButton")
-tpFlyBtn.Size = UDim2.new(0.48, 0, 0, 30)
-tpFlyBtn.Position = UDim2.new(0.52, 0, 0, 35)
-tpFlyBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
-tpFlyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-tpFlyBtn.Font = Enum.Font.GothamBold
-tpFlyBtn.TextSize = 12
-tpFlyBtn.Text = "TP Terbang"
-tpFlyBtn.Parent = tpContainer
+local tpBtn = Instance.new("TextButton")
+tpBtn.Size = UDim2.new(0.48, 0, 0, 30)
+tpBtn.Position = UDim2.new(0.52, 0, 0, 0)
+tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpBtn.Font = Enum.Font.GothamBold
+tpBtn.TextSize = 12
+tpBtn.Text = "Teleport"
+tpBtn.Parent = tpContainer
 
 local playerDropdown = Instance.new("TextButton")
 playerDropdown.Size = UDim2.new(1, 0, 0, 30)
-playerDropdown.Position = UDim2.new(0, 0, 0, 70)
+playerDropdown.Position = UDim2.new(0, 0, 0, 35)
 playerDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 playerDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
 playerDropdown.Font = Enum.Font.Gotham
@@ -405,7 +395,7 @@ playerDropdown.Parent = tpContainer
 
 local playerList = Instance.new("ScrollingFrame")
 playerList.Size = UDim2.new(1, 0, 0, 200)
-playerList.Position = UDim2.new(0, 0, 0, 103)
+playerList.Position = UDim2.new(0, 0, 0, 68)
 playerList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 playerList.ScrollBarThickness = 4
 playerList.Visible = false
@@ -443,7 +433,7 @@ local function updatePlayerList()
                 selectedPlayer = player
                 playerDropdown.Text = player.Name
                 playerList.Visible = false
-                tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
+                tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
             end)
             ySize = ySize + 25
         end
@@ -456,7 +446,7 @@ refreshBtn.MouseButton1Click:Connect(function()
     playerDropdown.Text = "Pilih Pemain..."
     selectedPlayer = nil
     if playerList.Visible then
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 305)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 270)
     end
 end)
 
@@ -464,9 +454,9 @@ playerDropdown.MouseButton1Click:Connect(function()
     playerList.Visible = not playerList.Visible
     if playerList.Visible then
         updatePlayerList()
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 305)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 270)
     else
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
     end
 end)
 
@@ -497,47 +487,11 @@ local function checkTeleportRequirements()
     return true, root, targetRoot
 end
 
-tpInstanBtn.MouseButton1Click:Connect(function()
+tpBtn.MouseButton1Click:Connect(function()
     local success, root, targetRoot = checkTeleportRequirements()
     if success then
         root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
         logAction("TELEPORT", "Berhasil teleport INSTAN ke " .. selectedPlayer.Name)
-    end
-end)
-
-tpFlyBtn.MouseButton1Click:Connect(function()
-    local success, root, targetRoot = checkTeleportRequirements()
-    if success then
-        local targetCFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
-        local dist = (root.Position - targetCFrame.Position).Magnitude
-        local tweenTime = dist / 150 -- Kecepatan terbang 150 studs per detik
-        if tweenTime < 0.05 then tweenTime = 0.05 end
-        
-        local previousNoclipState = State.Noclip
-        if not State.Noclip then
-            State.Noclip = true
-            if noclipBtn then
-                noclipBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-                noclipBtn.Text = "Noclip: ON"
-            end
-        end
-        
-        local TweenService = game:GetService("TweenService")
-        local tween = TweenService:Create(root, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
-        tween:Play()
-        logAction("TELEPORT", "Terbang menuju " .. selectedPlayer.Name .. "...")
-        
-        coroutine.wrap(function()
-            tween.Completed:Wait()
-            if not previousNoclipState then
-                State.Noclip = false
-                if noclipBtn then
-                    noclipBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-                    noclipBtn.Text = "Noclip: OFF"
-                end
-            end
-            logAction("TELEPORT", "Berhasil MENDARAT di lokasi " .. selectedPlayer.Name)
-        end)()
     end
 end)
 
@@ -678,32 +632,16 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
         return
     end
     
-    local previousNoclipState = State.Noclip
-    if not State.Noclip then
-        State.Noclip = true
-        if noclipBtn then
-            noclipBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-            noclipBtn.Text = "Noclip: ON"
-        end
-        logAction("FEATURE", "Noclip otomatis dinyalakan untuk Paste Base (Sky Build)")
-    end
-    
     logAction("BUILDER", "Memulai proses Paste Skybase " .. #SavedBase .. " bangunan...")
     
     -- Mulai proses Paste di background agar tidak hang
     coroutine.wrap(function()
         local count = 0
-        local originalGroundCFrame = originCFrame
-        -- Elevasi 35 studs ke udara agar bangunan aman dari gangguan (tanah, pohon, batu)
+        -- Elevasi 35 studs ke udara (di atas kepala karakter) memanfaatkan radius wajar game tanpa bergerak
         local baseOrigin = originCFrame * CFrame.new(0, 35, 0) 
         
         for _, data in ipairs(SavedBase) do
             local targetCFrame = baseOrigin * data.RelativeCFrame
-            
-            -- Teleport INSTAN tepat di atas koordinat tempat barang akan ditaruh (berdiri di atas bangunannya)
-            root.CFrame = targetCFrame * CFrame.new(0, 4, 0) 
-            
-            wait(0.05) -- Beri waktu sedikit agar server mendeteksi posisi baru kita
             
             if placeEvent:IsA("RemoteEvent") then
                 placeEvent:FireServer(data.Name, targetCFrame)
@@ -717,20 +655,7 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
             end
         end
         
-        -- Kembalikan pemain ke posisi awal di tanah setelah selesai
-        root.CFrame = originalGroundCFrame
-        
-        -- Kembalikan status Noclip ke semula
-        if not previousNoclipState then
-            State.Noclip = false
-            if noclipBtn then
-                noclipBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-                noclipBtn.Text = "Noclip: OFF"
-            end
-            logAction("FEATURE", "Noclip otomatis dimatikan (Paste selesai)")
-        end
-        
-        logAction("BUILDER", "Berhasil membangun Skybase berisi " .. count .. " bangunan!")
+        logAction("BUILDER", "Berhasil membangun Skybase berisi " .. count .. " bangunan tepat di atas kepala!")
     end)()
 end)
 
