@@ -63,8 +63,13 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "BoogaMultiHub"
 gui.ResetOnSpawn = false
 
-if gethui then
-    gui.Parent = gethui()
+local hui
+local success = pcall(function()
+    hui = gethui and gethui()
+end)
+
+if success and hui then
+    gui.Parent = hui
 elseif syn and syn.protect_gui then
     syn.protect_gui(gui)
     gui.Parent = CoreGui
@@ -117,16 +122,6 @@ minimizeBtn.Text = "-"
 minimizeBtn.Parent = spacer
 
 local isMinimized = false
-minimizeBtn.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
-    if isMinimized then
-        frame.Size = UDim2.new(0, 250, 0, 40)
-        minimizeBtn.Text = "+"
-    else
-        frame.Size = UDim2.new(0, 250, 0, 380)
-        minimizeBtn.Text = "-"
-    end
-end)
 
 local navBar = Instance.new("Frame")
 navBar.Size = UDim2.new(1, 0, 0, 35)
@@ -187,6 +182,21 @@ local function switchTab(tab)
     cheatsTab.Visible = (tab == cheatsTab)
     teleportTab.Visible = (tab == teleportTab)
 end
+
+minimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        frame.Size = UDim2.new(0, 250, 0, 40)
+        minimizeBtn.Text = "+"
+        contentContainer.Visible = false
+        navBar.Visible = false
+    else
+        frame.Size = UDim2.new(0, 250, 0, 380)
+        minimizeBtn.Text = "-"
+        contentContainer.Visible = true
+        navBar.Visible = true
+    end
+end)
 
 local function createNavBtn(text, tabToOpen)
     local btn = Instance.new("TextButton")
