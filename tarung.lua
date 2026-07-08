@@ -471,12 +471,19 @@ local lastLogTime = 0
 -- Cache pintar untuk semua objek yang bisa diklik (0 LAG)
 local cachedPrompts = {}
 
--- Pencarian awal
-for _, obj in ipairs(workspace:GetDescendants()) do
-    if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
-        cachedPrompts[obj] = true
+-- Pencarian awal dilakukan di background agar tidak membuat game freeze/crash saat script di-load
+task.spawn(function()
+    local count = 0
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
+            cachedPrompts[obj] = true
+        end
+        count = count + 1
+        if count % 1000 == 0 then
+            task.wait() -- Mencegah script timeout pada map Booga Booga yang sangat besar
+        end
     end
-end
+end)
 -- Otomatis tambah/hapus jika ada objek baru yang muncul di game
 track(workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
