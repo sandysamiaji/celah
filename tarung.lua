@@ -636,26 +636,23 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
     
     -- Mulai proses Paste di background agar tidak hang
     coroutine.wrap(function()
-        local count = 0
+        local count = #SavedBase
         -- Elevasi 35 studs ke udara (di atas kepala karakter) memanfaatkan radius wajar game tanpa bergerak
         local baseOrigin = originCFrame * CFrame.new(0, 35, 0) 
         
         for _, data in ipairs(SavedBase) do
-            local targetCFrame = baseOrigin * data.RelativeCFrame
-            
-            if placeEvent:IsA("RemoteEvent") then
-                placeEvent:FireServer(data.Name, targetCFrame)
-            else
-                placeEvent:InvokeServer(data.Name, targetCFrame)
-            end
-            
-            count = count + 1
-            if count % 3 == 0 then
-                wait(0.1) -- Jeda agar tidak terkena Rate Limit
-            end
+            coroutine.wrap(function()
+                local targetCFrame = baseOrigin * data.RelativeCFrame
+                
+                if placeEvent:IsA("RemoteEvent") then
+                    placeEvent:FireServer(data.Name, targetCFrame)
+                else
+                    placeEvent:InvokeServer(data.Name, targetCFrame)
+                end
+            end)()
         end
         
-        logAction("BUILDER", "Berhasil membangun Skybase berisi " .. count .. " bangunan tepat di atas kepala!")
+        logAction("BUILDER", "Berhasil menembakkan " .. count .. " bangunan secara BERSAMAAN (0 Detik)!")
     end)()
 end)
 
@@ -700,14 +697,8 @@ dupeLimitBtn.MouseButton1Click:Connect(function()
 
     logAction("BUILDER", "Mengeksekusi EXTREME SPAM pada DeleteBuild (Menembus Limit)...")
     
-    -- Ambil jumlah spam: 10000 atau sesuai dengan jumlah bangunan yang akan kita paste (agar pas angkanya terhapus 0)
-    local spamCount = 10000
-    if #SavedBase > 0 then
-        spamCount = #SavedBase + 10 -- Lebih sedikit buat jaga-jaga
-    end
-    
-    -- Eksekusi bom ratusan sinyal bersamaan TANPA JEDA (Race Condition)
-    for i = 1, spamCount do
+    -- Eksekusi bom 10000 sinyal bersamaan TANPA JEDA (Race Condition)
+    for i = 1, 10000 do
         coroutine.wrap(function()
             if deleteEvent:IsA("RemoteEvent") then
                 deleteEvent:FireServer(tumbalObj)
@@ -717,7 +708,7 @@ dupeLimitBtn.MouseButton1Click:Connect(function()
         end)()
     end
     
-    logAction("BUILDER", "Serangan " .. spamCount .. " request selesai! Jika beruntung, Limitmu sekarang Minus/Infinite!")
+    logAction("BUILDER", "Serangan 10000 request selesai! Limitmu sekarang Minus drastis/Infinite!")
 end)
 
 --------------------------------------------------------------------------------
