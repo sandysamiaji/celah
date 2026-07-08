@@ -591,7 +591,7 @@ copyBaseBtn.MouseButton1Click:Connect(function()
                 if primary then
                     local dist = (primary.Position - originCFrame.Position).Magnitude
                     if dist <= State.CopyRadius then
-                    -- Simpan tipe bangunan (berdasarkan nama Model) dan posisi relatif
+                    -- Simpan tipe bangunan dan posisi relatif (berdasarkan dunia murni, bukan rotasi karakter)
                     local relCFrame = originCFrame:ToObjectSpace(primary.CFrame)
                     table.insert(SavedBase, {
                         Name = obj.Name,
@@ -647,7 +647,7 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
     -- Mulai proses Paste di background agar tidak hang
     coroutine.wrap(function()
         local count = 0
-        -- Elevasi diturunkan jadi 15 studs agar pas presisi di atas ubun-ubun
+        -- Elevasi 15 studs ke udara. Karena originCFrame sejajar dunia murni, offset sumbu Y ini akan lurus ke atas.
         local baseOrigin = originCFrame * CFrame.new(0, 15, 0) 
         
         for _, data in ipairs(SavedBase) do
