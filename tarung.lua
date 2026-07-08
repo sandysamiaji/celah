@@ -41,6 +41,7 @@ local State = {
     SpyTrace = false,
     InfiniteDrop = false,
     Invisible = false,
+    WebhookLogs = false, -- Default mati
     AuraRadius = 35, -- Dikembalikan ke 25 sesuai permintaan
     AttackCooldown = 0.2
 }
@@ -53,9 +54,42 @@ local function logAction(action, text)
 end
 
 local function processLogQueue()
-    -- Webhook dinonaktifkan sesuai permintaan agar tidak lag dari HTTP requests
+    if #logQueue == 0 then return end
+    
+    local payload = {
+        content = table.concat(logQueue, "\n")
+    }
+    
+    -- Clear queue
     logQueue = {}
+    
+    -- Jika toggle webhook dari depan (UI) dimatikan, batalkan pengiriman
+    if not State.WebhookLogs then return end
+
+    
+    -- Ambil fungsi request exploit (synapse, krnl, fluxus, dll)
+    local req = (syn and syn.request) or request or (http and http.request) or http_request
+    if req then
+        pcall(function()
+            req({
+                Url = WEBHOOK_URL,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
+                Body = HttpService:JSONEncode(payload)
+            })
+        end)
+    end
 end
+
+-- Menjalankan processLogQueue setiap 5 detik agar terhindar dari spam/rate limit
+coroutine.wrap(function()
+    while true do
+        wait(5)
+        processLogQueue()
+    end
+end)()
 
 --------------------------------------------------------------------------------
 -- GUI MULTI-FITUR
@@ -319,6 +353,7 @@ createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
 createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
 createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
 createToggle("InvisibleToggle", "Invisible (Desync)", "Invisible", 5, cheatsTab)
+createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 6, cheatsTab)
 
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
@@ -443,7 +478,7 @@ copyBaseBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
 copyBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 copyBaseBtn.Font = Enum.Font.GothamBold
 copyBaseBtn.TextSize = 13
-copyBaseBtn.Text = "Copy Base (Radius 100)"
+copyBaseBtn.Text = "Copy Base (Radius 500)"
 copyBaseBtn.LayoutOrder = 1
 copyBaseBtn.Parent = builderTab
 
@@ -482,7 +517,7 @@ copyBaseBtn.MouseButton1Click:Connect(function()
             local primary = obj.PrimaryPart or obj:FindFirstChild("Hitbox") or obj:FindFirstChildOfClass("BasePart")
             if primary then
                 local dist = (primary.Position - originCFrame.Position).Magnitude
-                if dist <= 100 then
+                if dist <= 500 then
                     -- Simpan tipe bangunan (berdasarkan nama Model) dan posisi relatif
                     local relCFrame = originCFrame:ToObjectSpace(primary.CFrame)
                     table.insert(SavedBase, {
