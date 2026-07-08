@@ -350,7 +350,7 @@ createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 4, farmTab)
 
 -- CHEATS TAB
 createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab)
-createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
+local noclipBtn = createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
 createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
 createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
 createToggle("InvisibleToggle", "Invisible (Desync)", "Invisible", 5, cheatsTab)
@@ -606,6 +606,16 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
         return
     end
     
+    local previousNoclipState = State.Noclip
+    if not State.Noclip then
+        State.Noclip = true
+        if noclipBtn then
+            noclipBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+            noclipBtn.Text = "Noclip: ON"
+        end
+        logAction("FEATURE", "Noclip otomatis dinyalakan untuk Paste Base")
+    end
+    
     logAction("BUILDER", "Memulai proses Paste " .. #SavedBase .. " bangunan...")
     
     -- Mulai proses Paste di background agar tidak hang
@@ -644,6 +654,17 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
         
         -- Kembalikan pemain ke posisi awal setelah selesai
         root.CFrame = baseOrigin
+        
+        -- Kembalikan status Noclip ke semula
+        if not previousNoclipState then
+            State.Noclip = false
+            if noclipBtn then
+                noclipBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+                noclipBtn.Text = "Noclip: OFF"
+            end
+            logAction("FEATURE", "Noclip otomatis dimatikan (Paste selesai)")
+        end
+        
         logAction("BUILDER", "Berhasil Paste " .. count .. " bangunan!")
     end)()
 end)
