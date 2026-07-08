@@ -685,37 +685,25 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
             noclipBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
             noclipBtn.Text = "Noclip: ON"
         end
-        logAction("FEATURE", "Noclip otomatis dinyalakan untuk Paste Base")
+        logAction("FEATURE", "Noclip otomatis dinyalakan untuk Paste Base (Sky Build)")
     end
     
-    logAction("BUILDER", "Memulai proses Paste " .. #SavedBase .. " bangunan...")
+    logAction("BUILDER", "Memulai proses Paste Skybase " .. #SavedBase .. " bangunan...")
     
     -- Mulai proses Paste di background agar tidak hang
     coroutine.wrap(function()
         local count = 0
-        local baseOrigin = originCFrame -- Simpan titik awal karakter sebagai titik pusat Blueprint
+        local originalGroundCFrame = originCFrame
+        -- Elevasi 35 studs ke udara agar bangunan aman dari gangguan (tanah, pohon, batu)
+        local baseOrigin = originCFrame * CFrame.new(0, 35, 0) 
         
         for _, data in ipairs(SavedBase) do
             local targetCFrame = baseOrigin * data.RelativeCFrame
-            local TweenService = game:GetService("TweenService")
             
-            -- Posisi aman: 4 studs di belakang dan 2 studs di atas barang yang mau di-paste
-            local targetPos = targetCFrame * CFrame.new(0, 2, 4) 
+            -- Teleport INSTAN tepat di atas koordinat tempat barang akan ditaruh (berdiri di atas bangunannya)
+            root.CFrame = targetCFrame * CFrame.new(0, 4, 0) 
             
-            -- ANTI-VOID: Pastikan karakter tidak pernah ditarik ke bawah tanah tempat awal dia berdiri!
-            if targetPos.Y < baseOrigin.Position.Y then
-                targetPos = targetPos + Vector3.new(0, (baseOrigin.Position.Y - targetPos.Y) + 3, 0)
-            end
-            
-            -- Gunakan Tween agar karakter terlihat terbang/berjalan mulus (lebih aman dari anti-cheat teleport)
-            local dist = (root.Position - targetPos.Position).Magnitude
-            local tweenTime = dist / 150 -- Kecepatan terbang 150 studs per detik
-            if tweenTime < 0.05 then tweenTime = 0.05 end
-            
-            local tween = TweenService:Create(root, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetPos})
-            tween:Play()
-            tween.Completed:Wait() -- Tunggu sampai karakter sampai di lokasi
-            wait(0.05) -- Ekstra jeda sedikit untuk sinkronisasi server
+            wait(0.05) -- Beri waktu sedikit agar server mendeteksi posisi baru kita
             
             if placeEvent:IsA("RemoteEvent") then
                 placeEvent:FireServer(data.Name, targetCFrame)
@@ -729,8 +717,8 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
             end
         end
         
-        -- Kembalikan pemain ke posisi awal setelah selesai
-        root.CFrame = baseOrigin
+        -- Kembalikan pemain ke posisi awal di tanah setelah selesai
+        root.CFrame = originalGroundCFrame
         
         -- Kembalikan status Noclip ke semula
         if not previousNoclipState then
@@ -742,7 +730,7 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
             logAction("FEATURE", "Noclip otomatis dimatikan (Paste selesai)")
         end
         
-        logAction("BUILDER", "Berhasil Paste " .. count .. " bangunan!")
+        logAction("BUILDER", "Berhasil membangun Skybase berisi " .. count .. " bangunan!")
     end)()
 end)
 
