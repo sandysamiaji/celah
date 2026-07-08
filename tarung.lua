@@ -73,9 +73,9 @@ else
 end
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 250, 0, 520)
+frame.Size = UDim2.new(0, 250, 0, 380)
 frame.AnchorPoint = Vector2.new(0.5, 0) -- Anchor di atas tengah
-frame.Position = UDim2.new(0.5, 0, 0.5, -260) -- Posisi agar tetap center di awal
+frame.Position = UDim2.new(0.5, 0, 0.5, -190) -- Posisi agar tetap center di awal (380 / 2)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 2
 frame.BorderColor3 = Color3.fromRGB(60, 60, 60)
@@ -123,21 +123,101 @@ minimizeBtn.MouseButton1Click:Connect(function()
         frame.Size = UDim2.new(0, 250, 0, 40)
         minimizeBtn.Text = "+"
     else
-        frame.Size = UDim2.new(0, 250, 0, 520)
+        frame.Size = UDim2.new(0, 250, 0, 380)
         minimizeBtn.Text = "-"
     end
 end)
 
-local function createToggle(name, text, stateKey, layoutOrder)
+local navBar = Instance.new("Frame")
+navBar.Size = UDim2.new(1, 0, 0, 35)
+navBar.BackgroundTransparency = 1
+navBar.LayoutOrder = 2
+navBar.Parent = frame
+
+local navLayout = Instance.new("UIListLayout")
+navLayout.Parent = navBar
+navLayout.FillDirection = Enum.FillDirection.Horizontal
+navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+navLayout.Padding = UDim.new(0, 5)
+
+local contentContainer = Instance.new("Frame")
+contentContainer.Size = UDim2.new(1, 0, 1, -85)
+contentContainer.BackgroundTransparency = 1
+contentContainer.LayoutOrder = 3
+contentContainer.Parent = frame
+
+local farmTab = Instance.new("Frame")
+farmTab.Size = UDim2.new(1, 0, 1, 0)
+farmTab.BackgroundTransparency = 1
+farmTab.Visible = true
+farmTab.Parent = contentContainer
+
+local farmLayout = Instance.new("UIListLayout")
+farmLayout.Parent = farmTab
+farmLayout.SortOrder = Enum.SortOrder.LayoutOrder
+farmLayout.Padding = UDim.new(0, 5)
+farmLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local cheatsTab = Instance.new("Frame")
+cheatsTab.Size = UDim2.new(1, 0, 1, 0)
+cheatsTab.BackgroundTransparency = 1
+cheatsTab.Visible = false
+cheatsTab.Parent = contentContainer
+
+local cheatsLayout = Instance.new("UIListLayout")
+cheatsLayout.Parent = cheatsTab
+cheatsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+cheatsLayout.Padding = UDim.new(0, 5)
+cheatsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local teleportTab = Instance.new("Frame")
+teleportTab.Size = UDim2.new(1, 0, 1, 0)
+teleportTab.BackgroundTransparency = 1
+teleportTab.Visible = false
+teleportTab.Parent = contentContainer
+
+local teleportLayout = Instance.new("UIListLayout")
+teleportLayout.Parent = teleportTab
+teleportLayout.SortOrder = Enum.SortOrder.LayoutOrder
+teleportLayout.Padding = UDim.new(0, 5)
+teleportLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local function switchTab(tab)
+    farmTab.Visible = (tab == farmTab)
+    cheatsTab.Visible = (tab == cheatsTab)
+    teleportTab.Visible = (tab == teleportTab)
+end
+
+local function createNavBtn(text, tabToOpen)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 40)
-    btn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+    btn.Size = UDim2.new(0, 75, 1, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.Text = text .. ": OFF"
+    btn.TextSize = 12
+    btn.Text = text
+    btn.Parent = navBar
+    
+    btn.MouseButton1Click:Connect(function()
+        switchTab(tabToOpen)
+    end)
+    return btn
+end
+
+local farmNav = createNavBtn("Farm", farmTab)
+local cheatsNav = createNavBtn("Cheats", cheatsTab)
+local teleportNav = createNavBtn("Teleport", teleportTab)
+
+local function createToggle(name, text, stateKey, layoutOrder, parentTab)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.BackgroundColor3 = State[stateKey] and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(231, 76, 60)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.Text = text .. (State[stateKey] and ": ON" or ": OFF")
     btn.LayoutOrder = layoutOrder
-    btn.Parent = frame
+    btn.Parent = parentTab
     
     btn.MouseButton1Click:Connect(function()
         State[stateKey] = not State[stateKey]
@@ -154,14 +234,18 @@ local function createToggle(name, text, stateKey, layoutOrder)
     return btn
 end
 
-createToggle("AuraToggle", "Aura Farm & Collect", "AuraEnabled", 2)
+-- =======================
+-- TABS POPULATION
+-- =======================
 
--- INPUT RADIUS
+-- FARM TAB
+createToggle("AuraToggle", "Aura Farm", "AuraEnabled", 1, farmTab)
+
 local radiusContainer = Instance.new("Frame")
-radiusContainer.Size = UDim2.new(0.9, 0, 0, 40)
+radiusContainer.Size = UDim2.new(0.9, 0, 0, 35)
 radiusContainer.BackgroundTransparency = 1
-radiusContainer.LayoutOrder = 2.5 -- Muncul tepat di bawah AuraToggle
-radiusContainer.Parent = frame
+radiusContainer.LayoutOrder = 2
+radiusContainer.Parent = farmTab
 
 local radiusLabel = Instance.new("TextLabel")
 radiusLabel.Size = UDim2.new(0.55, 0, 1, 0)
@@ -169,7 +253,7 @@ radiusLabel.BackgroundTransparency = 1
 radiusLabel.Text = "Aura Radius:"
 radiusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 radiusLabel.Font = Enum.Font.GothamBold
-radiusLabel.TextSize = 14
+radiusLabel.TextSize = 13
 radiusLabel.TextXAlignment = Enum.TextXAlignment.Left
 radiusLabel.Parent = radiusContainer
 
@@ -179,7 +263,7 @@ radiusInput.Position = UDim2.new(0.6, 0, 0.1, 0)
 radiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 radiusInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 radiusInput.Font = Enum.Font.Gotham
-radiusInput.TextSize = 14
+radiusInput.TextSize = 13
 radiusInput.Text = tostring(State.AuraRadius)
 radiusInput.PlaceholderText = "Radius"
 radiusInput.Parent = radiusContainer
@@ -196,21 +280,21 @@ radiusInput.FocusLost:Connect(function()
     end
 end)
 
-createToggle("RewardToggle", "Auto Claim Reward", "AutoClaimReward", 3)
-createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 4)
-createToggle("FallDamageToggle", "Anti Fall Damage", "AntiFallDamage", 5)
-createToggle("NoclipToggle", "Noclip (Tembus Tembok)", "Noclip", 6)
-createToggle("SpyToggle", "Spy Trace (Log Semua)", "SpyTrace", 7)
-createToggle("DropToggle", "Infinite Drop (Dup Exploit)", "InfiniteDrop", 8)
+createToggle("RewardToggle", "Claim Reward", "AutoClaimReward", 3, farmTab)
+createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 4, farmTab)
 
---------------------------------------------------------------------------------
--- TELEPORT PEMAIN
---------------------------------------------------------------------------------
+-- CHEATS TAB
+createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab)
+createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
+createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
+createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
+
+-- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
 tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
 tpContainer.BackgroundTransparency = 1
-tpContainer.LayoutOrder = 9
-tpContainer.Parent = frame
+tpContainer.LayoutOrder = 1
+tpContainer.Parent = teleportTab
 
 local refreshBtn = Instance.new("TextButton")
 refreshBtn.Size = UDim2.new(0.48, 0, 0, 30)
@@ -243,7 +327,7 @@ playerDropdown.Text = "Pilih Pemain..."
 playerDropdown.Parent = tpContainer
 
 local playerList = Instance.new("ScrollingFrame")
-playerList.Size = UDim2.new(1, 0, 0, 100)
+playerList.Size = UDim2.new(1, 0, 0, 200)
 playerList.Position = UDim2.new(0, 0, 0, 68)
 playerList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 playerList.ScrollBarThickness = 4
@@ -295,7 +379,7 @@ refreshBtn.MouseButton1Click:Connect(function()
     playerDropdown.Text = "Pilih Pemain..."
     selectedPlayer = nil
     if playerList.Visible then
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 170)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 270)
     end
 end)
 
@@ -303,7 +387,7 @@ playerDropdown.MouseButton1Click:Connect(function()
     playerList.Visible = not playerList.Visible
     if playerList.Visible then
         updatePlayerList()
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 170)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 270)
     else
         tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
     end
@@ -313,7 +397,6 @@ tpBtn.MouseButton1Click:Connect(function()
     if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local myChar = LocalPlayer.Character
         if myChar and myChar:FindFirstChild("HumanoidRootPart") then
-            -- Teleport sedikit di belakang/samping agar tidak nyangkut
             myChar.HumanoidRootPart.CFrame = selectedPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
             logAction("TELEPORT", "Berhasil teleport ke " .. selectedPlayer.Name)
         end
