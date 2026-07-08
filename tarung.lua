@@ -40,6 +40,7 @@ local State = {
     Noclip = false,
     SpyTrace = false,
     InfiniteDrop = false,
+    Invisible = false,
     AuraRadius = 35, -- Dikembalikan ke 25 sesuai permintaan
     AttackCooldown = 0.2
 }
@@ -177,10 +178,23 @@ teleportLayout.SortOrder = Enum.SortOrder.LayoutOrder
 teleportLayout.Padding = UDim.new(0, 5)
 teleportLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
+local builderTab = Instance.new("Frame")
+builderTab.Size = UDim2.new(1, 0, 1, 0)
+builderTab.BackgroundTransparency = 1
+builderTab.Visible = false
+builderTab.Parent = contentContainer
+
+local builderLayout = Instance.new("UIListLayout")
+builderLayout.Parent = builderTab
+builderLayout.SortOrder = Enum.SortOrder.LayoutOrder
+builderLayout.Padding = UDim.new(0, 5)
+builderLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
 local function switchTab(tab)
     farmTab.Visible = (tab == farmTab)
     cheatsTab.Visible = (tab == cheatsTab)
     teleportTab.Visible = (tab == teleportTab)
+    builderTab.Visible = (tab == builderTab)
 end
 
 minimizeBtn.MouseButton1Click:Connect(function()
@@ -217,6 +231,7 @@ end
 local farmNav = createNavBtn("Farm", farmTab)
 local cheatsNav = createNavBtn("Cheats", cheatsTab)
 local teleportNav = createNavBtn("Teleport", teleportTab)
+local builderNav = createNavBtn("Builder", builderTab)
 
 local function createToggle(name, text, stateKey, layoutOrder, parentTab)
     local btn = Instance.new("TextButton")
@@ -298,6 +313,7 @@ createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab
 createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
 createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
 createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
+createToggle("InvisibleToggle", "Invisible (Desync)", "Invisible", 5, cheatsTab)
 
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
@@ -411,6 +427,80 @@ tpBtn.MouseButton1Click:Connect(function()
             logAction("TELEPORT", "Berhasil teleport ke " .. selectedPlayer.Name)
         end
     end
+end)
+
+-- BUILDER TAB
+local SavedBase = {}
+
+local copyBaseBtn = Instance.new("TextButton")
+copyBaseBtn.Size = UDim2.new(0.9, 0, 0, 35)
+copyBaseBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+copyBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyBaseBtn.Font = Enum.Font.GothamBold
+copyBaseBtn.TextSize = 13
+copyBaseBtn.Text = "Copy Base (Radius 100)"
+copyBaseBtn.LayoutOrder = 1
+copyBaseBtn.Parent = builderTab
+
+local pasteBaseBtn = Instance.new("TextButton")
+pasteBaseBtn.Size = UDim2.new(0.9, 0, 0, 35)
+pasteBaseBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+pasteBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+pasteBaseBtn.Font = Enum.Font.GothamBold
+pasteBaseBtn.TextSize = 13
+pasteBaseBtn.Text = "Paste Base (Auto Build)"
+pasteBaseBtn.LayoutOrder = 2
+pasteBaseBtn.Parent = builderTab
+
+local buildStatusLabel = Instance.new("TextLabel")
+buildStatusLabel.Size = UDim2.new(0.9, 0, 0, 20)
+buildStatusLabel.BackgroundTransparency = 1
+buildStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+buildStatusLabel.Font = Enum.Font.Gotham
+buildStatusLabel.TextSize = 11
+buildStatusLabel.Text = "0 Bangunan Tersimpan"
+buildStatusLabel.LayoutOrder = 3
+buildStatusLabel.Parent = builderTab
+
+copyBaseBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    SavedBase = {}
+    local originCFrame = root.CFrame
+
+    -- Cari bangunan di sekitar
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        -- Filter kasar: biasanya bangunan punya Health atau Owner
+        if obj:IsA("Model") and (obj:FindFirstChild("Owner") or obj:FindFirstChild("Health")) then
+            local primary = obj.PrimaryPart or obj:FindFirstChild("Hitbox") or obj:FindFirstChildOfClass("BasePart")
+            if primary then
+                local dist = (primary.Position - originCFrame.Position).Magnitude
+                if dist <= 100 then
+                    -- Simpan tipe bangunan (berdasarkan nama Model) dan posisi relatif
+                    local relCFrame = originCFrame:ToObjectSpace(primary.CFrame)
+                    table.insert(SavedBase, {
+                        Name = obj.Name,
+                        RelativeCFrame = relCFrame
+                    })
+                end
+            end
+        end
+    end
+    
+    buildStatusLabel.Text = #SavedBase .. " Bangunan Tersimpan"
+    logAction("BUILDER", "Berhasil meng-copy " .. #SavedBase .. " bangunan!")
+end)
+
+pasteBaseBtn.MouseButton1Click:Connect(function()
+    if #SavedBase == 0 then
+        logAction("BUILDER", "Tidak ada bangunan yang di-copy!")
+        return
+    end
+    
+    -- Membutuhkan Log Spy Trace dari User!
+    logAction("BUILDER", "MAAF! Sistem Paste belum aktif. Tolong berikan log Spy Trace saat kamu memasang bangunan!")
 end)
 
 --------------------------------------------------------------------------------
@@ -661,14 +751,26 @@ track(RunService.RenderStepped:Connect(function()
     end
 end))
 
--- 4. NOCLIP (Tembus Tembok)
+-- 4. NOCLIP & INVISIBLE
 track(RunService.Stepped:Connect(function()
-    if State.Noclip then
-        local char = LocalPlayer.Character
-        if char then
+    local char = LocalPlayer.Character
+    if char then
+        if State.Noclip then
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") and part.CanCollide then
                     part.CanCollide = false
+                end
+            end
+        end
+        
+        -- Invisible (Desync/RootJoint Break)
+        if State.Invisible then
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local joint = root:FindFirstChild("RootJoint") or root:FindFirstChild("Root")
+                if joint then 
+                    joint:Destroy()
+                    logAction("INVISIBLE", "RootJoint dihancurkan (Karakter menghilang dari server)")
                 end
             end
         end
