@@ -12,6 +12,7 @@ getgenv().Config = {
     AutoPickup = false,
     AuraGali = false,
     AuraRadius = 35,
+    MinTier = 1,
     EnableLogs = false
 }
 
@@ -85,8 +86,8 @@ else
 end
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 320)
-frame.Position = UDim2.new(0.5, -150, 0.5, -160)
+frame.Size = UDim2.new(0, 300, 0, 370)
+frame.Position = UDim2.new(0.5, -150, 0.5, -185)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 2
 frame.BorderColor3 = Color3.fromRGB(60, 60, 60)
@@ -182,7 +183,45 @@ radiusInput.FocusLost:Connect(function()
     end
 end)
 
-createToggle("EnableLogsToggle", "Enable Logs (Data Collector)", "EnableLogs", 7)
+local tierContainer = Instance.new("Frame")
+tierContainer.Size = UDim2.new(0.9, 0, 0, 35)
+tierContainer.BackgroundTransparency = 1
+tierContainer.LayoutOrder = 7
+tierContainer.Parent = frame
+
+local tierLabel = Instance.new("TextLabel")
+tierLabel.Size = UDim2.new(0.55, 0, 1, 0)
+tierLabel.BackgroundTransparency = 1
+tierLabel.Text = "Min Tier (1-5):"
+tierLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+tierLabel.Font = Enum.Font.GothamBold
+tierLabel.TextSize = 13
+tierLabel.TextXAlignment = Enum.TextXAlignment.Left
+tierLabel.Parent = tierContainer
+
+local tierInput = Instance.new("TextBox")
+tierInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+tierInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+tierInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+tierInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+tierInput.Font = Enum.Font.Gotham
+tierInput.TextSize = 13
+tierInput.Text = tostring(getgenv().Config.MinTier)
+tierInput.Parent = tierContainer
+
+tierInput.FocusLost:Connect(function()
+    local num = tonumber(tierInput.Text)
+    if num then
+        if num < 1 then num = 1 end
+        if num > 5 then num = 5 end
+        getgenv().Config.MinTier = num
+        tierInput.Text = tostring(num)
+    else
+        tierInput.Text = tostring(getgenv().Config.MinTier)
+    end
+end)
+
+createToggle("EnableLogsToggle", "Enable Logs (Data Collector)", "EnableLogs", 8)
 
 -- ==========================================
 -- LOGIC / LOOPING
@@ -238,11 +277,19 @@ task.spawn(function()
                 for _, obj in pairs(workspace:GetDescendants()) do
                     if obj:IsA("BasePart") or obj:IsA("Model") then
                         if obj.Name:lower():find("crystal") then
+                            -- Ekstrak tier dari nama, misalnya "Crystal_T3" atau "DroppedCrystal_T4"
+                            local tierMatch = string.match(obj.Name, "T(%d+)")
+                            local tier = tierMatch and tonumber(tierMatch) or 1
+                            
                             if not loggedObjects[obj] then
                                 loggedObjects[obj] = true
-                                logData("Mendeteksi Crystal Drop: " .. obj.Name)
+                                logData("Mendeteksi Crystal Drop: " .. obj.Name .. " (Tier: " .. tier .. ")")
                             end
-                            pickupRemote:FireServer(obj)
+                            
+                            -- Filter pickup berdasarkan Minimal Tier
+                            if tier >= getgenv().Config.MinTier then
+                                pickupRemote:FireServer(obj)
+                            end
                         end
                     end
                 end
