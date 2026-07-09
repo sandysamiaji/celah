@@ -562,7 +562,7 @@ TabExploit:Toggle({
 })
 
 TabExploit:Input({
-    Title    = "🎯 Target Manual (Ketik Nama)",
+    Title    = "Target Manual (Ketik Nama)",
     Desc     = "Gunakan ini jika nama tidak muncul di Dropdown.",
     Default  = "",
     Callback = function(text)
