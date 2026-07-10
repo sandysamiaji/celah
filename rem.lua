@@ -110,14 +110,15 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
 end)
 
 -- Bersihkan GUI Lama jika ada
-if CoreGui:FindFirstChild("AntiGravityMilitary") then
-    CoreGui.AntiGravityMilitary:Destroy()
+local targetGui = (gethui and gethui()) or CoreGui
+if targetGui:FindFirstChild("AntiGravityMilitary") then
+    targetGui.AntiGravityMilitary:Destroy()
 end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AntiGravityMilitary"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = CoreGui
+screenGui.Parent = targetGui
 
 -- Main Frame
 local frame = Instance.new("Frame")
@@ -320,6 +321,15 @@ statusLabel.TextSize = 12
 statusLabel.Text = "Tabel Tersimpan: 0 Roket"
 statusLabel.Parent = builderPage
 
+local btnToggleSpy = Instance.new("TextButton")
+btnToggleSpy.Size = UDim2.new(1, 0, 0, 35)
+btnToggleSpy.BackgroundColor3 = Color3.fromRGB(241, 196, 15)
+btnToggleSpy.TextColor3 = Color3.fromRGB(0, 0, 0)
+btnToggleSpy.Font = Enum.Font.GothamBold
+btnToggleSpy.TextSize = 13
+btnToggleSpy.Text = "SPY LOGS: [ON] (Matikan agar tidak lag)"
+btnToggleSpy.Parent = builderPage
+
 local btnRecord = Instance.new("TextButton")
 btnRecord.Size = UDim2.new(1, 0, 0, 35)
 btnRecord.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
@@ -421,6 +431,20 @@ if placementRemote then
 else
     statusLabel.Text = "Remote belum ditemukan, akan retry saat tombol ditekan..."
 end
+
+-- LOGIC TOGGLE SPY
+btnToggleSpy.MouseButton1Click:Connect(function()
+    State.SpyTrace = not State.SpyTrace
+    if State.SpyTrace then
+        btnToggleSpy.Text = "SPY LOGS: [ON] (Matikan agar tidak lag)"
+        btnToggleSpy.BackgroundColor3 = Color3.fromRGB(241, 196, 15)
+        logAction("SYSTEM", "Spy Logs dinyalakan.")
+    else
+        btnToggleSpy.Text = "SPY LOGS: [OFF] (Anti-Lag Aktif)"
+        btnToggleSpy.BackgroundColor3 = Color3.fromRGB(149, 165, 166)
+        logAction("SYSTEM", "Spy Logs dimatikan.")
+    end
+end)
 
 -- LOGIC REKAM
 btnRecord.MouseButton1Click:Connect(function()
