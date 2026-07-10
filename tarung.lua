@@ -42,6 +42,7 @@ local State = {
     InfiniteDrop = false,
     Invisible = false,
     WebhookLogs = false, -- Default mati
+    BypassSafeZone = false,
     CopyRadius = 500,
     AuraRadius = 35, -- Dikembalikan ke 25 sesuai permintaan
     AttackCooldown = 0.2
@@ -290,6 +291,35 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
             btn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
             btn.Text = text .. ": ON"
             logAction("FEATURE", text .. " diaktifkan")
+            
+            if stateKey == "BypassSafeZone" then
+                coroutine.wrap(function()
+                    logAction("SAFEZONE", "Mencari dan menghapus zona aman...")
+                    while State.BypassSafeZone do
+                        local count = 0
+                        for _, obj in ipairs(workspace:GetDescendants()) do
+                            local n = obj.Name:lower()
+                            if n:match("safe%s*zone") or n == "safe" then
+                                pcall(function() obj:Destroy() end)
+                                count = count + 1
+                            end
+                        end
+                        local char = LocalPlayer.Character
+                        if char then
+                            for _, v in ipairs(char:GetChildren()) do
+                                if v:IsA("ForceField") then
+                                    pcall(function() v:Destroy() end)
+                                    count = count + 1
+                                end
+                            end
+                        end
+                        if count > 0 then
+                            logAction("SAFEZONE", count .. " objek Safezone/ForceField berhasil dihapus!")
+                        end
+                        wait(2)
+                    end
+                end)()
+            end
         else
             btn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
             btn.Text = text .. ": OFF"
@@ -355,6 +385,7 @@ createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
 createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
 createToggle("InvisibleToggle", "Invisible (Desync)", "Invisible", 5, cheatsTab)
 createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 6, cheatsTab)
+createToggle("SafeZoneToggle", "Bypass Safezone", "BypassSafeZone", 7, cheatsTab)
 
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")

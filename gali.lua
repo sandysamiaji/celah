@@ -70,23 +70,24 @@ local function logAction(action, text)
     
     table.insert(logLines, 1, msg)
     if #logLines > 100 then table.remove(logLines, 101) end
-    if State.UpdateUIDisplay then State.UpdateUIDisplay() end
 end
 
 -- Resolusi Remote Cepat
 local Remotes = {}
-pcall(function()
-    local serverRemotes = RS:WaitForChild("Remotes", 5) and RS.Remotes:WaitForChild("Server", 5)
-    if serverRemotes then
-        Remotes.Click = serverRemotes:WaitForChild("Click", 2)
-        Remotes.HitWall = serverRemotes:WaitForChild("HitWall", 2)
-        Remotes.SellAllLoot = serverRemotes:WaitForChild("SellAllLoot", 2)
-        Remotes.Rebirth = serverRemotes:WaitForChild("Rebirth", 2)
-        Remotes.GotoSurface = serverRemotes:WaitForChild("GotoSurface", 2)
-        Remotes.PurchaseAura = serverRemotes:WaitForChild("PurchaseAura", 2)
-        Remotes.EquipAura = serverRemotes:WaitForChild("EquipAura", 2)
-        Remotes.GiftLoot = serverRemotes:WaitForChild("GiftLoot", 2)
-    end
+task.spawn(function()
+    pcall(function()
+        local serverRemotes = RS:WaitForChild("Remotes", 5) and RS.Remotes:WaitForChild("Server", 5)
+        if serverRemotes then
+            Remotes.Click = serverRemotes:WaitForChild("Click", 2)
+            Remotes.HitWall = serverRemotes:WaitForChild("HitWall", 2)
+            Remotes.SellAllLoot = serverRemotes:WaitForChild("SellAllLoot", 2)
+            Remotes.Rebirth = serverRemotes:WaitForChild("Rebirth", 2)
+            Remotes.GotoSurface = serverRemotes:WaitForChild("GotoSurface", 2)
+            Remotes.PurchaseAura = serverRemotes:WaitForChild("PurchaseAura", 2)
+            Remotes.EquipAura = serverRemotes:WaitForChild("EquipAura", 2)
+            Remotes.GiftLoot = serverRemotes:WaitForChild("GiftLoot", 2)
+        end
+    end)
 end)
 
 local function safeFire(remote, ...)
@@ -470,20 +471,11 @@ TabLogs:Toggle({
 })
 
 TabLogs:Button({
-    Title    = "🗑️ Bersihkan Log",
+    Title    = "🗑️ Bersihkan Log (Hanya di Webhook)",
     Callback = function() 
         logLines = {} 
-        if State.UpdateUIDisplay then State.UpdateUIDisplay() end
     end
 })
-
-local LogDisplay = TabLogs:Paragraph({ Title = "Live Logs", Desc = "Menunggu aktivitas..." })
-
-State.UpdateUIDisplay = function()
-    if LogDisplay and LogDisplay.SetDesc then
-        LogDisplay:SetDesc(table.concat(logLines, "\n"))
-    end
-end
 
 -- =====================
 -- TAB EXPLOITS (DANGER)

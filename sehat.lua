@@ -213,6 +213,9 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             local logMsg = "TEREKAM! [" .. remoteName .. "] Args: " .. argStr
             logLabel.Text = logMsg
             logAction("SEHAT-SPY | " .. logMsg)
+        else
+            -- Menampilkan remote lain yang terpicu agar kita tahu apa yang terjadi
+            logLabel.Text = "Remote lain terdeteksi: " .. remoteName .. " (Bukan target)"
         end
     end
     
