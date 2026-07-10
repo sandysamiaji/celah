@@ -363,15 +363,25 @@ local function findPlacementRemote()
 end
 
 -- Helper: debug print isi tabel ke log
-local function debugArgs(args)
+local function debugArgs(args, depth)
+    depth = depth or 1
+    if depth > 2 then return tostring(args) end
+    
     local parts = {}
-    for i, v in ipairs(args) do
+    for i, v in pairs(args) do
         local t = typeof(v)
         if t == "table" then
             local tblParts = {}
             for k, val in pairs(v) do
                 local valStr = tostring(val)
-                if typeof(val) == "CFrame" then
+                if typeof(val) == "table" then
+                    -- Rekursif ke dalam tabel maksimal 2 level
+                    if depth < 2 then
+                        valStr = debugArgs({val}, depth + 1)
+                    else
+                        valStr = "table:..."
+                    end
+                elseif typeof(val) == "CFrame" then
                     valStr = string.format("CFrame(%.1f,%.1f,%.1f)", val.X, val.Y, val.Z)
                 end
                 table.insert(tblParts, tostring(k) .. "=" .. valStr)
