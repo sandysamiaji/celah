@@ -551,14 +551,55 @@ tpBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+local isPulling = false
+local pullConnection = nil
+
 bringBtn.MouseButton1Click:Connect(function()
     local success, root, targetRoot = checkTeleportRequirements()
-    if success then
-        pcall(function()
-            targetRoot.CFrame = root.CFrame * CFrame.new(0, 0, -3)
-            targetRoot.Velocity = Vector3.new(0,0,0)
-            logAction("TELEPORT", "Berhasil menarik " .. selectedPlayer.Name .. " secara INSTAN")
+    if not success then
+        isPulling = false
+        bringBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
+        bringBtn.Text = "Tarik Dia"
+        if pullConnection then
+            pullConnection:Disconnect()
+            pullConnection = nil
+        end
+        return
+    end
+
+    isPulling = not isPulling
+    if isPulling then
+        bringBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113) -- Hijau
+        bringBtn.Text = "Stop Tarik"
+        logAction("TELEPORT", "Mulai menahan " .. selectedPlayer.Name .. " di depanmu!")
+        
+        pullConnection = RunService.RenderStepped:Connect(function()
+            if selectedPlayer and selectedPlayer.Character then
+                local currentTargetRoot = selectedPlayer.Character:FindFirstChild("HumanoidRootPart")
+                local myChar = LocalPlayer.Character
+                local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                if currentTargetRoot and myRoot then
+                    pcall(function()
+                        currentTargetRoot.CFrame = myRoot.CFrame * CFrame.new(0, 0, -3)
+                        currentTargetRoot.Velocity = Vector3.new(0, 0, 0)
+                    end)
+                end
+            else
+                -- Batal jika mati atau keluar
+                isPulling = false
+                bringBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
+                bringBtn.Text = "Tarik Dia"
+                if pullConnection then pullConnection:Disconnect() pullConnection = nil end
+            end
         end)
+    else
+        bringBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
+        bringBtn.Text = "Tarik Dia"
+        logAction("TELEPORT", "Berhenti menarik " .. selectedPlayer.Name)
+        if pullConnection then
+            pullConnection:Disconnect()
+            pullConnection = nil
+        end
     end
 end)
 
@@ -1074,12 +1115,19 @@ local function setTransparency(char, trans)
     end
 end
 
+local frameCounter = 0
 track(RunService.Stepped:Connect(function()
     local char = LocalPlayer.Character
     if State.Invisible then
         if char then
-            -- Set badan transparan 100% (tidak terlihat musuh)
-            setTransparency(char, 1)
+            frameCounter = frameCounter + 1
+            if frameCounter % 15 == 0 then
+                -- Muncul sekejap (Flicker) agar server / anti-cheat mendeteksi keberadaan
+                setTransparency(char, 0)
+            else
+                -- Transparan 100% (Ghost)
+                setTransparency(char, 1)
+            end
             
             -- Sembunyikan nametag bawaan dan custom
             local hum = char:FindFirstChild("Humanoid")
