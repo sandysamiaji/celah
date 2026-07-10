@@ -75,33 +75,40 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     local args = {...}
     
-    if State.SpyTrace and not checkcaller() then
+    if not checkcaller() then
         if method == "FireServer" or method == "InvokeServer" then
             local remoteName = tostring(self.Name)
+            
             if remoteName == "PlacementRequest" or remoteName == "PlacementState" or remoteName:match("Build") or remoteName:match("Delete") or remoteName:match("Sell") then
-                -- Tangkap tabel memori jika sedang Record
+                local actionType = tostring(args[1])
+                
+                -- HIRAUKAN SPAM! (Ini penyebab lag utamanya)
+                if actionType == "SetAttackDeployFocus" or actionType == "RequestState" or actionType == "UpdatePlacement" then
+                    return oldNamecall(self, ...)
+                end
+
+                -- Tangkap tabel memori jika sedang Record (HANYA PlaceRocketBatch)
                 if MemoryStorage.IsRecording and remoteName == "PlacementRequest" then
-                    local actionType = tostring(args[1])
-                    -- Simpan argumen jika ini adalah penempatan roket (PlaceRocketBatch / SetAttackDeployFocus)
-                    if actionType == "PlaceRocketBatch" or actionType == "SetAttackDeployFocus" then
+                    if actionType == "PlaceRocketBatch" then
                         table.insert(MemoryStorage.Rockets, args)
-                        logAction("BUILDER-MEMORY", "Berhasil menangkap 1 tabel roket! Total tersimpan: " .. #MemoryStorage.Rockets)
+                        logAction("BUILDER-MEMORY", "Menangkap roket! Total: " .. #MemoryStorage.Rockets)
                     end
                 end
 
-                -- Konversi argumen ke string untuk dilog
-                local argStr = ""
-                for i, v in ipairs(args) do
-                    if typeof(v) == "CFrame" then
-                        argStr = argStr .. string.format("CFrame(%.1f, %.1f, %.1f)", v.X, v.Y, v.Z) .. ", "
-                    elseif typeof(v) == "Instance" then
-                        argStr = argStr .. "Instance(" .. v.Name .. "), "
-                    else
-                        argStr = argStr .. tostring(v) .. ", "
+                -- Log jika SpyTrace sedang On
+                if State.SpyTrace then
+                    local argStr = ""
+                    for i, v in ipairs(args) do
+                        if typeof(v) == "CFrame" then
+                            argStr = argStr .. string.format("CFrame(%.1f, %.1f, %.1f)", v.X, v.Y, v.Z) .. ", "
+                        elseif typeof(v) == "Instance" then
+                            argStr = argStr .. "Instance(" .. v.Name .. "), "
+                        else
+                            argStr = argStr .. tostring(v) .. ", "
+                        end
                     end
+                    logAction("SPY-REMOTE", remoteName .. " | Args: [" .. argStr .. "]")
                 end
-                
-                logAction("SPY-REMOTE", remoteName .. " | Args: [" .. argStr .. "]")
             end
         end
     end
@@ -298,9 +305,32 @@ btnAutoTycoon.MouseButton1Click:Connect(function()
                 local char = LocalPlayer.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 if root then
-                    -- Fitur ini akan kita sempurnakan nanti setelah mendapat info struktur Tycoon
+                    -- Cari semua tombol tycoon yang punya TouchInterest
+                    for _, obj in pairs(workspace:GetDescendants()) do
+                        if not autoTycoonLoop then break end
+                        
+                        if obj:IsA("TouchInterest") and obj.Parent then
+                            local parentName = string.lower(obj.Parent.Name)
+                            local modelName = obj.Parent.Parent and string.lower(obj.Parent.Parent.Name) or ""
+                            
+                            -- Filter sederhana agar tidak menyentuh lava / laser
+                            if parentName:match("button") or parentName:match("buy") or parentName:match("giver") or parentName:match("upgrade") or modelName:match("button") then
+                                pcall(function()
+                                    if firetouchinterest then
+                                        firetouchinterest(root, obj.Parent, 0)
+                                        task.wait(0.01)
+                                        firetouchinterest(root, obj.Parent, 1)
+                                    else
+                                        -- Fallback teleport jika executor tidak support firetouchinterest
+                                        root.CFrame = obj.Parent.CFrame
+                                        task.wait(0.1)
+                                    end
+                                end)
+                            end
+                        end
+                    end
                 end
-                wait(2)
+                task.wait(1)
             end
         end)()
     else
