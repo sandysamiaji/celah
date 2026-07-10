@@ -297,47 +297,55 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
                     logAction("SAFEZONE", "Mencari dan menghapus zona aman secara agresif...")
                     while State.BypassSafeZone do
                         local count = 0
-                        -- 1. Hapus ForceField & Part bernama Safe di seluruh workspace
-                        for _, obj in ipairs(workspace:GetDescendants()) do
-                            local n = obj.Name:lower()
-                            if obj:IsA("ForceField") then
-                                pcall(function() obj:Destroy() end)
-                                count = count + 1
-                            elseif (n:match("safe") or n:match("zone") or n:match("lobby")) and (obj:IsA("BasePart") or obj:IsA("Model") or obj:IsA("Folder")) then
-                                -- Pastikan bukan part pemain
-                                if not obj.Parent:FindFirstChild("Humanoid") then
-                                    pcall(function() 
-                                        if obj:IsA("BasePart") then
-                                            obj.CanCollide = false
-                                            obj.Size = Vector3.new(0,0,0)
-                                            obj.CFrame = CFrame.new(0, 999999, 0)
-                                        end
-                                        obj:Destroy() 
+                        local localChar = LocalPlayer.Character
+                        local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+                        
+                        if localRoot then
+                            -- 1. Hapus Part SafeZone di sekitar karakter (Radius 60) tanpa bikin lag
+                            local params = OverlapParams.new()
+                            params.FilterType = Enum.RaycastFilterType.Exclude
+                            params.FilterDescendantsInstances = {localChar}
+                            
+                            local nearbyParts = workspace:GetPartBoundsInRadius(localRoot.Position, 60, params)
+                            for _, obj in ipairs(nearbyParts) do
+                                local n = obj.Name:lower()
+                                if n:match("safe") or n:match("zone") or n:match("lobby") then
+                                    pcall(function()
+                                        obj.CanCollide = false
+                                        obj.Size = Vector3.new(0,0,0)
+                                        obj.CFrame = CFrame.new(0, 999999, 0)
+                                        obj:Destroy()
                                     end)
                                     count = count + 1
                                 end
                             end
-                        end
-                        -- 2. Hapus ForceField & Edit properti PVP/Safe di semua pemain
-                        for _, p in ipairs(Players:GetPlayers()) do
-                            if p.Character then
-                                for _, v in ipairs(p.Character:GetDescendants()) do
-                                    if v:IsA("ForceField") then
-                                        pcall(function() v:Destroy() end)
-                                        count = count + 1
-                                    elseif v:IsA("BoolValue") then
-                                        local vn = v.Name:lower()
-                                        if vn:match("safe") and v.Value == true then
-                                            pcall(function() v.Value = false end)
-                                            count = count + 1
-                                        elseif vn:match("pvp") and v.Value == false then
-                                            pcall(function() v.Value = true end)
-                                            count = count + 1
+                            
+                            -- 2. Hapus ForceField & Edit PVP hanya pada pemain di sekitar kita (Radius 60)
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if p.Character then
+                                    local targetRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                                    -- Cek apakah itu diri kita sendiri, atau musuh dalam jarak 60 stud
+                                    if p == LocalPlayer or (targetRoot and (targetRoot.Position - localRoot.Position).Magnitude <= 60) then
+                                        for _, v in ipairs(p.Character:GetDescendants()) do
+                                            if v:IsA("ForceField") then
+                                                pcall(function() v:Destroy() end)
+                                                count = count + 1
+                                            elseif v:IsA("BoolValue") then
+                                                local vn = v.Name:lower()
+                                                if vn:match("safe") and v.Value == true then
+                                                    pcall(function() v.Value = false end)
+                                                    count = count + 1
+                                                elseif vn:match("pvp") and v.Value == false then
+                                                    pcall(function() v.Value = true end)
+                                                    count = count + 1
+                                                end
+                                            end
                                         end
                                     end
                                 end
                             end
                         end
+                        
                         if count > 0 then
                             logAction("SAFEZONE", count .. " objek Safezone/ForceField berhasil di-Bypass!")
                         end
@@ -1052,22 +1060,20 @@ track(RunService.Stepped:Connect(function()
     end
 end))
 
-local realPos = nil
+-- Invisible: Turunkan karakter ke bawah tanah di sisi server, tapi client melihat normal
+local isFlickering = false
 
--- Invisible: Di Stepped (sebelum dikirim ke server), geser karakter ke bawah tanah
 track(RunService.Stepped:Connect(function()
     local char = LocalPlayer.Character
     if State.Invisible then
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
-            -- Simpan posisi asli sebelum digeser
-            realPos = root.CFrame
-            -- Geser karakter jauh ke bawah tanah agar tidak terlihat player lain (jangan terlalu jauh agar tidak mati void)
-            root.CFrame = root.CFrame * CFrame.new(0, -25, 0)
-            -- Kunci kecepatan agar server tidak panik mengkalkulasi jatuh
-            root.Velocity = Vector3.new(0, 0, 0)
+            if not realPos then realPos = root.CFrame end
+            isFlickering = true
+            -- Pindahkan karakter ke bawah tanah di pipeline fisika (dikirim ke server)
+            root.CFrame = root.CFrame - Vector3.new(0, 25, 0)
             
-            -- Sembunyikan nametag default dan custom
+            -- Sembunyikan nametag bawaan dan custom
             local hum = char:FindFirstChild("Humanoid")
             if hum then hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end
             local head = char:FindFirstChild("Head")
@@ -1078,8 +1084,10 @@ track(RunService.Stepped:Connect(function()
             end
         end
     else
-        -- Kembalikan nametag saat tidak invisible
-        if char then
+        -- Matikan invisible
+        if char and isFlickering then
+            isFlickering = false
+            realPos = nil
             local hum = char:FindFirstChild("Humanoid")
             if hum and hum.DisplayDistanceType == Enum.HumanoidDisplayDistanceType.None then
                 hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer
@@ -1094,14 +1102,14 @@ track(RunService.Stepped:Connect(function()
     end
 end))
 
--- Invisible: Di RenderStepped (sebelum dirender di layarmu), kembalikan karakter ke posisi asli
+-- RenderStepped untuk menormalkan layar kamu sendiri (client-side)
 track(RunService.RenderStepped:Connect(function()
-    if State.Invisible then
+    if State.Invisible and isFlickering then
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root and realPos then
-            -- Kembalikan posisi ke atas tanah sehingga bagi kamu terlihat normal
-            root.CFrame = realPos
+        if root then
+            -- Tarik kembali karakter ke atas agar layarmu normal dan physics lokal tidak rusak
+            root.CFrame = root.CFrame + Vector3.new(0, 25, 0)
         end
     end
 end))
