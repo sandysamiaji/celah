@@ -232,7 +232,7 @@ local tycoonPage = Instance.new("ScrollingFrame")
 tycoonPage.Size = UDim2.new(1, 0, 1, 0)
 tycoonPage.BackgroundTransparency = 1
 tycoonPage.ScrollBarThickness = 4
-tycoonPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
+tycoonPage.CanvasSize = UDim2.new(0, 0, 0, 500)
 tycoonPage.Visible = true
 tycoonPage.Parent = contentContainer
 
@@ -245,7 +245,7 @@ local builderPage = Instance.new("ScrollingFrame")
 builderPage.Size = UDim2.new(1, 0, 1, 0)
 builderPage.BackgroundTransparency = 1
 builderPage.ScrollBarThickness = 4
-builderPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
+builderPage.CanvasSize = UDim2.new(0, 0, 0, 600)
 builderPage.Visible = false
 builderPage.Parent = contentContainer
 
