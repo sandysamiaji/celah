@@ -44,8 +44,9 @@ local State = {
     WebhookLogs = false, -- Default mati
     BypassSafeZone = false,
     CopyRadius = 500,
-    AuraRadius = 35, -- Dikembalikan ke 25 sesuai permintaan
-    AttackCooldown = 0.2
+    AuraRadius = 35,
+    AttackCooldown = 0.2,
+    SelectedPlayer = nil
 }
 
 -- Logging System
@@ -301,31 +302,11 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
                         local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
                         
                         if localRoot then
-                            -- 1. Hapus Part SafeZone di sekitar karakter (Radius 60) tanpa bikin lag
-                            local params = OverlapParams.new()
-                            params.FilterType = Enum.RaycastFilterType.Exclude
-                            params.FilterDescendantsInstances = {localChar}
-                            
-                            local nearbyParts = workspace:GetPartBoundsInRadius(localRoot.Position, 60, params)
-                            for _, obj in ipairs(nearbyParts) do
-                                local n = obj.Name:lower()
-                                if n:match("safe") or n:match("zone") or n:match("lobby") then
-                                    pcall(function()
-                                        obj.CanCollide = false
-                                        obj.Size = Vector3.new(0,0,0)
-                                        obj.CFrame = CFrame.new(0, 999999, 0)
-                                        obj:Destroy()
-                                    end)
-                                    count = count + 1
-                                end
-                            end
-                            
-                            -- 2. Hapus ForceField & Edit PVP hanya pada pemain di sekitar kita (Radius 60)
+                            -- Hapus ForceField & Edit PVP pada karakter kita sendiri DAN pemain musuh dalam radius 35
                             for _, p in ipairs(Players:GetPlayers()) do
                                 if p.Character then
                                     local targetRoot = p.Character:FindFirstChild("HumanoidRootPart")
-                                    -- Cek apakah itu diri kita sendiri, atau musuh dalam jarak 60 stud
-                                    if p == LocalPlayer or (targetRoot and (targetRoot.Position - localRoot.Position).Magnitude <= 60) then
+                                    if p == LocalPlayer or (targetRoot and (targetRoot.Position - localRoot.Position).Magnitude <= 35) then
                                         for _, v in ipairs(p.Character:GetDescendants()) do
                                             if v:IsA("ForceField") then
                                                 pcall(function() v:Destroy() end)
@@ -428,24 +409,34 @@ tpContainer.LayoutOrder = 1
 tpContainer.Parent = teleportTab
 
 local refreshBtn = Instance.new("TextButton")
-refreshBtn.Size = UDim2.new(0.48, 0, 0, 30)
+refreshBtn.Size = UDim2.new(0.32, 0, 0, 30)
 refreshBtn.Position = UDim2.new(0, 0, 0, 0)
 refreshBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
 refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 refreshBtn.Font = Enum.Font.GothamBold
 refreshBtn.TextSize = 12
-refreshBtn.Text = "Refresh Player"
+refreshBtn.Text = "Refresh"
 refreshBtn.Parent = tpContainer
 
 local tpBtn = Instance.new("TextButton")
-tpBtn.Size = UDim2.new(0.48, 0, 0, 30)
-tpBtn.Position = UDim2.new(0.52, 0, 0, 0)
+tpBtn.Size = UDim2.new(0.32, 0, 0, 30)
+tpBtn.Position = UDim2.new(0.34, 0, 0, 0)
 tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
 tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 tpBtn.Font = Enum.Font.GothamBold
 tpBtn.TextSize = 12
-tpBtn.Text = "Teleport"
+tpBtn.Text = "TP Ke Dia"
 tpBtn.Parent = tpContainer
+
+local bringBtn = Instance.new("TextButton")
+bringBtn.Size = UDim2.new(0.32, 0, 0, 30)
+bringBtn.Position = UDim2.new(0.68, 0, 0, 0)
+bringBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
+bringBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+bringBtn.Font = Enum.Font.GothamBold
+bringBtn.TextSize = 12
+bringBtn.Text = "Tarik Dia"
+bringBtn.Parent = tpContainer
 
 local playerDropdown = Instance.new("TextButton")
 playerDropdown.Size = UDim2.new(1, 0, 0, 30)
@@ -495,6 +486,7 @@ local function updatePlayerList()
             
             btn.MouseButton1Click:Connect(function()
                 selectedPlayer = player
+                State.SelectedPlayer = player
                 playerDropdown.Text = player.Name
                 playerList.Visible = false
                 tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
@@ -556,6 +548,17 @@ tpBtn.MouseButton1Click:Connect(function()
     if success then
         root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
         logAction("TELEPORT", "Berhasil teleport INSTAN ke " .. selectedPlayer.Name)
+    end
+end)
+
+bringBtn.MouseButton1Click:Connect(function()
+    local success, root, targetRoot = checkTeleportRequirements()
+    if success then
+        pcall(function()
+            targetRoot.CFrame = root.CFrame * CFrame.new(0, 0, -3)
+            targetRoot.Velocity = Vector3.new(0,0,0)
+            logAction("TELEPORT", "Berhasil menarik " .. selectedPlayer.Name .. " secara INSTAN")
+        end)
     end
 end)
 
@@ -1060,18 +1063,23 @@ track(RunService.Stepped:Connect(function()
     end
 end))
 
--- Invisible: Turunkan karakter ke bawah tanah di sisi server, tapi client melihat normal
-local isFlickering = false
+-- Invisible: Transparan Mode (Ghost)
+local function setTransparency(char, trans)
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            part.Transparency = trans
+        elseif part:IsA("Decal") then -- Wajah
+            part.Transparency = trans
+        end
+    end
+end
 
 track(RunService.Stepped:Connect(function()
     local char = LocalPlayer.Character
     if State.Invisible then
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            if not realPos then realPos = root.CFrame end
-            isFlickering = true
-            -- Pindahkan karakter ke bawah tanah di pipeline fisika (dikirim ke server)
-            root.CFrame = root.CFrame - Vector3.new(0, 25, 0)
+        if char then
+            -- Set badan transparan 100% (tidak terlihat musuh)
+            setTransparency(char, 1)
             
             -- Sembunyikan nametag bawaan dan custom
             local hum = char:FindFirstChild("Humanoid")
@@ -1084,10 +1092,9 @@ track(RunService.Stepped:Connect(function()
             end
         end
     else
-        -- Matikan invisible
-        if char and isFlickering then
-            isFlickering = false
-            realPos = nil
+        -- Matikan invisible (kembali solid)
+        if char then
+            setTransparency(char, 0)
             local hum = char:FindFirstChild("Humanoid")
             if hum and hum.DisplayDistanceType == Enum.HumanoidDisplayDistanceType.None then
                 hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer
@@ -1098,18 +1105,6 @@ track(RunService.Stepped:Connect(function()
                     end
                 end
             end
-        end
-    end
-end))
-
--- RenderStepped untuk menormalkan layar kamu sendiri (client-side)
-track(RunService.RenderStepped:Connect(function()
-    if State.Invisible and isFlickering then
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            -- Tarik kembali karakter ke atas agar layarmu normal dan physics lokal tidak rusak
-            root.CFrame = root.CFrame + Vector3.new(0, 25, 0)
         end
     end
 end))
