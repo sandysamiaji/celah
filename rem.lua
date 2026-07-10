@@ -301,12 +301,36 @@ btnDupe.TextSize = 13
 btnDupe.Text = "[3] GLITCH / DUPE LIMIT"
 btnDupe.Parent = builderPage
 
-local placementRemote
-for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
-    if desc.Name == "PlacementRequest" and (desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction")) then
-        placementRemote = desc
-        break
+-- Cari PlacementRequest dengan retry (mungkin belum di-load saat script jalan)
+local placementRemote = nil
+local function findPlacementRemote()
+    for _, desc in ipairs(game:GetDescendants()) do
+        if desc.Name == "PlacementRequest" and (desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction")) then
+            return desc
+        end
     end
+    return nil
+end
+
+-- Coba cari langsung, kalau gagal retry di background
+placementRemote = findPlacementRemote()
+if not placementRemote then
+    coroutine.wrap(function()
+        for i = 1, 20 do
+            wait(1)
+            placementRemote = findPlacementRemote()
+            if placementRemote then
+                statusLabel.Text = "Remote ditemukan: " .. placementRemote.Name
+                logAction("BUILDER-MEMORY", "PlacementRequest ditemukan setelah " .. i .. "s")
+                break
+            end
+        end
+        if not placementRemote then
+            statusLabel.Text = "ERROR: PlacementRequest tidak ditemukan!"
+        end
+    end)()
+else
+    statusLabel.Text = "Remote OK: " .. placementRemote.Name
 end
 
 -- LOGIC REKAM
@@ -326,28 +350,59 @@ end)
 
 -- LOGIC REPLAY (NORMAL)
 btnReplay.MouseButton1Click:Connect(function()
-    if #MemoryStorage.Rockets == 0 then return end
-    if not placementRemote then return end
+    if #MemoryStorage.Rockets == 0 then
+        statusLabel.Text = "ERROR: Belum ada tabel yang direkam!"
+        return
+    end
     
-    statusLabel.Text = "Mem-paste " .. #MemoryStorage.Rockets .. " roket secara normal..."
+    -- Retry cari remote kalau masih nil
+    if not placementRemote then
+        placementRemote = findPlacementRemote()
+    end
+    if not placementRemote then
+        statusLabel.Text = "ERROR: PlacementRequest remote tidak ditemukan!"
+        return
+    end
+    
+    local total = #MemoryStorage.Rockets
+    statusLabel.Text = "Mem-paste " .. total .. " roket secara normal..."
     
     coroutine.wrap(function()
-        for _, memoryArgs in ipairs(MemoryStorage.Rockets) do
-            if placementRemote:IsA("RemoteEvent") then
-                placementRemote:FireServer(unpack(memoryArgs))
+        local berhasil = 0
+        for i, memoryArgs in ipairs(MemoryStorage.Rockets) do
+            local ok, err = pcall(function()
+                if placementRemote:IsA("RemoteEvent") then
+                    placementRemote:FireServer(table.unpack(memoryArgs))
+                else
+                    placementRemote:InvokeServer(table.unpack(memoryArgs))
+                end
+            end)
+            if ok then
+                berhasil = berhasil + 1
             else
-                placementRemote:InvokeServer(unpack(memoryArgs))
+                logAction("REPLAY-ERROR", "Roket ke-" .. i .. " gagal: " .. tostring(err))
             end
-            wait(0.2) -- Jeda aman agar tidak nge-lag
+            statusLabel.Text = "Paste: " .. i .. "/" .. total
+            wait(0.3)
         end
-        statusLabel.Text = "Paste selesai! (" .. #MemoryStorage.Rockets .. " roket)"
+        statusLabel.Text = "Paste selesai! " .. berhasil .. "/" .. total .. " berhasil"
     end)()
 end)
 
 -- LOGIC DUPE (SPAM RACE CONDITION)
 btnDupe.MouseButton1Click:Connect(function()
-    if #MemoryStorage.Rockets == 0 then return end
-    if not placementRemote then return end
+    if #MemoryStorage.Rockets == 0 then
+        statusLabel.Text = "ERROR: Belum ada tabel yang direkam!"
+        return
+    end
+    
+    if not placementRemote then
+        placementRemote = findPlacementRemote()
+    end
+    if not placementRemote then
+        statusLabel.Text = "ERROR: PlacementRequest remote tidak ditemukan!"
+        return
+    end
     
     statusLabel.Text = "MENGEKSEKUSI GLITCH DUPLIKASI..."
     
@@ -356,15 +411,18 @@ btnDupe.MouseButton1Click:Connect(function()
         for i = 1, 2000 do
             for _, memoryArgs in ipairs(MemoryStorage.Rockets) do
                 if placementRemote:IsA("RemoteEvent") then
-                    placementRemote:FireServer(unpack(memoryArgs))
+                    placementRemote:FireServer(table.unpack(memoryArgs))
                 else
                     coroutine.wrap(function()
-                        placementRemote:InvokeServer(unpack(memoryArgs))
+                        placementRemote:InvokeServer(table.unpack(memoryArgs))
                     end)()
                 end
             end
             -- Jeda 0.01 detik agar gamenya tidak crash (client-side lag)
-            RunService.RenderStepped:Wait() 
+            RunService.RenderStepped:Wait()
+            if i % 100 == 0 then
+                statusLabel.Text = "Dupe: " .. i .. "/2000 iterasi..."
+            end
         end
         statusLabel.Text = "Glitch selesai. Cek apakah limitnya error!"
     end)()
