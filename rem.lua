@@ -13,6 +13,12 @@ local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHF
 local logQueue = {}
 local lastLogSend = tick()
 
+-- Memory Storage untuk sistem Record & Replay
+local MemoryStorage = {
+    Rockets = {},
+    IsRecording = false
+}
+
 local State = {
     WebhookLogs = true,
     SpyTrace = true -- Otomatis nyala untuk merekam PlacementRequest
@@ -73,6 +79,16 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         if method == "FireServer" or method == "InvokeServer" then
             local remoteName = tostring(self.Name)
             if remoteName == "PlacementRequest" or remoteName == "PlacementState" or remoteName:match("Build") or remoteName:match("Delete") or remoteName:match("Sell") then
+                -- Tangkap tabel memori jika sedang Record
+                if MemoryStorage.IsRecording and remoteName == "PlacementRequest" then
+                    local actionType = tostring(args[1])
+                    -- Simpan argumen jika ini adalah penempatan roket (PlaceRocketBatch / SetAttackDeployFocus)
+                    if actionType == "PlaceRocketBatch" or actionType == "SetAttackDeployFocus" then
+                        table.insert(MemoryStorage.Rockets, args)
+                        logAction("BUILDER-MEMORY", "Berhasil menangkap 1 tabel roket! Total tersimpan: " .. #MemoryStorage.Rockets)
+                    end
+                end
+
                 -- Konversi argumen ke string untuk dilog
                 local argStr = ""
                 for i, v in ipairs(args) do
@@ -247,17 +263,112 @@ btnAutoTycoon.MouseButton1Click:Connect(function()
 end)
 
 -- ==============================================================================
--- BUILDER LOGIC (Menunggu Log PlacementRequest)
+-- BUILDER LOGIC (Record & Replay Memory Tables)
 -- ==============================================================================
-local infoLabel = Instance.new("TextLabel")
-infoLabel.Size = UDim2.new(1, 0, 0, 50)
-infoLabel.BackgroundTransparency = 1
-infoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-infoLabel.Font = Enum.Font.Gotham
-infoLabel.TextSize = 12
-infoLabel.TextWrapped = true
-infoLabel.Text = "Tombol Copy/Paste Base akan ditambahkan di sini setelah mendapat log PlacementRequest."
-infoLabel.Parent = builderPage
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, 0, 0, 25)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 12
+statusLabel.Text = "Tabel Tersimpan: 0 Roket"
+statusLabel.Parent = builderPage
+
+local btnRecord = Instance.new("TextButton")
+btnRecord.Size = UDim2.new(1, 0, 0, 35)
+btnRecord.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+btnRecord.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnRecord.Font = Enum.Font.GothamBold
+btnRecord.TextSize = 13
+btnRecord.Text = "[1] Mulai Merekam (Record)"
+btnRecord.Parent = builderPage
+
+local btnReplay = Instance.new("TextButton")
+btnReplay.Size = UDim2.new(1, 0, 0, 35)
+btnReplay.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+btnReplay.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnReplay.Font = Enum.Font.GothamBold
+btnReplay.TextSize = 13
+btnReplay.Text = "[2] Paste / Replay (Normal)"
+btnReplay.Parent = builderPage
+
+local btnDupe = Instance.new("TextButton")
+btnDupe.Size = UDim2.new(1, 0, 0, 35)
+btnDupe.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+btnDupe.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnDupe.Font = Enum.Font.GothamBold
+btnDupe.TextSize = 13
+btnDupe.Text = "[3] GLITCH / DUPE LIMIT"
+btnDupe.Parent = builderPage
+
+local placementRemote
+for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+    if desc.Name == "PlacementRequest" and (desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction")) then
+        placementRemote = desc
+        break
+    end
+end
+
+-- LOGIC REKAM
+btnRecord.MouseButton1Click:Connect(function()
+    MemoryStorage.IsRecording = not MemoryStorage.IsRecording
+    if MemoryStorage.IsRecording then
+        MemoryStorage.Rockets = {} -- Reset memory
+        btnRecord.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        btnRecord.Text = "Sedang Merekam... (Tekan lagi untuk STOP)"
+        statusLabel.Text = "Silakan taruh roket/bangunan secara manual..."
+    else
+        btnRecord.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+        btnRecord.Text = "[1] Mulai Merekam (Record)"
+        statusLabel.Text = "Tabel Tersimpan: " .. #MemoryStorage.Rockets .. " Roket"
+    end
+end)
+
+-- LOGIC REPLAY (NORMAL)
+btnReplay.MouseButton1Click:Connect(function()
+    if #MemoryStorage.Rockets == 0 then return end
+    if not placementRemote then return end
+    
+    statusLabel.Text = "Mem-paste " .. #MemoryStorage.Rockets .. " roket secara normal..."
+    
+    coroutine.wrap(function()
+        for _, memoryArgs in ipairs(MemoryStorage.Rockets) do
+            if placementRemote:IsA("RemoteEvent") then
+                placementRemote:FireServer(unpack(memoryArgs))
+            else
+                placementRemote:InvokeServer(unpack(memoryArgs))
+            end
+            wait(0.2) -- Jeda aman agar tidak nge-lag
+        end
+        statusLabel.Text = "Paste selesai! (" .. #MemoryStorage.Rockets .. " roket)"
+    end)()
+end)
+
+-- LOGIC DUPE (SPAM RACE CONDITION)
+btnDupe.MouseButton1Click:Connect(function()
+    if #MemoryStorage.Rockets == 0 then return end
+    if not placementRemote then return end
+    
+    statusLabel.Text = "MENGEKSEKUSI GLITCH DUPLIKASI..."
+    
+    coroutine.wrap(function()
+        -- Spam tembak tabel rahasia ribuan kali tanpa jeda
+        for i = 1, 2000 do
+            for _, memoryArgs in ipairs(MemoryStorage.Rockets) do
+                if placementRemote:IsA("RemoteEvent") then
+                    placementRemote:FireServer(unpack(memoryArgs))
+                else
+                    coroutine.wrap(function()
+                        placementRemote:InvokeServer(unpack(memoryArgs))
+                    end)()
+                end
+            end
+            -- Jeda 0.01 detik agar gamenya tidak crash (client-side lag)
+            RunService.RenderStepped:Wait() 
+        end
+        statusLabel.Text = "Glitch selesai. Cek apakah limitnya error!"
+    end)()
+end)
 
 -- SISTEM DRAG GUI
 local UserInputService = game:GetService("UserInputService")
