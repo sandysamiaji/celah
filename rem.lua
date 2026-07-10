@@ -362,36 +362,33 @@ local function findPlacementRemote()
     return nil
 end
 
--- Helper: debug print isi tabel ke log
-local function debugArgs(args, depth)
+-- Helper: dump tabel secara rekursif
+local function dumpTable(tbl, depth)
     depth = depth or 1
-    if depth > 2 then return tostring(args) end
+    if depth > 5 then return "{...}" end
+    if typeof(tbl) ~= "table" then
+        if typeof(tbl) == "CFrame" then
+            return string.format("CFrame(%.1f,%.1f,%.1f)", tbl.X, tbl.Y, tbl.Z)
+        elseif type(tbl) == "string" then
+            return '"' .. tbl .. '"'
+        else
+            return tostring(tbl)
+        end
+    end
     
     local parts = {}
-    for i, v in pairs(args) do
-        local t = typeof(v)
-        if t == "table" then
-            local tblParts = {}
-            for k, val in pairs(v) do
-                local valStr = tostring(val)
-                if typeof(val) == "table" then
-                    -- Rekursif ke dalam tabel maksimal 2 level
-                    if depth < 2 then
-                        valStr = debugArgs({val}, depth + 1)
-                    else
-                        valStr = "table:..."
-                    end
-                elseif typeof(val) == "CFrame" then
-                    valStr = string.format("CFrame(%.1f,%.1f,%.1f)", val.X, val.Y, val.Z)
-                end
-                table.insert(tblParts, tostring(k) .. "=" .. valStr)
-            end
-            table.insert(parts, "table{" .. table.concat(tblParts, ", ") .. "}")
-        elseif t == "CFrame" then
-            table.insert(parts, string.format("CFrame(%.1f,%.1f,%.1f)", v.X, v.Y, v.Z))
-        else
-            table.insert(parts, tostring(v))
-        end
+    for k, v in pairs(tbl) do
+        local keyStr = type(k) == "string" and k or "[" .. tostring(k) .. "]"
+        table.insert(parts, keyStr .. "=" .. dumpTable(v, depth + 1))
+    end
+    return "{" .. table.concat(parts, ", ") .. "}"
+end
+
+-- Helper: debug print args ke log
+local function debugArgs(args)
+    local parts = {}
+    for _, v in pairs(args) do
+        table.insert(parts, dumpTable(v, 1))
     end
     return table.concat(parts, ", ")
 end
