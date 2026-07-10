@@ -133,7 +133,7 @@ uiCorner.CornerRadius = UDim.new(0, 10)
 uiCorner.Parent = frame
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
+title.Size = UDim2.new(1, -40, 0, 40) -- Adjusted size to make room for minimize button
 title.BackgroundColor3 = Color3.fromRGB(30, 40, 45)
 title.TextColor3 = Color3.fromRGB(46, 204, 113)
 title.Font = Enum.Font.GothamBold
@@ -144,6 +144,50 @@ title.Parent = frame
 local titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 10)
 titleCorner.Parent = title
+
+local btnMinimize = Instance.new("TextButton")
+btnMinimize.Size = UDim2.new(0, 40, 0, 40)
+btnMinimize.Position = UDim2.new(1, -40, 0, 0)
+btnMinimize.BackgroundColor3 = Color3.fromRGB(30, 40, 45)
+btnMinimize.TextColor3 = Color3.fromRGB(200, 200, 200)
+btnMinimize.Font = Enum.Font.GothamBold
+btnMinimize.TextSize = 18
+btnMinimize.Text = "-"
+btnMinimize.Parent = frame
+
+local minimizeCorner = Instance.new("UICorner")
+minimizeCorner.CornerRadius = UDim.new(0, 10)
+minimizeCorner.Parent = btnMinimize
+
+local isMinimized = false
+btnMinimize.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        btnMinimize.Text = "+"
+        frame.Size = UDim2.new(0, 400, 0, 40)
+        -- Sembunyikan konten lain
+        for _, child in ipairs(frame:GetChildren()) do
+            if child ~= title and child ~= btnMinimize and child ~= uiCorner then
+                child.Visible = false
+            end
+        end
+    else
+        btnMinimize.Text = "-"
+        frame.Size = UDim2.new(0, 400, 0, 300)
+        -- Tampilkan konten lain
+        for _, child in ipairs(frame:GetChildren()) do
+            if child ~= title and child ~= btnMinimize and child ~= uiCorner then
+                child.Visible = true
+            end
+        end
+        -- Kembalikan state tab
+        if tycoonPage.Visible then
+            builderPage.Visible = false
+        else
+            tycoonPage.Visible = false
+        end
+    end
+end)
 
 local tabContainer = Instance.new("Frame")
 tabContainer.Size = UDim2.new(1, 0, 0, 35)
@@ -324,9 +368,15 @@ local function debugArgs(args)
     for i, v in ipairs(args) do
         local t = typeof(v)
         if t == "table" then
-            local keys = 0
-            for _ in pairs(v) do keys = keys + 1 end
-            table.insert(parts, "table[" .. keys .. "keys]")
+            local tblParts = {}
+            for k, val in pairs(v) do
+                local valStr = tostring(val)
+                if typeof(val) == "CFrame" then
+                    valStr = string.format("CFrame(%.1f,%.1f,%.1f)", val.X, val.Y, val.Z)
+                end
+                table.insert(tblParts, tostring(k) .. "=" .. valStr)
+            end
+            table.insert(parts, "table{" .. table.concat(tblParts, ", ") .. "}")
         elseif t == "CFrame" then
             table.insert(parts, string.format("CFrame(%.1f,%.1f,%.1f)", v.X, v.Y, v.Z))
         else
