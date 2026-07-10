@@ -515,8 +515,6 @@ btnDupe.MouseButton1Click:Connect(function()
                 statusLabel.Text = "Dupe: " .. i .. "/2000 iterasi..."
             end
         end
-        statusLabel.Text = "Glitch selesai. Cek apakah limitnya error!"
-    end)()
     end)()
 end)
 
