@@ -1049,17 +1049,59 @@ track(RunService.Stepped:Connect(function()
                 end
             end
         end
-        
-        -- Invisible (Desync/RootJoint Break)
-        if State.Invisible then
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root then
-                local joint = root:FindFirstChild("RootJoint") or root:FindFirstChild("Root")
-                if joint then 
-                    joint:Destroy()
-                    logAction("INVISIBLE", "RootJoint dihancurkan (Karakter menghilang dari server)")
+    end
+end))
+
+local realPos = nil
+
+-- Invisible: Di Stepped (sebelum dikirim ke server), geser karakter ke bawah tanah
+track(RunService.Stepped:Connect(function()
+    local char = LocalPlayer.Character
+    if State.Invisible then
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            -- Simpan posisi asli sebelum digeser
+            realPos = root.CFrame
+            -- Geser karakter jauh ke bawah tanah agar tidak terlihat player lain (jangan terlalu jauh agar tidak mati void)
+            root.CFrame = root.CFrame * CFrame.new(0, -25, 0)
+            -- Kunci kecepatan agar server tidak panik mengkalkulasi jatuh
+            root.Velocity = Vector3.new(0, 0, 0)
+            
+            -- Sembunyikan nametag default dan custom
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end
+            local head = char:FindFirstChild("Head")
+            if head then
+                for _, v in ipairs(head:GetChildren()) do
+                    if v:IsA("BillboardGui") then v.Enabled = false end
                 end
             end
+        end
+    else
+        -- Kembalikan nametag saat tidak invisible
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum and hum.DisplayDistanceType == Enum.HumanoidDisplayDistanceType.None then
+                hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer
+                local head = char:FindFirstChild("Head")
+                if head then
+                    for _, v in ipairs(head:GetChildren()) do
+                        if v:IsA("BillboardGui") then v.Enabled = true end
+                    end
+                end
+            end
+        end
+    end
+end))
+
+-- Invisible: Di RenderStepped (sebelum dirender di layarmu), kembalikan karakter ke posisi asli
+track(RunService.RenderStepped:Connect(function()
+    if State.Invisible then
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root and realPos then
+            -- Kembalikan posisi ke atas tanah sehingga bagi kamu terlihat normal
+            root.CFrame = realPos
         end
     end
 end))
@@ -1104,7 +1146,25 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         end
     end
     
-    return oldNamecall(self, ...)
+    return oldNamecall(self, unpack(args))
+end)
+
+local oldIndex
+oldIndex = hookmetamethod(game, "__index", function(self, key)
+    if not checkcaller() and State.BypassSafeZone then
+        -- Spoof posisi karakter jika game mengecek posisi (agar dikira selalu di Area Merah)
+        if self:IsA("BasePart") and self.Name == "HumanoidRootPart" then
+            local char = LocalPlayer.Character
+            if char and self:IsDescendantOf(char) then
+                if key == "Position" then
+                    return Vector3.new(-521.7, 92.2, -276.2)
+                elseif key == "CFrame" then
+                    return CFrame.new(-521.7, 92.2, -276.2)
+                end
+            end
+        end
+    end
+    return oldIndex(self, key)
 end)
 
 -- 6. EQUIP TOOL TRACKER
