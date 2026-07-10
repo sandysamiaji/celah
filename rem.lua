@@ -232,6 +232,7 @@ local tycoonPage = Instance.new("ScrollingFrame")
 tycoonPage.Size = UDim2.new(1, 0, 1, 0)
 tycoonPage.BackgroundTransparency = 1
 tycoonPage.ScrollBarThickness = 4
+tycoonPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
 tycoonPage.Visible = true
 tycoonPage.Parent = contentContainer
 
@@ -244,6 +245,7 @@ local builderPage = Instance.new("ScrollingFrame")
 builderPage.Size = UDim2.new(1, 0, 1, 0)
 builderPage.BackgroundTransparency = 1
 builderPage.ScrollBarThickness = 4
+builderPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
 builderPage.Visible = false
 builderPage.Parent = contentContainer
 
@@ -344,6 +346,24 @@ btnDupe.Font = Enum.Font.GothamBold
 btnDupe.TextSize = 13
 btnDupe.Text = "[3] GLITCH / DUPE LIMIT"
 btnDupe.Parent = builderPage
+
+local btnBypassDict = Instance.new("TextButton")
+btnBypassDict.Size = UDim2.new(1, 0, 0, 35)
+btnBypassDict.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
+btnBypassDict.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnBypassDict.Font = Enum.Font.GothamBold
+btnBypassDict.TextSize = 13
+btnBypassDict.Text = "[4] BYPASS COST (0-Cost Dict)"
+btnBypassDict.Parent = builderPage
+
+local btnBypassArray = Instance.new("TextButton")
+btnBypassArray.Size = UDim2.new(1, 0, 0, 35)
+btnBypassArray.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
+btnBypassArray.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnBypassArray.Font = Enum.Font.GothamBold
+btnBypassArray.TextSize = 13
+btnBypassArray.Text = "[5] BYPASS COST (Batch 100x)"
+btnBypassArray.Parent = builderPage
 
 -- Akses langsung ke path pasti (dari hasil spy: ReplicatedStorage.PlacementRemotes.PlacementRequest)
 local placementRemote = nil
@@ -496,6 +516,96 @@ btnDupe.MouseButton1Click:Connect(function()
             end
         end
         statusLabel.Text = "Glitch selesai. Cek apakah limitnya error!"
+    end)()
+    end)()
+end)
+
+-- LOGIC BYPASS DICTIONARY (Mencoba 0-Cost bypass)
+btnBypassDict.MouseButton1Click:Connect(function()
+    if #MemoryStorage.Rockets == 0 then
+        statusLabel.Text = "ERROR: Belum ada roket direkam!"
+        return
+    end
+    if not placementRemote then placementRemote = findPlacementRemote() end
+    if not placementRemote then return end
+    
+    statusLabel.Text = "Mengeksekusi Bypass Dictionary..."
+    coroutine.wrap(function()
+        local memoryArgs = MemoryStorage.Rockets[1]
+        local newArgs = {}
+        for i, v in ipairs(memoryArgs) do newArgs[i] = v end
+        
+        if type(newArgs[2]) == "table" and type(newArgs[2].Entries) == "table" then
+            local payload = {}
+            for k,v in pairs(newArgs[2]) do payload[k] = v end
+            
+            local originalEntries = payload.Entries
+            local newEntries = {}
+            for i, entry in pairs(originalEntries) do
+                newEntries["Exploit_Key_Bypass_Cost_" .. tostring(i)] = entry
+            end
+            payload.Entries = newEntries
+            newArgs[2] = payload
+            
+            if placementRemote:IsA("RemoteEvent") then
+                placementRemote:FireServer(table.unpack(newArgs))
+            else
+                placementRemote:InvokeServer(table.unpack(newArgs))
+            end
+            statusLabel.Text = "Bypass Dict Dikirim! Cek game apakah berhasil."
+            logAction("EXPLOIT", "Bypass Dict Dikirim!")
+        else
+            statusLabel.Text = "ERROR: Format tabel Entries tidak cocok!"
+        end
+    end)()
+end)
+
+-- LOGIC BYPASS BATCH ARRAY (Mencoba Spam 100 entries di 1 paket)
+btnBypassArray.MouseButton1Click:Connect(function()
+    if #MemoryStorage.Rockets == 0 then
+        statusLabel.Text = "ERROR: Belum ada roket direkam!"
+        return
+    end
+    if not placementRemote then placementRemote = findPlacementRemote() end
+    if not placementRemote then return end
+    
+    statusLabel.Text = "Mengeksekusi Bypass Batch X100..."
+    coroutine.wrap(function()
+        local memoryArgs = MemoryStorage.Rockets[1]
+        local newArgs = {}
+        for i, v in ipairs(memoryArgs) do newArgs[i] = v end
+        
+        if type(newArgs[2]) == "table" and type(newArgs[2].Entries) == "table" then
+            local payload = {}
+            for k,v in pairs(newArgs[2]) do payload[k] = v end
+            
+            local originalEntry = payload.Entries[1]
+            if originalEntry then
+                local newEntries = {}
+                for i = 1, 100 do
+                    local dupedEntry = {}
+                    for k, v in pairs(originalEntry) do dupedEntry[k] = v end
+                    if dupedEntry.OriginZ then
+                        dupedEntry.OriginZ = dupedEntry.OriginZ + (i * 1.5)
+                    end
+                    newEntries[i] = dupedEntry
+                end
+                payload.Entries = newEntries
+                newArgs[2] = payload
+                
+                if placementRemote:IsA("RemoteEvent") then
+                    placementRemote:FireServer(table.unpack(newArgs))
+                else
+                    placementRemote:InvokeServer(table.unpack(newArgs))
+                end
+                statusLabel.Text = "Batch X100 Dikirim! Cek apakah uang kurang."
+                logAction("EXPLOIT", "Bypass Batch X100 Dikirim!")
+            else
+                statusLabel.Text = "ERROR: Entri pertama kosong!"
+            end
+        else
+            statusLabel.Text = "ERROR: Format tabel Entries tidak cocok!"
+        end
     end)()
 end)
 
