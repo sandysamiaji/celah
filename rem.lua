@@ -1,0 +1,295 @@
+-- ==============================================================================
+-- ANTIGRAVITY MILITARY EXPLOIT (rem.lua)
+-- ==============================================================================
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Konfigurasi Webhook
+local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
+local logQueue = {}
+local lastLogSend = tick()
+
+local State = {
+    WebhookLogs = true,
+    SpyTrace = true -- Otomatis nyala untuk merekam PlacementRequest
+}
+
+-- Logging System
+local function logAction(action, text)
+    local t = os.date("%H:%M:%S")
+    local msg = string.format("[%s] %s | %s", t, action, text)
+    table.insert(logQueue, msg)
+end
+
+local function processLogQueue()
+    if #logQueue == 0 then return end
+    
+    local payload = {
+        content = table.concat(logQueue, "\n")
+    }
+    
+    -- Clear queue
+    logQueue = {}
+    
+    if State.WebhookLogs then
+        pcall(function()
+            local jsonData = HttpService:JSONEncode(payload)
+            local req = nil
+            if syn and syn.request then req = syn.request
+            elseif http and http.request then req = http.request
+            elseif request then req = request end
+            
+            if req then
+                req({
+                    Url = WEBHOOK_URL,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = jsonData
+                })
+            end
+        end)
+    end
+end
+
+-- Looping pengiriman webhook tiap 2 detik
+coroutine.wrap(function()
+    while true do
+        wait(2)
+        processLogQueue()
+    end
+end)()
+
+-- SPY REMOTE SYSTEM (Otomatis merekam PlacementRequest / Delete)
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if State.SpyTrace and not checkcaller() then
+        if method == "FireServer" or method == "InvokeServer" then
+            local remoteName = tostring(self.Name)
+            if remoteName == "PlacementRequest" or remoteName == "PlacementState" or remoteName:match("Build") or remoteName:match("Delete") or remoteName:match("Sell") then
+                -- Konversi argumen ke string untuk dilog
+                local argStr = ""
+                for i, v in ipairs(args) do
+                    if typeof(v) == "CFrame" then
+                        argStr = argStr .. string.format("CFrame(%.1f, %.1f, %.1f)", v.X, v.Y, v.Z) .. ", "
+                    elseif typeof(v) == "Instance" then
+                        argStr = argStr .. "Instance(" .. v.Name .. "), "
+                    else
+                        argStr = argStr .. tostring(v) .. ", "
+                    end
+                end
+                
+                logAction("SPY-REMOTE", remoteName .. " | Args: [" .. argStr .. "]")
+            end
+        end
+    end
+    
+    return oldNamecall(self, ...)
+end)
+
+-- Bersihkan GUI Lama jika ada
+if CoreGui:FindFirstChild("AntiGravityMilitary") then
+    CoreGui.AntiGravityMilitary:Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AntiGravityMilitary"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = CoreGui
+
+-- Main Frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 400, 0, 300)
+frame.Position = UDim2.new(0.5, -200, 0.5, -150)
+frame.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 10)
+uiCorner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundColor3 = Color3.fromRGB(30, 40, 45)
+title.TextColor3 = Color3.fromRGB(46, 204, 113)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Text = "ANTIGRAVITY - MILITARY HUB"
+title.Parent = frame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.Parent = title
+
+local tabContainer = Instance.new("Frame")
+tabContainer.Size = UDim2.new(1, 0, 0, 35)
+tabContainer.Position = UDim2.new(0, 0, 0, 45)
+tabContainer.BackgroundTransparency = 1
+tabContainer.Parent = frame
+
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+tabLayout.Padding = UDim.new(0, 10)
+tabLayout.Parent = tabContainer
+
+local function createTabButton(name)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 100, 1, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 55, 65)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 13
+    btn.Text = name
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = btn
+    
+    btn.Parent = tabContainer
+    return btn
+end
+
+local btnTycoon = createTabButton("Tycoon")
+local btnBuilder = createTabButton("Free Build")
+
+local contentContainer = Instance.new("Frame")
+contentContainer.Size = UDim2.new(1, -20, 1, -95)
+contentContainer.Position = UDim2.new(0, 10, 0, 85)
+contentContainer.BackgroundTransparency = 1
+contentContainer.Parent = frame
+
+-- Tab Pages
+local tycoonPage = Instance.new("ScrollingFrame")
+tycoonPage.Size = UDim2.new(1, 0, 1, 0)
+tycoonPage.BackgroundTransparency = 1
+tycoonPage.ScrollBarThickness = 4
+tycoonPage.Visible = true
+tycoonPage.Parent = contentContainer
+
+local tycoonLayout = Instance.new("UIListLayout")
+tycoonLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tycoonLayout.Padding = UDim.new(0, 8)
+tycoonLayout.Parent = tycoonPage
+
+local builderPage = Instance.new("ScrollingFrame")
+builderPage.Size = UDim2.new(1, 0, 1, 0)
+builderPage.BackgroundTransparency = 1
+builderPage.ScrollBarThickness = 4
+builderPage.Visible = false
+builderPage.Parent = contentContainer
+
+local builderLayout = Instance.new("UIListLayout")
+builderLayout.SortOrder = Enum.SortOrder.LayoutOrder
+builderLayout.Padding = UDim.new(0, 8)
+builderLayout.Parent = builderPage
+
+-- Tab Switching Logic
+btnTycoon.MouseButton1Click:Connect(function()
+    tycoonPage.Visible = true
+    builderPage.Visible = false
+    btnTycoon.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+    btnBuilder.BackgroundColor3 = Color3.fromRGB(45, 55, 65)
+end)
+
+btnBuilder.MouseButton1Click:Connect(function()
+    tycoonPage.Visible = false
+    builderPage.Visible = true
+    btnTycoon.BackgroundColor3 = Color3.fromRGB(45, 55, 65)
+    btnBuilder.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+end)
+
+-- Default Tab State
+btnTycoon.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+
+-- ==============================================================================
+-- TYCOON LOGIC
+-- ==============================================================================
+local autoTycoonLoop = false
+local btnAutoTycoon = Instance.new("TextButton")
+btnAutoTycoon.Size = UDim2.new(1, 0, 0, 35)
+btnAutoTycoon.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+btnAutoTycoon.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnAutoTycoon.Font = Enum.Font.GothamBold
+btnAutoTycoon.TextSize = 13
+btnAutoTycoon.Text = "Auto Collect / Claim Tycoon Buttons [OFF]"
+btnAutoTycoon.Parent = tycoonPage
+
+btnAutoTycoon.MouseButton1Click:Connect(function()
+    autoTycoonLoop = not autoTycoonLoop
+    if autoTycoonLoop then
+        btnAutoTycoon.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        btnAutoTycoon.Text = "Auto Tycoon [ON]"
+        
+        -- Background loop untuk menyentuh semua tombol
+        coroutine.wrap(function()
+            while autoTycoonLoop do
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    -- Fitur ini akan kita sempurnakan nanti setelah mendapat info struktur Tycoon
+                end
+                wait(2)
+            end
+        end)()
+    else
+        btnAutoTycoon.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+        btnAutoTycoon.Text = "Auto Tycoon [OFF]"
+    end
+end)
+
+-- ==============================================================================
+-- BUILDER LOGIC (Menunggu Log PlacementRequest)
+-- ==============================================================================
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Size = UDim2.new(1, 0, 0, 50)
+infoLabel.BackgroundTransparency = 1
+infoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+infoLabel.Font = Enum.Font.Gotham
+infoLabel.TextSize = 12
+infoLabel.TextWrapped = true
+infoLabel.Text = "Tombol Copy/Paste Base akan ditambahkan di sini setelah mendapat log PlacementRequest."
+infoLabel.Parent = builderPage
+
+-- SISTEM DRAG GUI
+local UserInputService = game:GetService("UserInputService")
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
