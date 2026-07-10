@@ -301,9 +301,15 @@ btnDupe.TextSize = 13
 btnDupe.Text = "[3] GLITCH / DUPE LIMIT"
 btnDupe.Parent = builderPage
 
--- Cari PlacementRequest dengan retry (mungkin belum di-load saat script jalan)
+-- Akses langsung ke path pasti (dari hasil spy: ReplicatedStorage.PlacementRemotes.PlacementRequest)
 local placementRemote = nil
 local function findPlacementRemote()
+    -- Coba path langsung dulu (paling cepat & pasti)
+    local direct = ReplicatedStorage:FindFirstChild("PlacementRemotes")
+        and ReplicatedStorage.PlacementRemotes:FindFirstChild("PlacementRequest")
+    if direct then return direct end
+    
+    -- Fallback: scan seluruh descendants
     for _, desc in ipairs(game:GetDescendants()) do
         if desc.Name == "PlacementRequest" and (desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction")) then
             return desc
@@ -312,25 +318,31 @@ local function findPlacementRemote()
     return nil
 end
 
--- Coba cari langsung, kalau gagal retry di background
+-- Helper: debug print isi tabel ke log
+local function debugArgs(args)
+    local parts = {}
+    for i, v in ipairs(args) do
+        local t = typeof(v)
+        if t == "table" then
+            local keys = 0
+            for _ in pairs(v) do keys = keys + 1 end
+            table.insert(parts, "table[" .. keys .. "keys]")
+        elseif t == "CFrame" then
+            table.insert(parts, string.format("CFrame(%.1f,%.1f,%.1f)", v.X, v.Y, v.Z))
+        else
+            table.insert(parts, tostring(v))
+        end
+    end
+    return table.concat(parts, ", ")
+end
+
+-- Inisialisasi remote
 placementRemote = findPlacementRemote()
-if not placementRemote then
-    coroutine.wrap(function()
-        for i = 1, 20 do
-            wait(1)
-            placementRemote = findPlacementRemote()
-            if placementRemote then
-                statusLabel.Text = "Remote ditemukan: " .. placementRemote.Name
-                logAction("BUILDER-MEMORY", "PlacementRequest ditemukan setelah " .. i .. "s")
-                break
-            end
-        end
-        if not placementRemote then
-            statusLabel.Text = "ERROR: PlacementRequest tidak ditemukan!"
-        end
-    end)()
+if placementRemote then
+    statusLabel.Text = "Remote OK: " .. placementRemote.ClassName .. " -> " .. placementRemote:GetFullName()
+    logAction("BUILDER-MEMORY", "Remote siap: " .. placementRemote:GetFullName())
 else
-    statusLabel.Text = "Remote OK: " .. placementRemote.Name
+    statusLabel.Text = "Remote belum ditemukan, akan retry saat tombol ditekan..."
 end
 
 -- LOGIC REKAM
@@ -365,17 +377,18 @@ btnReplay.MouseButton1Click:Connect(function()
     end
     
     local total = #MemoryStorage.Rockets
-    statusLabel.Text = "Mem-paste " .. total .. " roket secara normal..."
+    statusLabel.Text = "Mem-paste " .. total .. " roket..."
+    logAction("REPLAY", "Mulai paste " .. total .. " roket via " .. placementRemote:GetFullName())
     
     coroutine.wrap(function()
         local berhasil = 0
         for i, memoryArgs in ipairs(MemoryStorage.Rockets) do
+            -- Log isi args untuk debug
+            logAction("REPLAY-SEND", "Roket " .. i .. ": " .. debugArgs(memoryArgs))
+            
             local ok, err = pcall(function()
-                if placementRemote:IsA("RemoteEvent") then
-                    placementRemote:FireServer(table.unpack(memoryArgs))
-                else
-                    placementRemote:InvokeServer(table.unpack(memoryArgs))
-                end
+                -- PlacementRequest adalah RemoteEvent (dari spy data)
+                placementRemote:FireServer(table.unpack(memoryArgs))
             end)
             if ok then
                 berhasil = berhasil + 1
@@ -386,6 +399,7 @@ btnReplay.MouseButton1Click:Connect(function()
             wait(0.3)
         end
         statusLabel.Text = "Paste selesai! " .. berhasil .. "/" .. total .. " berhasil"
+        logAction("REPLAY", "Selesai. Berhasil: " .. berhasil .. "/" .. total)
     end)()
 end)
 
