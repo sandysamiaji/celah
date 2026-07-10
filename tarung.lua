@@ -294,27 +294,52 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
             
             if stateKey == "BypassSafeZone" then
                 coroutine.wrap(function()
-                    logAction("SAFEZONE", "Mencari dan menghapus zona aman...")
+                    logAction("SAFEZONE", "Mencari dan menghapus zona aman secara agresif...")
                     while State.BypassSafeZone do
                         local count = 0
+                        -- 1. Hapus ForceField & Part bernama Safe di seluruh workspace
                         for _, obj in ipairs(workspace:GetDescendants()) do
                             local n = obj.Name:lower()
-                            if n:match("safe%s*zone") or n == "safe" then
+                            if obj:IsA("ForceField") then
                                 pcall(function() obj:Destroy() end)
                                 count = count + 1
-                            end
-                        end
-                        local char = LocalPlayer.Character
-                        if char then
-                            for _, v in ipairs(char:GetChildren()) do
-                                if v:IsA("ForceField") then
-                                    pcall(function() v:Destroy() end)
+                            elseif (n:match("safe") or n:match("zone") or n:match("lobby")) and (obj:IsA("BasePart") or obj:IsA("Model") or obj:IsA("Folder")) then
+                                -- Pastikan bukan part pemain
+                                if not obj.Parent:FindFirstChild("Humanoid") then
+                                    pcall(function() 
+                                        if obj:IsA("BasePart") then
+                                            obj.CanCollide = false
+                                            obj.Size = Vector3.new(0,0,0)
+                                            obj.CFrame = CFrame.new(0, 999999, 0)
+                                        end
+                                        obj:Destroy() 
+                                    end)
                                     count = count + 1
                                 end
                             end
                         end
+                        -- 2. Hapus ForceField & Edit properti PVP/Safe di semua pemain
+                        for _, p in ipairs(Players:GetPlayers()) do
+                            if p.Character then
+                                for _, v in ipairs(p.Character:GetDescendants()) do
+                                    if v:IsA("ForceField") then
+                                        pcall(function() v:Destroy() end)
+                                        count = count + 1
+                                    elseif v:IsA("BoolValue") then
+                                        local vn = v.Name:lower()
+                                        if vn:match("safe") and v.Value == true then
+                                            pcall(function() v.Value = false end)
+                                            count = count + 1
+                                        elseif vn:match("pvp") and v.Value == false then
+                                            pcall(function() v.Value = true end)
+                                            count = count + 1
+                                        end
+                                    end
+                                end
+                            end
+                        end
                         if count > 0 then
-                            logAction("SAFEZONE", count .. " objek Safezone/ForceField berhasil dihapus!")
+                            logAction("SAFEZONE", count .. " objek Safezone/ForceField berhasil di-Bypass!")
                         end
                         wait(2)
                     end
