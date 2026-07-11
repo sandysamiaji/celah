@@ -581,9 +581,9 @@ local function checkTeleportRequirements()
         return false
     end
     
-    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar.PrimaryPart or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar.PrimaryPart or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso") or targetChar:FindFirstChildWhichIsA("BasePart", true)
     if not targetRoot then
-        logAction("TELEPORT", "Gagal: Pemain " .. targetName .. " tidak memiliki RootPart/Torso!")
+        logAction("TELEPORT", "Gagal: Pemain " .. targetName .. " belum memiliki bagian tubuh (BasePart)!")
         return false
     end
     
@@ -593,9 +593,9 @@ local function checkTeleportRequirements()
         return false
     end
     
-    local root = myChar:FindFirstChild("HumanoidRootPart") or myChar.PrimaryPart or myChar:FindFirstChild("Torso") or myChar:FindFirstChild("UpperTorso")
+    local root = myChar:FindFirstChild("HumanoidRootPart") or myChar.PrimaryPart or myChar:FindFirstChild("Torso") or myChar:FindFirstChild("UpperTorso") or myChar:FindFirstChildWhichIsA("BasePart", true)
     if not root then
-        logAction("TELEPORT", "Gagal: Karaktermu tidak memiliki RootPart/Torso!")
+        logAction("TELEPORT", "Gagal: Karaktermu tidak memiliki bagian tubuh (BasePart)!")
         return false
     end
     
@@ -1110,15 +1110,27 @@ end))
 
 -- 4. NOCLIP & FLY
 local bbg, bve
+local wasNoclipping = false
 
 track(RunService.Stepped:Connect(function()
     local char = LocalPlayer.Character
     if char then
         -- Noclip
         if State.Noclip or State.Fly then
+            wasNoclipping = true
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") and part.CanCollide then
                     part.CanCollide = false
+                end
+            end
+        elseif wasNoclipping then
+            wasNoclipping = false
+            -- Kembalikan tabrakan (collision) ke bagian tubuh utama agar tidak nembus lagi
+            local mainParts = {"Head", "Torso", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
+            for _, name in ipairs(mainParts) do
+                local p = char:FindFirstChild(name)
+                if p and p:IsA("BasePart") then
+                    p.CanCollide = true
                 end
             end
         end
