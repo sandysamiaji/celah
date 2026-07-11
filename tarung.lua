@@ -623,6 +623,8 @@ end)
 
 -- BUILDER TAB
 local SavedBase = {}
+local BaseDatabase = {}
+local selectedBaseName = nil
 
 local builderRadiusInput = Instance.new("TextBox")
 builderRadiusInput.Size = UDim2.new(0.9, 0, 0, 30)
@@ -658,16 +660,6 @@ builderRadiusInput.FocusLost:Connect(function()
     end
 end)
 
-local pasteBaseBtn = Instance.new("TextButton")
-pasteBaseBtn.Size = UDim2.new(0.9, 0, 0, 35)
-pasteBaseBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
-pasteBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-pasteBaseBtn.Font = Enum.Font.GothamBold
-pasteBaseBtn.TextSize = 13
-pasteBaseBtn.Text = "Paste Base (Auto Build)"
-pasteBaseBtn.LayoutOrder = 3
-pasteBaseBtn.Parent = builderTab
-
 local buildStatusLabel = Instance.new("TextLabel")
 buildStatusLabel.Size = UDim2.new(0.9, 0, 0, 20)
 buildStatusLabel.BackgroundTransparency = 1
@@ -675,8 +667,116 @@ buildStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 buildStatusLabel.Font = Enum.Font.Gotham
 buildStatusLabel.TextSize = 11
 buildStatusLabel.Text = "0 Bangunan Tersimpan"
-buildStatusLabel.LayoutOrder = 4
+buildStatusLabel.LayoutOrder = 3
 buildStatusLabel.Parent = builderTab
+
+local baseNameInput = Instance.new("TextBox")
+baseNameInput.Size = UDim2.new(0.9, 0, 0, 30)
+baseNameInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+baseNameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+baseNameInput.Font = Enum.Font.Gotham
+baseNameInput.TextSize = 12
+baseNameInput.Text = ""
+baseNameInput.PlaceholderText = "Nama Base (Contoh: rumah panda)"
+baseNameInput.LayoutOrder = 4
+baseNameInput.Parent = builderTab
+
+local saveBaseBtn = Instance.new("TextButton")
+saveBaseBtn.Size = UDim2.new(0.9, 0, 0, 30)
+saveBaseBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+saveBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveBaseBtn.Font = Enum.Font.GothamBold
+saveBaseBtn.TextSize = 12
+saveBaseBtn.Text = "Simpan Base ke List"
+saveBaseBtn.LayoutOrder = 5
+saveBaseBtn.Parent = builderTab
+
+local loadBaseBtn = Instance.new("TextButton")
+loadBaseBtn.Size = UDim2.new(0.9, 0, 0, 30)
+loadBaseBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
+loadBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+loadBaseBtn.Font = Enum.Font.GothamBold
+loadBaseBtn.TextSize = 12
+loadBaseBtn.Text = "Muat Semua Data dari File"
+loadBaseBtn.LayoutOrder = 6
+loadBaseBtn.Parent = builderTab
+
+local baseDropdown = Instance.new("TextButton")
+baseDropdown.Size = UDim2.new(0.9, 0, 0, 30)
+baseDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+baseDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+baseDropdown.Font = Enum.Font.Gotham
+baseDropdown.TextSize = 12
+baseDropdown.Text = "Pilih Base dari List..."
+baseDropdown.LayoutOrder = 7
+baseDropdown.Parent = builderTab
+
+local baseList = Instance.new("ScrollingFrame")
+baseList.Size = UDim2.new(0.9, 0, 0, 0)
+baseList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+baseList.BorderSizePixel = 0
+baseList.ScrollBarThickness = 4
+baseList.Visible = false
+baseList.LayoutOrder = 8
+baseList.Parent = builderTab
+
+local baseListLayout = Instance.new("UIListLayout")
+baseListLayout.Parent = baseList
+baseListLayout.SortOrder = Enum.SortOrder.Name
+
+local pasteBaseBtn = Instance.new("TextButton")
+pasteBaseBtn.Size = UDim2.new(0.9, 0, 0, 35)
+pasteBaseBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+pasteBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+pasteBaseBtn.Font = Enum.Font.GothamBold
+pasteBaseBtn.TextSize = 13
+pasteBaseBtn.Text = "Paste Base Terpilih"
+pasteBaseBtn.LayoutOrder = 9
+pasteBaseBtn.Parent = builderTab
+
+local function updateBaseList()
+    for _, child in ipairs(baseList:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    local ySize = 0
+    for bName, _ in pairs(BaseDatabase) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 25)
+        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 12
+        btn.Text = bName
+        btn.Name = bName
+        btn.Parent = baseList
+        
+        btn.MouseButton1Click:Connect(function()
+            selectedBaseName = bName
+            baseDropdown.Text = bName
+            baseList.Visible = false
+            baseList.Size = UDim2.new(0.9, 0, 0, 0)
+            
+            -- Set SavedBase ke base yang dipilih agar siap di-paste
+            SavedBase = BaseDatabase[bName]
+            buildStatusLabel.Text = #SavedBase .. " Bangunan (" .. bName .. ") Siap Di-paste"
+        end)
+        ySize = ySize + 25
+    end
+    baseList.CanvasSize = UDim2.new(0, 0, 0, ySize)
+end
+
+baseDropdown.MouseButton1Click:Connect(function()
+    baseList.Visible = not baseList.Visible
+    if baseList.Visible then
+        updateBaseList()
+        baseList.Size = UDim2.new(0.9, 0, 0, 100)
+    else
+        baseList.Size = UDim2.new(0.9, 0, 0, 0)
+    end
+end)
 
 copyBaseBtn.MouseButton1Click:Connect(function()
     local char = LocalPlayer.Character
@@ -733,6 +833,96 @@ copyBaseBtn.MouseButton1Click:Connect(function()
     
     buildStatusLabel.Text = #SavedBase .. " Bangunan Tersimpan"
     logAction("BUILDER", "Berhasil meng-copy " .. #SavedBase .. " bangunan!")
+end)
+
+saveBaseBtn.MouseButton1Click:Connect(function()
+    if #SavedBase == 0 then
+        logAction("BUILDER", "Gagal: Tidak ada base yang sedang di-copy!")
+        return
+    end
+    local bName = baseNameInput.Text
+    if bName == "" or bName:match("^%s*$") then
+        logAction("BUILDER", "Gagal: Masukkan nama base dulu! (Contoh: rumah panda)")
+        return
+    end
+    
+    -- Simpan base saat ini ke database internal
+    BaseDatabase[bName] = {}
+    for _, item in ipairs(SavedBase) do
+        table.insert(BaseDatabase[bName], {
+            Name = item.Name,
+            Offset = item.Offset,
+            Rotation = item.Rotation
+        })
+    end
+    
+    if writefile and HttpService then
+        local serializedDB = {}
+        for key, baseArr in pairs(BaseDatabase) do
+            local sArr = {}
+            for _, item in ipairs(baseArr) do
+                table.insert(sArr, {
+                    Name = item.Name,
+                    OffsetX = item.Offset.X,
+                    OffsetY = item.Offset.Y,
+                    OffsetZ = item.Offset.Z,
+                    RotComponents = {item.Rotation:components()}
+                })
+            end
+            serializedDB[key] = sArr
+        end
+        local success, err = pcall(function()
+            local jsonString = HttpService:JSONEncode(serializedDB)
+            writefile("PandaBooga_BasesDB.json", jsonString)
+        end)
+        if success then
+            logAction("BUILDER", "Base '" .. bName .. "' berhasil disimpan ke list!")
+            updateBaseList()
+        else
+            logAction("BUILDER", "Gagal menyimpan file: " .. tostring(err))
+        end
+    else
+        logAction("BUILDER", "Disimpan di list sementara (Executor tidak mendukung writefile).")
+        updateBaseList()
+    end
+end)
+
+loadBaseBtn.MouseButton1Click:Connect(function()
+    if readfile and isfile and HttpService then
+        if not isfile("PandaBooga_BasesDB.json") then
+            -- Fallback jika file versi sebelumnya yang ada
+            if isfile("PandaBooga_SavedBase.json") then
+                logAction("BUILDER", "INFO: Ditemukan file lama, harap Copy dan Save ulang dengan nama baru.")
+            else
+                logAction("BUILDER", "Gagal: File PandaBooga_BasesDB.json tidak ditemukan!")
+            end
+            return
+        end
+        local success, err = pcall(function()
+            local jsonString = readfile("PandaBooga_BasesDB.json")
+            local serializedDB = HttpService:JSONDecode(jsonString)
+            BaseDatabase = {}
+            for key, baseArr in pairs(serializedDB) do
+                local arr = {}
+                for _, item in ipairs(baseArr) do
+                    table.insert(arr, {
+                        Name = item.Name,
+                        Offset = Vector3.new(item.OffsetX, item.OffsetY, item.OffsetZ),
+                        Rotation = CFrame.new(unpack(item.RotComponents))
+                    })
+                end
+                BaseDatabase[key] = arr
+            end
+        end)
+        if success then
+            logAction("BUILDER", "Berhasil memuat list base dari file! Silakan pilih di dropdown.")
+            updateBaseList()
+        else
+            logAction("BUILDER", "Gagal memuat file: " .. tostring(err))
+        end
+    else
+        logAction("BUILDER", "Gagal: Executor kamu tidak mendukung fungsi readfile/isfile!")
+    end
 end)
 
 pasteBaseBtn.MouseButton1Click:Connect(function()
