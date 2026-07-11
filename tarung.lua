@@ -40,9 +40,9 @@ local State = {
     Noclip = false,
     SpyTrace = false,
     InfiniteDrop = false,
-    Invisible = false,
+    Fly = false,
     WebhookLogs = false, -- Default mati
-    BypassSafeZone = false,
+    FlingAura = false,
     CopyRadius = 500,
     AuraRadius = 35,
     AttackCooldown = 0.2,
@@ -293,44 +293,48 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
             btn.Text = text .. ": ON"
             logAction("FEATURE", text .. " diaktifkan")
             
-            if stateKey == "BypassSafeZone" then
+            if stateKey == "FlingAura" then
                 coroutine.wrap(function()
-                    logAction("SAFEZONE", "Mencari dan menghapus zona aman secara agresif...")
-                    while State.BypassSafeZone do
-                        local count = 0
-                        local localChar = LocalPlayer.Character
-                        local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+                    logAction("FLING", "Aura Nendang aktif! Mendekati musuh < 35 stud akan mementalkan mereka.")
+                    local thrust = Instance.new("BodyAngularVelocity")
+                    thrust.Name = "NendangVelocity"
+                    thrust.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                    thrust.AngularVelocity = Vector3.new(0, 99999, 0)
+                    
+                    while State.FlingAura do
+                        local char = LocalPlayer.Character
+                        local root = char and char:FindFirstChild("HumanoidRootPart")
+                        local hum = char and char:FindFirstChildOfClass("Humanoid")
                         
-                        if localRoot then
-                            -- Hapus ForceField & Edit PVP pada karakter kita sendiri DAN pemain musuh dalam radius 35
+                        if root and hum and hum.Health > 0 then
+                            if not root:FindFirstChild("NendangVelocity") then
+                                thrust:Clone().Parent = root
+                            end
+                            
                             for _, p in ipairs(Players:GetPlayers()) do
-                                if p.Character then
-                                    local targetRoot = p.Character:FindFirstChild("HumanoidRootPart")
-                                    if p == LocalPlayer or (targetRoot and (targetRoot.Position - localRoot.Position).Magnitude <= 35) then
-                                        for _, v in ipairs(p.Character:GetDescendants()) do
-                                            if v:IsA("ForceField") then
-                                                pcall(function() v:Destroy() end)
-                                                count = count + 1
-                                            elseif v:IsA("BoolValue") then
-                                                local vn = v.Name:lower()
-                                                if vn:match("safe") and v.Value == true then
-                                                    pcall(function() v.Value = false end)
-                                                    count = count + 1
-                                                elseif vn:match("pvp") and v.Value == false then
-                                                    pcall(function() v.Value = true end)
-                                                    count = count + 1
-                                                end
-                                            end
-                                        end
+                                if p ~= LocalPlayer and p.Character then
+                                    local targetRoot = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso") or p.Character:FindFirstChild("UpperTorso")
+                                    if targetRoot and (targetRoot.Position - root.Position).Magnitude <= 35 then
+                                        local oldPos = root.CFrame
+                                        -- Teleport kilat ke target untuk menendang
+                                        root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 0.5)
+                                        -- Berikan waktu pada physics Roblox untuk memukul
+                                        RunService.Heartbeat:Wait()
+                                        RunService.Heartbeat:Wait()
+                                        -- Kembali ke posisi semula seakan-akan tidak terjadi apa-apa
+                                        root.CFrame = oldPos
                                     end
                                 end
                             end
                         end
-                        
-                        if count > 0 then
-                            logAction("SAFEZONE", count .. " objek Safezone/ForceField berhasil di-Bypass!")
-                        end
-                        wait(2)
+                        wait(0.1)
+                    end
+                    
+                    -- Bersihkan putaran ketika fitur dimatikan
+                    local char = LocalPlayer.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    if root and root:FindFirstChild("NendangVelocity") then
+                        root.NendangVelocity:Destroy()
                     end
                 end)()
             end
@@ -397,9 +401,9 @@ createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab
 local noclipBtn = createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
 createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
 createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
-createToggle("InvisibleToggle", "Invisible (Desync)", "Invisible", 5, cheatsTab)
+createToggle("FlyToggle", "Fly", "Fly", 5, cheatsTab)
 createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 6, cheatsTab)
-createToggle("SafeZoneToggle", "Bypass Safezone", "BypassSafeZone", 7, cheatsTab)
+createToggle("FlingToggle", "Fling Aura (Nendang)", "FlingAura", 7, cheatsTab)
 
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
@@ -485,8 +489,8 @@ local function updatePlayerList()
             btn.Parent = playerList
             
             btn.MouseButton1Click:Connect(function()
-                selectedPlayer = player
-                State.SelectedPlayer = player
+                selectedPlayer = player.Name
+                State.SelectedPlayer = player.Name
                 playerDropdown.Text = player.Name
                 playerList.Visible = false
                 tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
@@ -521,43 +525,57 @@ local function checkTeleportRequirements()
         logAction("TELEPORT", "Gagal: Kamu belum memilih pemain dari daftar!")
         return false
     end
-    if not selectedPlayer.Character then
-        logAction("TELEPORT", "Gagal: Pemain target belum spawn (Character nil)!")
+    
+    local targetName = type(selectedPlayer) == "string" and selectedPlayer or selectedPlayer.Name
+    local targetPlayer = Players:FindFirstChild(targetName)
+    
+    if not targetPlayer then
+        logAction("TELEPORT", "Gagal: Pemain " .. targetName .. " tidak ditemukan di server!")
         return false
     end
-    local targetRoot = selectedPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+    local targetChar = targetPlayer.Character
+    if not targetChar then
+        logAction("TELEPORT", "Gagal: Pemain " .. targetName .. " belum spawn (Character nil)!")
+        return false
+    end
+    
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar.PrimaryPart or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
     if not targetRoot then
-        logAction("TELEPORT", "Gagal: Pemain target tidak memiliki HumanoidRootPart!")
+        logAction("TELEPORT", "Gagal: Pemain " .. targetName .. " tidak memiliki RootPart/Torso!")
         return false
     end
+    
     local myChar = LocalPlayer.Character
     if not myChar then
         logAction("TELEPORT", "Gagal: Karaktermu belum spawn!")
         return false
     end
-    local root = myChar:FindFirstChild("HumanoidRootPart")
+    
+    local root = myChar:FindFirstChild("HumanoidRootPart") or myChar.PrimaryPart or myChar:FindFirstChild("Torso") or myChar:FindFirstChild("UpperTorso")
     if not root then
-        logAction("TELEPORT", "Gagal: Karaktermu tidak memiliki HumanoidRootPart!")
+        logAction("TELEPORT", "Gagal: Karaktermu tidak memiliki RootPart/Torso!")
         return false
     end
-    return true, root, targetRoot
+    
+    return true, root, targetRoot, targetName
 end
 
 tpBtn.MouseButton1Click:Connect(function()
-    local success, root, targetRoot = checkTeleportRequirements()
+    local success, root, targetRoot, targetName = checkTeleportRequirements()
     if success then
         root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
-        logAction("TELEPORT", "Berhasil teleport INSTAN ke " .. selectedPlayer.Name)
+        logAction("TELEPORT", "Berhasil teleport INSTAN ke " .. targetName)
     end
 end)
 
 bringBtn.MouseButton1Click:Connect(function()
-    local success, root, targetRoot = checkTeleportRequirements()
+    local success, root, targetRoot, targetName = checkTeleportRequirements()
     if success then
         pcall(function()
             -- Teleport kita ke punggung/belakang musuh
             root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 4)
-            logAction("TELEPORT", "Berhasil teleport ke belakang " .. selectedPlayer.Name)
+            logAction("TELEPORT", "Berhasil teleport ke belakang " .. targetName)
         end)
     end
 end)
@@ -1049,86 +1067,95 @@ track(RunService.RenderStepped:Connect(function()
     end
 end))
 
--- 4. NOCLIP & INVISIBLE
-local isFlickering = false
-local fakeFloor = nil
+-- 4. NOCLIP & FLY
+local FlySpeed = 50
+local bbg, bve
 
 track(RunService.Stepped:Connect(function()
     local char = LocalPlayer.Character
     if char then
-        -- Noclip biasa jika toggle Noclip dinyalakan
-        if State.Noclip then
+        -- Noclip
+        if State.Noclip or State.Fly then
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") and part.CanCollide then
                     part.CanCollide = false
                 end
             end
         end
+    end
+end))
+
+local control = {w=0, a=0, s=0, d=0}
+local camera = workspace.CurrentCamera
+track(UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.W then control.w = 1
+    elseif input.KeyCode == Enum.KeyCode.S then control.s = -1
+    elseif input.KeyCode == Enum.KeyCode.A then control.a = -1
+    elseif input.KeyCode == Enum.KeyCode.D then control.d = 1
+    end
+end))
+track(UserInputService.InputEnded:Connect(function(input, gp)
+    if input.KeyCode == Enum.KeyCode.W then control.w = 0
+    elseif input.KeyCode == Enum.KeyCode.S then control.s = 0
+    elseif input.KeyCode == Enum.KeyCode.A then control.a = 0
+    elseif input.KeyCode == Enum.KeyCode.D then control.d = 0
+    end
+end))
+
+local fakeFloor = nil
+track(RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    if char then
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChild("Humanoid")
         
-        -- Proses Invisible (Terbang ke langit + Pijakan)
-        if State.Invisible then
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root then
-                if not fakeFloor then
-                    fakeFloor = Instance.new("Part")
-                    fakeFloor.Size = Vector3.new(15, 1, 15)
-                    fakeFloor.Anchored = true
-                    fakeFloor.Transparency = 1
-                    fakeFloor.CanCollide = true
-                    fakeFloor.Parent = workspace
-                end
-                
-                -- Pindahkan karakter ke langit di pipeline fisika
-                root.CFrame = root.CFrame + Vector3.new(0, 500, 0)
-                isFlickering = true
-                
-                -- Pasang lantai palsu tepat di bawah kaki mereka di langit
-                fakeFloor.CFrame = root.CFrame - Vector3.new(0, 3.5, 0)
-                
-                -- Sembunyikan nametag bawaan dan custom
-                local hum = char:FindFirstChild("Humanoid")
-                if hum then hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end
-                local head = char:FindFirstChild("Head")
-                if head then
-                    for _, v in ipairs(head:GetChildren()) do
-                        if v:IsA("BillboardGui") then v.Enabled = false end
-                    end
-                end
+        if State.Fly and root and hum then
+            if not fakeFloor then
+                fakeFloor = Instance.new("Part")
+                fakeFloor.Size = Vector3.new(5, 1, 5)
+                fakeFloor.Anchored = true
+                fakeFloor.Transparency = 1
+                fakeFloor.CanCollide = true
+                fakeFloor.Parent = workspace
             end
+            if not bbg then
+                bbg = Instance.new("BodyGyro")
+                bbg.P = 9e4
+                bbg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+                bbg.Parent = root
+            end
+            if not bve then
+                bve = Instance.new("BodyVelocity")
+                bve.maxForce = Vector3.new(9e9, 9e9, 9e9)
+                bve.Parent = root
+            end
+            
+            hum.PlatformStand = false
+            
+            -- Pasang lantai di bawah kaki agar animasi jalan/idle tetap berjalan
+            fakeFloor.CFrame = root.CFrame - Vector3.new(0, 3.2, 0)
+            
+            -- Arahkan badan karakter mengikuti kamera secara horizontal (agar tidak nungging)
+            local look = camera.CFrame.LookVector
+            bbg.cframe = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
+            
+            local dir = camera.CFrame.LookVector * (control.w + control.s) + camera.CFrame.RightVector * (control.a + control.d)
+            if dir.Magnitude > 0 then
+                dir = dir.Unit
+            end
+            
+            bve.velocity = dir * FlySpeed
         else
-            -- Matikan invisible
-            if isFlickering then
-                isFlickering = false
-                if fakeFloor then
-                    fakeFloor:Destroy()
-                    fakeFloor = nil
-                end
-                local hum = char:FindFirstChild("Humanoid")
-                if hum and hum.DisplayDistanceType == Enum.HumanoidDisplayDistanceType.None then
-                    hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer
-                    local head = char:FindFirstChild("Head")
-                    if head then
-                        for _, v in ipairs(head:GetChildren()) do
-                            if v:IsA("BillboardGui") then v.Enabled = true end
-                        end
-                    end
-                end
+            if fakeFloor then fakeFloor:Destroy(); fakeFloor = nil end
+            if bbg then bbg:Destroy(); bbg = nil end
+            if bve then bve:Destroy(); bve = nil end
+            if hum and hum.PlatformStand then
+                hum.PlatformStand = false
             end
         end
     end
 end))
-
--- BindToRenderStep prioritas tinggi agar kamera TIDAK MELIHAT pergeseran ke bawah tanah
-RunService:BindToRenderStep("InvisCamFix", Enum.RenderPriority.Camera.Value - 1, function()
-    if State.Invisible and isFlickering then
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            -- Kembalikan root ke posisi asli (tanah nyata) tepat sebelum frame digambar
-            root.CFrame = root.CFrame - Vector3.new(0, 500, 0)
-        end
-    end
-end)
 
 -- 5. UNIVERSAL NAMECALL HOOK (Anti Fall Damage & Spy Trace)
 -- Game ini menggunakan ReplicatedStorage.GUIs.Vitals.FallDamageEvent
@@ -1175,19 +1202,7 @@ end)
 
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, key)
-    if not checkcaller() and State.BypassSafeZone then
-        -- Spoof posisi karakter jika game mengecek posisi (agar dikira selalu di Area Merah)
-        if self:IsA("BasePart") and self.Name == "HumanoidRootPart" then
-            local char = LocalPlayer.Character
-            if char and self:IsDescendantOf(char) then
-                if key == "Position" then
-                    return Vector3.new(-521.7, 92.2, -276.2)
-                elseif key == "CFrame" then
-                    return CFrame.new(-521.7, 92.2, -276.2)
-                end
-            end
-        end
-    end
+    -- Jika di masa depan ada manipulasi Index lainnya bisa ditambah di sini
     return oldIndex(self, key)
 end)
 
