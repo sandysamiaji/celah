@@ -1085,23 +1085,37 @@ track(RunService.Stepped:Connect(function()
     end
 end))
 
-local control = {w=0, a=0, s=0, d=0}
 local camera = workspace.CurrentCamera
-track(UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == Enum.KeyCode.W then control.w = 1
-    elseif input.KeyCode == Enum.KeyCode.S then control.s = -1
-    elseif input.KeyCode == Enum.KeyCode.A then control.a = -1
-    elseif input.KeyCode == Enum.KeyCode.D then control.d = 1
+local getMoveVector
+pcall(function()
+    local PlayerModule = require(LocalPlayer.PlayerScripts:WaitForChild("PlayerModule"))
+    local controls = PlayerModule:GetControls()
+    getMoveVector = function()
+        return controls:GetMoveVector()
     end
-end))
-track(UserInputService.InputEnded:Connect(function(input, gp)
-    if input.KeyCode == Enum.KeyCode.W then control.w = 0
-    elseif input.KeyCode == Enum.KeyCode.S then control.s = 0
-    elseif input.KeyCode == Enum.KeyCode.A then control.a = 0
-    elseif input.KeyCode == Enum.KeyCode.D then control.d = 0
+end)
+
+if not getMoveVector then
+    local control = {w=0, a=0, s=0, d=0}
+    track(UserInputService.InputBegan:Connect(function(input, gp)
+        if UserInputService:GetFocusedTextBox() then return end
+        if input.KeyCode == Enum.KeyCode.W then control.w = 1
+        elseif input.KeyCode == Enum.KeyCode.S then control.s = -1
+        elseif input.KeyCode == Enum.KeyCode.A then control.a = -1
+        elseif input.KeyCode == Enum.KeyCode.D then control.d = 1
+        end
+    end))
+    track(UserInputService.InputEnded:Connect(function(input, gp)
+        if input.KeyCode == Enum.KeyCode.W then control.w = 0
+        elseif input.KeyCode == Enum.KeyCode.S then control.s = 0
+        elseif input.KeyCode == Enum.KeyCode.A then control.a = 0
+        elseif input.KeyCode == Enum.KeyCode.D then control.d = 0
+        end
+    end))
+    getMoveVector = function()
+        return Vector3.new(control.d + control.a, 0, -(control.w + control.s))
     end
-end))
+end
 
 local fakeFloor = nil
 track(RunService.RenderStepped:Connect(function()
@@ -1117,6 +1131,7 @@ track(RunService.RenderStepped:Connect(function()
                 fakeFloor.Anchored = true
                 fakeFloor.Transparency = 1
                 fakeFloor.CanCollide = true
+                fakeFloor.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
                 fakeFloor.Parent = workspace
             end
             if not bbg then
@@ -1140,7 +1155,8 @@ track(RunService.RenderStepped:Connect(function()
             local look = camera.CFrame.LookVector
             bbg.cframe = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
             
-            local dir = camera.CFrame.LookVector * (control.w + control.s) + camera.CFrame.RightVector * (control.a + control.d)
+            local moveVec = getMoveVector()
+            local dir = camera.CFrame.LookVector * -moveVec.Z + camera.CFrame.RightVector * moveVec.X
             if dir.Magnitude > 0 then
                 dir = dir.Unit
             end
