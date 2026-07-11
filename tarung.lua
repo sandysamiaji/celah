@@ -435,7 +435,7 @@ bringBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
 bringBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 bringBtn.Font = Enum.Font.GothamBold
 bringBtn.TextSize = 12
-bringBtn.Text = "Tarik Dia"
+bringBtn.Text = "Belakang Dia"
 bringBtn.Parent = tpContainer
 
 local playerDropdown = Instance.new("TextButton")
@@ -551,55 +551,14 @@ tpBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local isPulling = false
-local pullConnection = nil
-
 bringBtn.MouseButton1Click:Connect(function()
     local success, root, targetRoot = checkTeleportRequirements()
-    if not success then
-        isPulling = false
-        bringBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
-        bringBtn.Text = "Tarik Dia"
-        if pullConnection then
-            pullConnection:Disconnect()
-            pullConnection = nil
-        end
-        return
-    end
-
-    isPulling = not isPulling
-    if isPulling then
-        bringBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113) -- Hijau
-        bringBtn.Text = "Stop Tarik"
-        logAction("TELEPORT", "Mulai menahan " .. selectedPlayer.Name .. " di depanmu!")
-        
-        pullConnection = RunService.RenderStepped:Connect(function()
-            if selectedPlayer and selectedPlayer.Character then
-                local currentTargetRoot = selectedPlayer.Character:FindFirstChild("HumanoidRootPart")
-                local myChar = LocalPlayer.Character
-                local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-                if currentTargetRoot and myRoot then
-                    pcall(function()
-                        currentTargetRoot.CFrame = myRoot.CFrame * CFrame.new(0, 0, -3)
-                        currentTargetRoot.Velocity = Vector3.new(0, 0, 0)
-                    end)
-                end
-            else
-                -- Batal jika mati atau keluar
-                isPulling = false
-                bringBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
-                bringBtn.Text = "Tarik Dia"
-                if pullConnection then pullConnection:Disconnect() pullConnection = nil end
-            end
+    if success then
+        pcall(function()
+            -- Teleport kita ke punggung/belakang musuh
+            root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 4)
+            logAction("TELEPORT", "Berhasil teleport ke belakang " .. selectedPlayer.Name)
         end)
-    else
-        bringBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
-        bringBtn.Text = "Tarik Dia"
-        logAction("TELEPORT", "Berhenti menarik " .. selectedPlayer.Name)
-        if pullConnection then
-            pullConnection:Disconnect()
-            pullConnection = nil
-        end
     end
 end)
 
@@ -1091,9 +1050,13 @@ track(RunService.RenderStepped:Connect(function()
 end))
 
 -- 4. NOCLIP & INVISIBLE
+local isFlickering = false
+local fakeFloor = nil
+
 track(RunService.Stepped:Connect(function()
     local char = LocalPlayer.Character
     if char then
+        -- Noclip biasa jika toggle Noclip dinyalakan
         if State.Noclip then
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") and part.CanCollide then
@@ -1101,61 +1064,71 @@ track(RunService.Stepped:Connect(function()
                 end
             end
         end
-    end
-end))
-
--- Invisible: Transparan Mode (Ghost)
-local function setTransparency(char, trans)
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-            part.Transparency = trans
-        elseif part:IsA("Decal") then -- Wajah
-            part.Transparency = trans
-        end
-    end
-end
-
-local frameCounter = 0
-track(RunService.Stepped:Connect(function()
-    local char = LocalPlayer.Character
-    if State.Invisible then
-        if char then
-            frameCounter = frameCounter + 1
-            if frameCounter % 15 == 0 then
-                -- Muncul sekejap (Flicker) agar server / anti-cheat mendeteksi keberadaan
-                setTransparency(char, 0)
-            else
-                -- Transparan 100% (Ghost)
-                setTransparency(char, 1)
-            end
-            
-            -- Sembunyikan nametag bawaan dan custom
-            local hum = char:FindFirstChild("Humanoid")
-            if hum then hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end
-            local head = char:FindFirstChild("Head")
-            if head then
-                for _, v in ipairs(head:GetChildren()) do
-                    if v:IsA("BillboardGui") then v.Enabled = false end
+        
+        -- Proses Invisible (Terbang ke langit + Pijakan)
+        if State.Invisible then
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                if not fakeFloor then
+                    fakeFloor = Instance.new("Part")
+                    fakeFloor.Size = Vector3.new(15, 1, 15)
+                    fakeFloor.Anchored = true
+                    fakeFloor.Transparency = 1
+                    fakeFloor.CanCollide = true
+                    fakeFloor.Parent = workspace
                 end
-            end
-        end
-    else
-        -- Matikan invisible (kembali solid)
-        if char then
-            setTransparency(char, 0)
-            local hum = char:FindFirstChild("Humanoid")
-            if hum and hum.DisplayDistanceType == Enum.HumanoidDisplayDistanceType.None then
-                hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer
+                
+                -- Pindahkan karakter ke langit di pipeline fisika
+                root.CFrame = root.CFrame + Vector3.new(0, 500, 0)
+                isFlickering = true
+                
+                -- Pasang lantai palsu tepat di bawah kaki mereka di langit
+                fakeFloor.CFrame = root.CFrame - Vector3.new(0, 3.5, 0)
+                
+                -- Sembunyikan nametag bawaan dan custom
+                local hum = char:FindFirstChild("Humanoid")
+                if hum then hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end
                 local head = char:FindFirstChild("Head")
                 if head then
                     for _, v in ipairs(head:GetChildren()) do
-                        if v:IsA("BillboardGui") then v.Enabled = true end
+                        if v:IsA("BillboardGui") then v.Enabled = false end
+                    end
+                end
+            end
+        else
+            -- Matikan invisible
+            if isFlickering then
+                isFlickering = false
+                if fakeFloor then
+                    fakeFloor:Destroy()
+                    fakeFloor = nil
+                end
+                local hum = char:FindFirstChild("Humanoid")
+                if hum and hum.DisplayDistanceType == Enum.HumanoidDisplayDistanceType.None then
+                    hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer
+                    local head = char:FindFirstChild("Head")
+                    if head then
+                        for _, v in ipairs(head:GetChildren()) do
+                            if v:IsA("BillboardGui") then v.Enabled = true end
+                        end
                     end
                 end
             end
         end
     end
 end))
+
+-- BindToRenderStep prioritas tinggi agar kamera TIDAK MELIHAT pergeseran ke bawah tanah
+RunService:BindToRenderStep("InvisCamFix", Enum.RenderPriority.Camera.Value - 1, function()
+    if State.Invisible and isFlickering then
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            -- Kembalikan root ke posisi asli (tanah nyata) tepat sebelum frame digambar
+            root.CFrame = root.CFrame - Vector3.new(0, 500, 0)
+        end
+    end
+end)
 
 -- 5. UNIVERSAL NAMECALL HOOK (Anti Fall Damage & Spy Trace)
 -- Game ini menggunakan ReplicatedStorage.GUIs.Vitals.FallDamageEvent
