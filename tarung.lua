@@ -41,6 +41,7 @@ local State = {
     SpyTrace = false,
     InfiniteDrop = false,
     Fly = false,
+    FlySpeed = 16,
     WebhookLogs = false, -- Default mati
     FlingAura = false,
     CopyRadius = 500,
@@ -402,8 +403,48 @@ local noclipBtn = createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
 createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
 createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
 createToggle("FlyToggle", "Fly", "Fly", 5, cheatsTab)
-createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 6, cheatsTab)
-createToggle("FlingToggle", "Fling Aura (Nendang)", "FlingAura", 7, cheatsTab)
+
+local flySpeedContainer = Instance.new("Frame")
+flySpeedContainer.Size = UDim2.new(0.9, 0, 0, 35)
+flySpeedContainer.BackgroundTransparency = 1
+flySpeedContainer.LayoutOrder = 6
+flySpeedContainer.Parent = cheatsTab
+
+local flySpeedLabel = Instance.new("TextLabel")
+flySpeedLabel.Size = UDim2.new(0.55, 0, 1, 0)
+flySpeedLabel.BackgroundTransparency = 1
+flySpeedLabel.Text = "Fly Speed:"
+flySpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedLabel.Font = Enum.Font.GothamBold
+flySpeedLabel.TextSize = 13
+flySpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+flySpeedLabel.Parent = flySpeedContainer
+
+local flySpeedInput = Instance.new("TextBox")
+flySpeedInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+flySpeedInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+flySpeedInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+flySpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedInput.Font = Enum.Font.Gotham
+flySpeedInput.TextSize = 13
+flySpeedInput.Text = tostring(State.FlySpeed)
+flySpeedInput.PlaceholderText = "Speed"
+flySpeedInput.Parent = flySpeedContainer
+
+flySpeedInput.FocusLost:Connect(function()
+    local num = tonumber(flySpeedInput.Text)
+    if num then
+        if num < 0 then num = 0 end
+        if num > 500 then num = 500 end
+        State.FlySpeed = num
+        flySpeedInput.Text = tostring(num)
+    else
+        flySpeedInput.Text = tostring(State.FlySpeed)
+    end
+end)
+
+createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 7, cheatsTab)
+createToggle("FlingToggle", "Fling Aura (Nendang)", "FlingAura", 8, cheatsTab)
 
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
@@ -1068,7 +1109,6 @@ track(RunService.RenderStepped:Connect(function()
 end))
 
 -- 4. NOCLIP & FLY
-local FlySpeed = 50
 local bbg, bve
 
 track(RunService.Stepped:Connect(function()
@@ -1161,7 +1201,7 @@ track(RunService.RenderStepped:Connect(function()
                 dir = dir.Unit
             end
             
-            bve.velocity = dir * FlySpeed
+            bve.velocity = dir * State.FlySpeed
         else
             if fakeFloor then fakeFloor:Destroy(); fakeFloor = nil end
             if bbg then bbg:Destroy(); bbg = nil end
