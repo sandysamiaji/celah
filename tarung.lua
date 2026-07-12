@@ -297,10 +297,14 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
             if stateKey == "FlingAura" then
                 coroutine.wrap(function()
                     logAction("FLING", "Aura Nendang aktif! Mendekati musuh < 35 stud akan mementalkan mereka.")
-                    local thrust = Instance.new("BodyAngularVelocity")
-                    thrust.Name = "NendangVelocity"
-                    thrust.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                    thrust.AngularVelocity = Vector3.new(0, 99999, 0)
+                    local thrust = Instance.new("BodyThrust")
+                    thrust.Name = "NendangThrust"
+                    thrust.Force = Vector3.new(9999, 9999, 9999)
+                    
+                    local bav = Instance.new("BodyAngularVelocity")
+                    bav.Name = "NendangVelocity"
+                    bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                    bav.AngularVelocity = Vector3.new(0, 99999, 0)
                     
                     while State.FlingAura do
                         local char = LocalPlayer.Character
@@ -309,6 +313,7 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
                         
                         if root and hum and hum.Health > 0 then
                             if not root:FindFirstChild("NendangVelocity") then
+                                bav:Clone().Parent = root
                                 thrust:Clone().Parent = root
                             end
                             
@@ -317,13 +322,29 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
                                     local targetRoot = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso") or p.Character:FindFirstChild("UpperTorso")
                                     if targetRoot and (targetRoot.Position - root.Position).Magnitude <= 35 then
                                         local oldPos = root.CFrame
-                                        -- Teleport kilat ke target untuk menendang
-                                        root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 0.5)
-                                        -- Berikan waktu pada physics Roblox untuk memukul
+                                        
+                                        -- Pastikan kita bisa menabrak
+                                        local oldCollide = root.CanCollide
+                                        root.CanCollide = true
+                                        hum.PlatformStand = true
+                                        
+                                        -- Teleport persis ke tengah musuh
+                                        root.CFrame = targetRoot.CFrame
+                                        
+                                        -- Paksa kecepatan tak masuk akal untuk benturan
+                                        root.Velocity = Vector3.new(0, 10000, 0)
+                                        root.RotVelocity = Vector3.new(10000, 10000, 10000)
+                                        
+                                        -- Biarkan mesin fisika Roblox bereaksi terhadap tabrakan
                                         RunService.Heartbeat:Wait()
                                         RunService.Heartbeat:Wait()
-                                        -- Kembali ke posisi semula seakan-akan tidak terjadi apa-apa
+                                        
+                                        -- Kembalikan posisi dan normalkan agar tidak ketahuan
+                                        root.Velocity = Vector3.zero
+                                        root.RotVelocity = Vector3.zero
                                         root.CFrame = oldPos
+                                        root.CanCollide = oldCollide
+                                        hum.PlatformStand = false
                                     end
                                 end
                             end
@@ -331,11 +352,14 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
                         wait(0.1)
                     end
                     
-                    -- Bersihkan putaran ketika fitur dimatikan
+                    -- Bersihkan efek ketika fitur dimatikan
                     local char = LocalPlayer.Character
                     local root = char and char:FindFirstChild("HumanoidRootPart")
-                    if root and root:FindFirstChild("NendangVelocity") then
-                        root.NendangVelocity:Destroy()
+                    if root then
+                        local t = root:FindFirstChild("NendangThrust")
+                        if t then t:Destroy() end
+                        local v = root:FindFirstChild("NendangVelocity")
+                        if v then v:Destroy() end
                     end
                 end)()
             end
