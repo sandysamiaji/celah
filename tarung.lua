@@ -589,32 +589,38 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
     local success, root, targetRoot, targetName = checkTeleportRequirements()
     if success then
         coroutine.wrap(function()
-            logAction("FLING", "Melancarkan tendangan gaib ke " .. targetName .. "!")
+            logAction("FLING", "Melancarkan tendangan ke " .. targetName .. "!")
             
-            local oldPos = root.CFrame
+            -- Hitung arah lemparan: dari posisi kita ke posisi target
+            local dir = (targetRoot.Position - root.Position).Unit
             
-            local bav = Instance.new("BodyAngularVelocity")
-            bav.Name = "NendangVelocity"
-            bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-            bav.AngularVelocity = Vector3.new(0, 99999, 0)
-            bav.Parent = root
-            
-            -- Menubruk target berulang-ulang tanpa bergerak maju secara linear
-            for i = 1, 20 do
-                if targetRoot and targetRoot.Parent then
-                    root.CFrame = targetRoot.CFrame
-                    -- Mengunci kecepatan kita di 0 agar kita sendiri tidak mental!
-                    root.Velocity = Vector3.zero
-                    root.RotVelocity = Vector3.zero
-                end
-                RunService.Heartbeat:Wait()
+            -- Langkah 1: Hapus semua BodyMover lama di target jika ada
+            for _, v in ipairs(targetRoot:GetChildren()) do
+                if v:IsA("BodyMover") then v:Destroy() end
             end
             
-            -- Hapus putaran dan kembalikan posisi normal
-            bav:Destroy()
-            root.Velocity = Vector3.zero
-            root.RotVelocity = Vector3.zero
-            root.CFrame = oldPos
+            -- Langkah 2: Tambahkan BodyVelocity langsung ke tubuh target
+            local bv = Instance.new("BodyVelocity")
+            bv.Name = "FlingVelocity"
+            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            -- Arahkan ke atas + ke depan (seperti benar-benar ditendang dan terbang)
+            bv.Velocity = (dir * 300) + Vector3.new(0, 500, 0)
+            bv.Parent = targetRoot
+            
+            -- Langkah 3: Tambahkan putaran agar visual terlihat terbang
+            local bav = Instance.new("BodyAngularVelocity")
+            bav.Name = "FlingAngular"
+            bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            bav.AngularVelocity = Vector3.new(0, 9999, 0)
+            bav.Parent = targetRoot
+            
+            -- Langkah 4: Biarkan efek berlaku sebentar lalu bersihkan
+            wait(0.5)
+            
+            local fv = targetRoot:FindFirstChild("FlingVelocity")
+            if fv then fv:Destroy() end
+            local fa = targetRoot:FindFirstChild("FlingAngular")
+            if fa then fa:Destroy() end
             
             logAction("FLING", "Berhasil menendang " .. targetName .. "!")
         end)()
