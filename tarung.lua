@@ -589,39 +589,84 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
     local success, root, targetRoot, targetName = checkTeleportRequirements()
     if success then
         coroutine.wrap(function()
-            logAction("FLING", "Melancarkan tendangan ke " .. targetName .. "!")
+            logAction("FLING", "Mencari Punch tool untuk menendang " .. targetName .. "!")
+            
+            -- Cari tool Punch di backpack atau yang sedang di-equip
+            local char = LocalPlayer.Character
+            local backpack = LocalPlayer:FindFirstChild("Backpack")
+            local punchTool = nil
+            
+            -- Cek di karakter (sudah equipped)
+            for _, v in ipairs(char:GetChildren()) do
+                if v:IsA("Tool") and v.Name:lower():find("punch") then
+                    punchTool = v
+                    break
+                end
+            end
+            -- Cek di backpack jika belum ditemukan
+            if not punchTool and backpack then
+                for _, v in ipairs(backpack:GetChildren()) do
+                    if v:IsA("Tool") and v.Name:lower():find("punch") then
+                        punchTool = v
+                        break
+                    end
+                end
+            end
+            -- Kalau tidak ada yang namanya "punch", ambil tool apapun yang ada
+            if not punchTool and backpack then
+                for _, v in ipairs(backpack:GetChildren()) do
+                    if v:IsA("Tool") then
+                        punchTool = v
+                        break
+                    end
+                end
+            end
+            
+            if not punchTool then
+                logAction("FLING", "Gagal: Tidak ada Tool/Senjata di backpack! Ambil dulu Punch-nya.")
+                return
+            end
             
             local oldPos = root.CFrame
-            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            local hum = char:FindFirstChildOfClass("Humanoid")
             
-            local bav = Instance.new("BodyAngularVelocity")
-            bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-            bav.AngularVelocity = Vector3.new(999999, 999999, 999999)
-            bav.Parent = root
+            -- Pindahkan tool ke character (equip) agar handle-nya aktif sebagai BasePart
+            punchTool.Parent = char
+            wait(0.1)
             
-            if hum then
-                hum.Sit = true
+            -- Ambil handle tool
+            local handle = punchTool:FindFirstChild("Handle") or punchTool:FindFirstChildOfClass("BasePart")
+            
+            if not handle then
+                logAction("FLING", "Gagal: Tool tidak punya Handle.")
+                punchTool.Parent = backpack
+                return
             end
             
-            RunService.Heartbeat:Wait()
+            -- Paksa handle tool ke dalam tubuh target berulang-ulang
+            -- Server akan memproses tabrakan tool (BasePart) ke player lain
+            local oldHandleCollide = handle.CanCollide
+            handle.CanCollide = true
             
-            if targetRoot and targetRoot.Parent then
-                root.CFrame = targetRoot.CFrame
-                RunService.Heartbeat:Wait()
-                RunService.Heartbeat:Wait()
+            for i = 1, 15 do
+                if targetRoot and targetRoot.Parent then
+                    handle.CFrame = targetRoot.CFrame
+                end
                 RunService.Heartbeat:Wait()
             end
             
-            bav:Destroy()
-            root.Velocity = Vector3.zero
-            root.RotVelocity = Vector3.zero
+            -- Aktifkan tool (swing punch)
+            punchTool:Activate()
+            wait(0.2)
+            
+            -- Bersihkan
+            handle.CanCollide = oldHandleCollide
             root.CFrame = oldPos
             
-            if hum then
-                hum.Sit = false
-            end
+            -- Kembalikan tool ke backpack
+            punchTool.Parent = backpack
             
-            logAction("FLING", "Berhasil menendang " .. targetName .. "!")
+            logAction("FLING", "Berhasil menendang " .. targetName .. " dengan " .. punchTool.Name .. "!")
         end)()
     end
 end)
