@@ -749,6 +749,56 @@ local SavedBase = {}
 local BaseDatabase = {}
 local selectedBaseName = nil
 
+local function loadBaseDatabase()
+    if readfile and isfile and HttpService then
+        if isfile("PandaBooga_BasesDB.json") then
+            local success, err = pcall(function()
+                local jsonString = readfile("PandaBooga_BasesDB.json")
+                local serializedDB = HttpService:JSONDecode(jsonString)
+                BaseDatabase = {}
+                for key, baseArr in pairs(serializedDB) do
+                    local arr = {}
+                    for _, item in ipairs(baseArr) do
+                        table.insert(arr, {
+                            Name = item.Name,
+                            Offset = Vector3.new(item.OffsetX, item.OffsetY, item.OffsetZ),
+                            Rotation = CFrame.new(unpack(item.RotComponents))
+                        })
+                    end
+                    BaseDatabase[key] = arr
+                end
+            end)
+            return success
+        end
+    end
+    return false
+end
+
+local function saveBaseDatabase()
+    if writefile and HttpService then
+        local serializedDB = {}
+        for key, baseArr in pairs(BaseDatabase) do
+            local sArr = {}
+            for _, item in ipairs(baseArr) do
+                table.insert(sArr, {
+                    Name = item.Name,
+                    OffsetX = item.Offset.X,
+                    OffsetY = item.Offset.Y,
+                    OffsetZ = item.Offset.Z,
+                    RotComponents = {item.Rotation:components()}
+                })
+            end
+            serializedDB[key] = sArr
+        end
+        pcall(function()
+            local jsonString = HttpService:JSONEncode(serializedDB)
+            writefile("PandaBooga_BasesDB.json", jsonString)
+        end)
+    end
+end
+
+loadBaseDatabase()
+
 local builderRadiusInput = Instance.new("TextBox")
 builderRadiusInput.Size = UDim2.new(0.9, 0, 0, 30)
 builderRadiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -820,7 +870,7 @@ loadBaseBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
 loadBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 loadBaseBtn.Font = Enum.Font.GothamBold
 loadBaseBtn.TextSize = 12
-loadBaseBtn.Text = "Muat Semua Data dari File"
+loadBaseBtn.Text = "Sinkronisasi Data JSON"
 loadBaseBtn.LayoutOrder = 6
 loadBaseBtn.Parent = builderTab
 
@@ -857,6 +907,16 @@ pasteBaseBtn.Text = "Paste Base Terpilih"
 pasteBaseBtn.LayoutOrder = 9
 pasteBaseBtn.Parent = builderTab
 
+local deleteBaseBtn = Instance.new("TextButton")
+deleteBaseBtn.Size = UDim2.new(0.9, 0, 0, 35)
+deleteBaseBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+deleteBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+deleteBaseBtn.Font = Enum.Font.GothamBold
+deleteBaseBtn.TextSize = 13
+deleteBaseBtn.Text = "Hapus Base Terpilih"
+deleteBaseBtn.LayoutOrder = 10
+deleteBaseBtn.Parent = builderTab
+
 local function updateBaseList()
     for _, child in ipairs(baseList:GetChildren()) do
         if child:IsA("TextButton") then
@@ -879,6 +939,7 @@ local function updateBaseList()
         btn.MouseButton1Click:Connect(function()
             selectedBaseName = bName
             baseDropdown.Text = bName
+            baseNameInput.Text = bName -- Set nama base ke textbox biar mudah diedit
             baseList.Visible = false
             baseList.Size = UDim2.new(0.9, 0, 0, 0)
             
@@ -969,6 +1030,9 @@ saveBaseBtn.MouseButton1Click:Connect(function()
         return
     end
     
+    -- Load dulu dari file untuk memastikan kita punya data terbaru sebelum save (biar tidak tertimpa)
+    loadBaseDatabase()
+    
     -- Simpan base saat ini ke database internal
     BaseDatabase[bName] = {}
     for _, item in ipairs(SavedBase) do
@@ -979,73 +1043,38 @@ saveBaseBtn.MouseButton1Click:Connect(function()
         })
     end
     
-    if writefile and HttpService then
-        local serializedDB = {}
-        for key, baseArr in pairs(BaseDatabase) do
-            local sArr = {}
-            for _, item in ipairs(baseArr) do
-                table.insert(sArr, {
-                    Name = item.Name,
-                    OffsetX = item.Offset.X,
-                    OffsetY = item.Offset.Y,
-                    OffsetZ = item.Offset.Z,
-                    RotComponents = {item.Rotation:components()}
-                })
-            end
-            serializedDB[key] = sArr
-        end
-        local success, err = pcall(function()
-            local jsonString = HttpService:JSONEncode(serializedDB)
-            writefile("PandaBooga_BasesDB.json", jsonString)
-        end)
-        if success then
-            logAction("BUILDER", "Base '" .. bName .. "' berhasil disimpan ke list!")
-            updateBaseList()
-        else
-            logAction("BUILDER", "Gagal menyimpan file: " .. tostring(err))
-        end
-    else
-        logAction("BUILDER", "Disimpan di list sementara (Executor tidak mendukung writefile).")
-        updateBaseList()
-    end
+    saveBaseDatabase()
+    logAction("BUILDER", "Base '" .. bName .. "' berhasil disimpan/diedit di list!")
+    updateBaseList()
 end)
 
 loadBaseBtn.MouseButton1Click:Connect(function()
-    if readfile and isfile and HttpService then
-        if not isfile("PandaBooga_BasesDB.json") then
-            -- Fallback jika file versi sebelumnya yang ada
-            if isfile("PandaBooga_SavedBase.json") then
-                logAction("BUILDER", "INFO: Ditemukan file lama, harap Copy dan Save ulang dengan nama baru.")
-            else
-                logAction("BUILDER", "Gagal: File PandaBooga_BasesDB.json tidak ditemukan!")
-            end
-            return
-        end
-        local success, err = pcall(function()
-            local jsonString = readfile("PandaBooga_BasesDB.json")
-            local serializedDB = HttpService:JSONDecode(jsonString)
-            BaseDatabase = {}
-            for key, baseArr in pairs(serializedDB) do
-                local arr = {}
-                for _, item in ipairs(baseArr) do
-                    table.insert(arr, {
-                        Name = item.Name,
-                        Offset = Vector3.new(item.OffsetX, item.OffsetY, item.OffsetZ),
-                        Rotation = CFrame.new(unpack(item.RotComponents))
-                    })
-                end
-                BaseDatabase[key] = arr
-            end
-        end)
-        if success then
-            logAction("BUILDER", "Berhasil memuat list base dari file! Silakan pilih di dropdown.")
-            updateBaseList()
-        else
-            logAction("BUILDER", "Gagal memuat file: " .. tostring(err))
-        end
+    local success = loadBaseDatabase()
+    if success then
+        logAction("BUILDER", "Berhasil mensinkronisasi data base dari file json!")
+        updateBaseList()
     else
-        logAction("BUILDER", "Gagal: Executor kamu tidak mendukung fungsi readfile/isfile!")
+        logAction("BUILDER", "Gagal memuat file (Mungkin belum ada file PandaBooga_BasesDB.json).")
     end
+end)
+
+deleteBaseBtn.MouseButton1Click:Connect(function()
+    if not selectedBaseName or not BaseDatabase[selectedBaseName] then
+        logAction("BUILDER", "Gagal: Pilih base dari list terlebih dahulu untuk dihapus!")
+        return
+    end
+    
+    loadBaseDatabase() -- sinkronisasi dengan file terbaru
+    BaseDatabase[selectedBaseName] = nil
+    saveBaseDatabase()
+    
+    logAction("BUILDER", "Base '" .. selectedBaseName .. "' berhasil dihapus!")
+    selectedBaseName = nil
+    baseDropdown.Text = "Pilih Base dari List..."
+    baseNameInput.Text = ""
+    SavedBase = {}
+    buildStatusLabel.Text = "0 Bangunan Tersimpan"
+    updateBaseList()
 end)
 
 pasteBaseBtn.MouseButton1Click:Connect(function()
