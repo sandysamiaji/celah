@@ -591,36 +591,43 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
         coroutine.wrap(function()
             logAction("FLING", "Melancarkan tendangan ke " .. targetName .. "!")
             
-            -- Hitung arah lemparan: dari posisi kita ke posisi target
-            local dir = (targetRoot.Position - root.Position).Unit
+            local oldPos = root.CFrame
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             
-            -- Langkah 1: Hapus semua BodyMover lama di target jika ada
-            for _, v in ipairs(targetRoot:GetChildren()) do
-                if v:IsA("BodyMover") then v:Destroy() end
+            -- Pasang gasing dengan kecepatan putaran ekstrem pada karakter KITA
+            local bav = Instance.new("BodyAngularVelocity")
+            bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            bav.AngularVelocity = Vector3.new(0, 999999, 0)
+            bav.Parent = root
+            
+            -- Nonaktifkan Humanoid agar tidak menolak gerakan
+            if hum then
+                hum.PlatformStand = true
             end
             
-            -- Langkah 2: Tambahkan BodyVelocity langsung ke tubuh target
-            local bv = Instance.new("BodyVelocity")
-            bv.Name = "FlingVelocity"
-            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            -- Arahkan ke atas + ke depan (seperti benar-benar ditendang dan terbang)
-            bv.Velocity = (dir * 300) + Vector3.new(0, 500, 0)
-            bv.Parent = targetRoot
+            -- Tunggu putaran ekstrem sudah aktif dulu
+            RunService.Heartbeat:Wait()
+            RunService.Heartbeat:Wait()
             
-            -- Langkah 3: Tambahkan putaran agar visual terlihat terbang
-            local bav = Instance.new("BodyAngularVelocity")
-            bav.Name = "FlingAngular"
-            bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-            bav.AngularVelocity = Vector3.new(0, 9999, 0)
-            bav.Parent = targetRoot
+            -- Hantam: teleport masuk ke dalam tubuh lawan (JANGAN reset velocity!)
+            -- Fisika Roblox akan memproses tabrakan ini dan melontarkan lawan
+            if targetRoot and targetRoot.Parent then
+                root.CFrame = targetRoot.CFrame
+                -- Tunggu 2-3 frame agar mesin fisika sempat memproses tabrakan
+                RunService.Heartbeat:Wait()
+                RunService.Heartbeat:Wait()
+                RunService.Heartbeat:Wait()
+            end
             
-            -- Langkah 4: Biarkan efek berlaku sebentar lalu bersihkan
-            wait(0.5)
+            -- Setelah tabrakan diproses, baru bersihkan dan kembali ke posisi
+            bav:Destroy()
+            root.Velocity = Vector3.zero
+            root.RotVelocity = Vector3.zero
+            root.CFrame = oldPos
             
-            local fv = targetRoot:FindFirstChild("FlingVelocity")
-            if fv then fv:Destroy() end
-            local fa = targetRoot:FindFirstChild("FlingAngular")
-            if fa then fa:Destroy() end
+            if hum then
+                hum.PlatformStand = false
+            end
             
             logAction("FLING", "Berhasil menendang " .. targetName .. "!")
         end)()
