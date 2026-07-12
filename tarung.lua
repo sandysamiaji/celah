@@ -408,8 +408,8 @@ scanRemoteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 scanRemoteBtn.Font = Enum.Font.GothamBold
 scanRemoteBtn.TextSize = 13
 scanRemoteBtn.Text = "Scan RemoteEvents (Lihat Log)"
-scanRemoteBtn.LayoutOrder = 8
-scanRemoteBtn.Parent = cheatsTab
+scanRemoteBtn.LayoutOrder = 3
+scanRemoteBtn.Parent = teleportTab
 
 scanRemoteBtn.MouseButton1Click:Connect(function()
     logAction("SCAN", "Mencari semua RemoteEvent di game...")
@@ -455,7 +455,7 @@ local function touchFlingLoop()
     end
 end
 
-createToggle("TouchFling", "Touch Fling (Vibrate)", "TouchFling", 9, cheatsTab)
+createToggle("TouchFling", "Touch Fling (Vibrate)", "TouchFling", 2, teleportTab)
 
 spawn(function()
     while true do
