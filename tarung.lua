@@ -594,39 +594,31 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
             local oldPos = root.CFrame
             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             
-            -- Pasang gasing dengan kecepatan putaran ekstrem pada karakter KITA
             local bav = Instance.new("BodyAngularVelocity")
             bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-            bav.AngularVelocity = Vector3.new(0, 999999, 0)
+            bav.AngularVelocity = Vector3.new(999999, 999999, 999999)
             bav.Parent = root
             
-            -- Nonaktifkan Humanoid agar tidak menolak gerakan
             if hum then
-                hum.PlatformStand = true
+                hum.Sit = true
             end
             
-            -- Tunggu putaran ekstrem sudah aktif dulu
-            RunService.Heartbeat:Wait()
             RunService.Heartbeat:Wait()
             
-            -- Hantam: teleport masuk ke dalam tubuh lawan (JANGAN reset velocity!)
-            -- Fisika Roblox akan memproses tabrakan ini dan melontarkan lawan
             if targetRoot and targetRoot.Parent then
                 root.CFrame = targetRoot.CFrame
-                -- Tunggu 2-3 frame agar mesin fisika sempat memproses tabrakan
                 RunService.Heartbeat:Wait()
                 RunService.Heartbeat:Wait()
                 RunService.Heartbeat:Wait()
             end
             
-            -- Setelah tabrakan diproses, baru bersihkan dan kembali ke posisi
             bav:Destroy()
             root.Velocity = Vector3.zero
             root.RotVelocity = Vector3.zero
             root.CFrame = oldPos
             
             if hum then
-                hum.PlatformStand = false
+                hum.Sit = false
             end
             
             logAction("FLING", "Berhasil menendang " .. targetName .. "!")
