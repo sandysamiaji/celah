@@ -297,14 +297,11 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
             if stateKey == "FlingAura" then
                 coroutine.wrap(function()
                     logAction("FLING", "Aura Nendang aktif! Mendekati musuh < 35 stud akan mementalkan mereka.")
-                    local thrust = Instance.new("BodyThrust")
-                    thrust.Name = "NendangThrust"
-                    thrust.Force = Vector3.new(9999, 9999, 9999)
                     
                     local bav = Instance.new("BodyAngularVelocity")
                     bav.Name = "NendangVelocity"
                     bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                    bav.AngularVelocity = Vector3.new(0, 99999, 0)
+                    bav.AngularVelocity = Vector3.new(0, 999999, 0)
                     
                     while State.FlingAura do
                         local char = LocalPlayer.Character
@@ -314,7 +311,6 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
                         if root and hum and hum.Health > 0 then
                             if not root:FindFirstChild("NendangVelocity") then
                                 bav:Clone().Parent = root
-                                thrust:Clone().Parent = root
                             end
                             
                             for _, p in ipairs(Players:GetPlayers()) do
@@ -323,28 +319,22 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
                                     if targetRoot and (targetRoot.Position - root.Position).Magnitude <= 35 then
                                         local oldPos = root.CFrame
                                         
-                                        -- Pastikan kita bisa menabrak
                                         local oldCollide = root.CanCollide
                                         root.CanCollide = true
-                                        hum.PlatformStand = true
+                                        hum.Sit = true -- Menonaktifkan perlawanan Humanoid dengan aman
                                         
-                                        -- Teleport persis ke tengah musuh
-                                        root.CFrame = targetRoot.CFrame
+                                        -- Menubruk target berturut-turut untuk menghasilkan memental ekstrem
+                                        for i = 1, 3 do
+                                            root.CFrame = targetRoot.CFrame
+                                            RunService.Heartbeat:Wait()
+                                        end
                                         
-                                        -- Paksa kecepatan tak masuk akal untuk benturan
-                                        root.Velocity = Vector3.new(0, 10000, 0)
-                                        root.RotVelocity = Vector3.new(10000, 10000, 10000)
-                                        
-                                        -- Biarkan mesin fisika Roblox bereaksi terhadap tabrakan
-                                        RunService.Heartbeat:Wait()
-                                        RunService.Heartbeat:Wait()
-                                        
-                                        -- Kembalikan posisi dan normalkan agar tidak ketahuan
+                                        -- Kembalikan posisi dan normalkan agar kita tidak ikut mental
                                         root.Velocity = Vector3.zero
                                         root.RotVelocity = Vector3.zero
                                         root.CFrame = oldPos
                                         root.CanCollide = oldCollide
-                                        hum.PlatformStand = false
+                                        hum.Sit = false
                                     end
                                 end
                             end
@@ -356,8 +346,6 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
                     local char = LocalPlayer.Character
                     local root = char and char:FindFirstChild("HumanoidRootPart")
                     if root then
-                        local t = root:FindFirstChild("NendangThrust")
-                        if t then t:Destroy() end
                         local v = root:FindFirstChild("NendangVelocity")
                         if v then v:Destroy() end
                     end
