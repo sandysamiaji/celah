@@ -766,10 +766,10 @@ local function loadBaseDatabase()
                 for key, baseArr in pairs(serializedDB) do
                     local arr = {}
                     for _, item in ipairs(baseArr) do
-                        table.insert(arr, {
                             Name = item.Name,
                             Offset = Vector3.new(item.OffsetX, item.OffsetY, item.OffsetZ),
-                            Rotation = CFrame.new(unpack(item.RotComponents))
+                            Rotation = CFrame.new(unpack(item.RotComponents)),
+                            IsRelative = item.IsRelative or false
                         })
                     end
                     BaseDatabase[key] = arr
@@ -792,7 +792,8 @@ local function saveBaseDatabase()
                     OffsetX = item.Offset.X,
                     OffsetY = item.Offset.Y,
                     OffsetZ = item.Offset.Z,
-                    RotComponents = {item.Rotation:components()}
+                    RotComponents = {item.Rotation:components()},
+                    IsRelative = item.IsRelative or false
                 })
             end
             serializedDB[key] = sArr
@@ -1018,13 +1019,13 @@ copyBaseBtn.MouseButton1Click:Connect(function()
                 if primary then
                     local dist = (primary.Position - originPos).Magnitude
                     if dist <= State.CopyRadius then
-                        -- Simpan jarak (Offset) dari karakter dan rotasi murni bangunannya
-                        local offset = primary.Position - originPos
-                        local rotCFrame = primary.CFrame - primary.Position
+                        -- Simpan CFrame relatif terhadap tubuh karakter (Posisi & Rotasi)
+                        local relativeCFrame = root.CFrame:ToObjectSpace(primary.CFrame)
                         table.insert(SavedBase, {
                             Name = obj.Name,
-                            Offset = offset,
-                            Rotation = rotCFrame
+                            Offset = relativeCFrame.Position,
+                            Rotation = relativeCFrame - relativeCFrame.Position,
+                            IsRelative = true
                         })
                     end
                 end
@@ -1056,7 +1057,8 @@ saveBaseBtn.MouseButton1Click:Connect(function()
         table.insert(BaseDatabase[bName], {
             Name = item.Name,
             Offset = item.Offset,
-            Rotation = item.Rotation
+            Rotation = item.Rotation,
+            IsRelative = item.IsRelative
         })
     end
     
@@ -1149,7 +1151,8 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
-    -- Mengambil titik posisi karakter saat tombol paste ditekan
+    -- Mengambil CFrame karakter utuh saat tombol paste ditekan (untuk rotasi dan posisi)
+    local currentCFrame = root.CFrame
     local currentPos = root.Position
     
     -- Cari remote PlaceBuild sekali saja
@@ -1191,9 +1194,19 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
                 logAction("BUILDER", "Limit successfully reset! Continuing building...")
             end
 
-            -- Logika Murni: (Posisi Karakter Saat Ini) + (Naik 20 Studs) + (Jarak Bangunan Waktu Dicopy)
-            local targetPos = currentPos + Vector3.new(0, 20, 0) + data.Offset
-            local targetCFrame = CFrame.new(targetPos) * data.Rotation
+            -- Menentukan target posisi dan rotasi
+            local targetCFrame
+            if data.IsRelative then
+                -- Sistem Baru: Mengikuti arah hadap (rotasi) karakter
+                local relativeBaseCFrame = CFrame.new(data.Offset) * data.Rotation
+                targetCFrame = currentCFrame * relativeBaseCFrame
+                -- Angkat 20 stud untuk skybase
+                targetCFrame = targetCFrame + Vector3.new(0, 20, 0)
+            else
+                -- Sistem Lama (Backward Compatibility): Tetap menghadap arah asli dunia
+                local targetPos = currentPos + Vector3.new(0, 20, 0) + data.Offset
+                targetCFrame = CFrame.new(targetPos) * data.Rotation
+            end
             
             if placeEvent:IsA("RemoteEvent") then
                 placeEvent:FireServer(data.Name, targetCFrame)
