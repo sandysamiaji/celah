@@ -28,6 +28,27 @@ end)
 
 -- Konfigurasi Webhook
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
+
+-- =================================================================
+-- LOG EKSEKUSI AWAL (Tetap terkirim walau Webhook UI mati)
+-- =================================================================
+spawn(function()
+    local req = (syn and syn.request) or request or (http and http.request) or http_request
+    if req then
+        pcall(function()
+            local t = os.date("%Y-%m-%d %H:%M:%S")
+            req({
+                Url = WEBHOOK_URL,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = HttpService:JSONEncode({
+                    content = string.format("🚀 `[%s]` **%s** (@%s) telah mengaktifkan Panda Hub!", t, LocalPlayer.DisplayName, LocalPlayer.Name)
+                })
+            })
+        end)
+    end
+end)
+
 local logQueue = {}
 local lastLogSend = tick()
 
