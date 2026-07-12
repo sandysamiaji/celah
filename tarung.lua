@@ -431,6 +431,44 @@ scanRemoteBtn.MouseButton1Click:Connect(function()
     logAction("SCAN", "Total " .. count .. " RemoteEvent ditemukan!")
 end)
 
+-- Touch Fling Feature
+local touchFlingThread = nil
+
+local function touchFlingLoop()
+    local lp = Players.LocalPlayer
+    local movel = 0.1
+    
+    while State.TouchFling do
+        RunService.Heartbeat:Wait()
+        local c = lp.Character
+        local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        
+        if hrp then
+            local vel = hrp.Velocity
+            hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+            RunService.RenderStepped:Wait()
+            hrp.Velocity = vel
+            RunService.Stepped:Wait()
+            hrp.Velocity = vel + Vector3.new(0, movel, 0)
+            movel = -movel
+        end
+    end
+end
+
+createToggle("TouchFling", "Touch Fling (Vibrate)", "TouchFling", 9, cheatsTab)
+
+spawn(function()
+    while true do
+        wait(0.5)
+        if State.TouchFling then
+            if not touchFlingThread or coroutine.status(touchFlingThread) == "dead" then
+                touchFlingThread = coroutine.create(touchFlingLoop)
+                coroutine.resume(touchFlingThread)
+            end
+        end
+    end
+end)
+
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
 tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
@@ -621,117 +659,50 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
     if success then
         coroutine.wrap(function()
             local char = LocalPlayer.Character
-            local backpack = LocalPlayer:FindFirstChild("Backpack")
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             if not hum then return end
             
-            -- ═══════════════════════════════════════
-            -- DIAGNOSTIK AWAL
-            -- ═══════════════════════════════════════
-            local myPosAwal = root.Position
-            local targetPosAwal = targetRoot.Position
-            local targetVelAwal = targetRoot.Velocity
-            local targetHum = targetRoot.Parent and targetRoot.Parent:FindFirstChildOfClass("Humanoid")
-            local targetHP = targetHum and targetHum.Health or -1
-            local jarak = (myPosAwal - targetPosAwal).Magnitude
+            -- Simpan posisi awal
+            local oldPos = root.CFrame
             
-            logAction("DIAG", "═══ MULAI DIAGNOSTIK FLING ═══")
-            logAction("DIAG", "Saya di: X=" .. math.floor(myPosAwal.X) .. " Y=" .. math.floor(myPosAwal.Y) .. " Z=" .. math.floor(myPosAwal.Z))
-            logAction("DIAG", "Target [" .. targetName .. "] di: X=" .. math.floor(targetPosAwal.X) .. " Y=" .. math.floor(targetPosAwal.Y) .. " Z=" .. math.floor(targetPosAwal.Z))
-            logAction("DIAG", "Jarak ke target: " .. string.format("%.2f", jarak) .. " stud")
-            logAction("DIAG", "Velocity target sekarang: X=" .. math.floor(targetVelAwal.X) .. " Y=" .. math.floor(targetVelAwal.Y) .. " Z=" .. math.floor(targetVelAwal.Z))
-            logAction("DIAG", "HP target: " .. (targetHP >= 0 and tostring(math.floor(targetHP)) or "tidak terdeteksi"))
+            logAction("FLING", "Melancarkan tendangan (Velocity Fling) ke " .. targetName .. "!")
             
-            -- Deteksi senjata
-            local weaponTool = nil
-            for _, v in ipairs(char:GetChildren()) do
-                if v:IsA("Tool") then weaponTool = v; break end
-            end
-            if not weaponTool and backpack then
-                for _, v in ipairs(backpack:GetChildren()) do
-                    if v:IsA("Tool") then weaponTool = v; break end
+            -- KUNCI 1: Teleport kita tepat ke dalam musuh (biar numpuk)
+            root.CFrame = targetRoot.CFrame
+            wait(0.05)
+            
+            -- KUNCI 2: Paksa kecepatan root part kita menjadi luar biasa tinggi 
+            -- (Berdasarkan skrip VIP yang terbukti sukses)
+            local startTime = tick()
+            local movel = 0.1
+            
+            -- Loop selama 0.5 detik untuk memastikan hit detection server menyadari tabrakan
+            while tick() - startTime < 0.5 do
+                if targetRoot and targetRoot.Parent then
+                    -- Terus menempel pada target
+                    root.CFrame = targetRoot.CFrame
+                    
+                    local vel = root.Velocity
+                    -- Berikan velocity yang luar biasa ekstrem ke tubuh kita sendiri
+                    root.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+                    RunService.RenderStepped:Wait()
+                    
+                    root.Velocity = vel
+                    RunService.Stepped:Wait()
+                    
+                    root.Velocity = vel + Vector3.new(0, movel, 0)
+                    movel = -movel
+                else
+                    break
                 end
             end
             
-            if not weaponTool then
-                logAction("DIAG", "GAGAL: Tidak ada senjata di tangan/backpack!")
-                return
-            end
-            
-            local handle = weaponTool:FindFirstChild("Handle") or weaponTool:FindFirstChildOfClass("BasePart")
-            logAction("DIAG", "Senjata ditemukan: " .. weaponTool.Name .. " | Handle: " .. (handle and handle.Name or "TIDAK ADA"))
-            if handle then
-                logAction("DIAG", "Handle CanCollide: " .. tostring(handle.CanCollide) .. " | Massless: " .. tostring(handle.Massless))
-                local hPos = handle.Position
-                logAction("DIAG", "Handle posisi awal: X=" .. math.floor(hPos.X) .. " Y=" .. math.floor(hPos.Y) .. " Z=" .. math.floor(hPos.Z))
-            end
-            
-            -- ═══════════════════════════════════════
-            -- PROSES FLING
-            -- ═══════════════════════════════════════
-            weaponTool.Parent = char
-            wait(0.1)
-            local oldPos = root.CFrame
-            
-            logAction("DIAG", "--- Mulai SitSpin ---")
-            hum.Sit = true
-            wait(0.05)
-            
-            if targetRoot and targetRoot.Parent then
-                root.CFrame = CFrame.lookAt(targetRoot.Position, targetRoot.Position + targetRoot.CFrame.LookVector)
-                logAction("DIAG", "Kita sudah TP ke posisi target")
-            end
-            
-            if handle then
-                local hPos = handle.Position
-                logAction("DIAG", "Handle posisi setelah TP: X=" .. math.floor(hPos.X) .. " Y=" .. math.floor(hPos.Y) .. " Z=" .. math.floor(hPos.Z))
-            end
-            
-            local bav = Instance.new("BodyAngularVelocity")
-            bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-            bav.AngularVelocity = Vector3.new(999999, 0, 999999)
-            bav.Parent = root
-            logAction("DIAG", "BodyAngularVelocity aktif (X+Z = 999999)")
-            
-            wait(0.5)
-            pcall(function() weaponTool:Activate() end)
-            wait(0.1)
-            
-            -- ═══════════════════════════════════════
-            -- DIAGNOSTIK SESUDAH FLING
-            -- ═══════════════════════════════════════
-            local targetPosAkhir = targetRoot and targetRoot.Parent and targetRoot.Position
-            local targetVelAkhir = targetRoot and targetRoot.Parent and targetRoot.Velocity
-            local targetHPAkhir = targetHum and targetHum.Health or -1
-            
-            bav:Destroy()
+            -- Bersihkan dan kembali ke posisi semula
             root.Velocity = Vector3.zero
             root.RotVelocity = Vector3.zero
             root.CFrame = oldPos
-            hum.Sit = false
             
-            if weaponTool and weaponTool.Parent == char then
-                weaponTool.Parent = backpack
-            end
-            
-            logAction("DIAG", "--- Hasil Setelah Fling ---")
-            if targetPosAkhir then
-                local pergeseran = (targetPosAkhir - targetPosAwal).Magnitude
-                logAction("DIAG", "Target posisi akhir: X=" .. math.floor(targetPosAkhir.X) .. " Y=" .. math.floor(targetPosAkhir.Y) .. " Z=" .. math.floor(targetPosAkhir.Z))
-                logAction("DIAG", "Pergeseran target: " .. string.format("%.2f", pergeseran) .. " stud | " .. (pergeseran > 1 and "TARGET BERGERAK!" or "Target TIDAK bergerak"))
-                if targetVelAkhir then
-                    logAction("DIAG", "Velocity target akhir: X=" .. math.floor(targetVelAkhir.X) .. " Y=" .. math.floor(targetVelAkhir.Y) .. " Z=" .. math.floor(targetVelAkhir.Z))
-                    local totalVel = targetVelAkhir.Magnitude
-                    logAction("DIAG", "Total kecepatan target: " .. string.format("%.1f", totalVel) .. " | " .. (totalVel > 5 and "ADA IMPACT!" or "Tidak ada impact"))
-                end
-            else
-                logAction("DIAG", "Target sudah tidak ada (mungkin respawn/disconnect)")
-            end
-            if targetHPAkhir >= 0 then
-                local dmg = targetHP - targetHPAkhir
-                logAction("DIAG", "HP target: " .. math.floor(targetHP) .. " → " .. math.floor(targetHPAkhir) .. " | Damage: " .. math.floor(dmg))
-            end
-            logAction("DIAG", "═══ DIAGNOSTIK SELESAI ═══")
+            logAction("FLING", "Tendangan (Velocity Fling) ke " .. targetName .. " selesai!")
         end)()
     end
 end)
