@@ -22,8 +22,8 @@ end
 
 -- CLEANUP OLD GUI
 pcall(function()
-    if CoreGui:FindFirstChild("BoogaMultiHub") then CoreGui.BoogaMultiHub:Destroy() end
-    if gethui and gethui():FindFirstChild("BoogaMultiHub") then gethui().BoogaMultiHub:Destroy() end
+    if CoreGui:FindFirstChild("PandaHub") then CoreGui.PandaHub:Destroy() end
+    if gethui and gethui():FindFirstChild("PandaHub") then gethui().PandaHub:Destroy() end
 end)
 
 -- Konfigurasi Webhook
@@ -99,7 +99,7 @@ end)()
 -- GUI MULTI-FITUR
 --------------------------------------------------------------------------------
 local gui = Instance.new("ScreenGui")
-gui.Name = "BoogaMultiHub"
+gui.Name = "PandaHub"
 gui.ResetOnSpawn = false
 
 if gethui then
@@ -128,7 +128,7 @@ title.BackgroundTransparency = 1
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
-title.Text = "🔥 ALL-IN-ONE HUB 🔥"
+title.Text = "🐼 PANDA HUB 🐼"
 title.Parent = frame
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -686,8 +686,8 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
             local startTime = tick()
             local movel = 0.1
             
-            -- Loop selama 0.5 detik untuk memastikan hit detection server menyadari tabrakan
-            while tick() - startTime < 0.5 do
+            -- Loop selama 0.2 detik untuk memastikan hit detection server menyadari tabrakan
+            while tick() - startTime < 0.2 do
                 if targetRoot and targetRoot.Parent then
                     -- Terus menempel pada target
                     root.CFrame = targetRoot.CFrame
@@ -695,6 +695,12 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
                     local vel = root.Velocity
                     -- Berikan velocity yang luar biasa ekstrem ke tubuh kita sendiri
                     root.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+                    
+                    -- OTOMATIS NONJOK/MUKUL PAKAI SENJATA
+                    if weaponTool then
+                        pcall(function() weaponTool:Activate() end)
+                    end
+                    
                     RunService.RenderStepped:Wait()
                     
                     root.Velocity = vel
