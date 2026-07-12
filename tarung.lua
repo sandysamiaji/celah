@@ -589,84 +589,70 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
     local success, root, targetRoot, targetName = checkTeleportRequirements()
     if success then
         coroutine.wrap(function()
-            logAction("FLING", "Mencari Punch tool untuk menendang " .. targetName .. "!")
-            
-            -- Cari tool Punch di backpack atau yang sedang di-equip
             local char = LocalPlayer.Character
             local backpack = LocalPlayer:FindFirstChild("Backpack")
-            local punchTool = nil
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if not hum then return end
             
-            -- Cek di karakter (sudah equipped)
+            -- Deteksi otomatis senjata yang sedang di-equip atau ada di backpack
+            local punchTool = nil
+            -- Prioritas 1: Tool yang SEDANG di-equip di karakter
             for _, v in ipairs(char:GetChildren()) do
-                if v:IsA("Tool") and v.Name:lower():find("punch") then
+                if v:IsA("Tool") then
                     punchTool = v
+                    logAction("FLING", "Menggunakan senjata yang sedang di-equip: " .. v.Name)
                     break
                 end
             end
-            -- Cek di backpack jika belum ditemukan
-            if not punchTool and backpack then
-                for _, v in ipairs(backpack:GetChildren()) do
-                    if v:IsA("Tool") and v.Name:lower():find("punch") then
-                        punchTool = v
-                        break
-                    end
-                end
-            end
-            -- Kalau tidak ada yang namanya "punch", ambil tool apapun yang ada
+            -- Prioritas 2: Tool pertama di backpack jika tidak ada yang di-equip
             if not punchTool and backpack then
                 for _, v in ipairs(backpack:GetChildren()) do
                     if v:IsA("Tool") then
                         punchTool = v
+                        logAction("FLING", "Senjata di-equip dari backpack: " .. v.Name)
                         break
                     end
                 end
             end
             
             if not punchTool then
-                logAction("FLING", "Gagal: Tidak ada Tool/Senjata di backpack! Ambil dulu Punch-nya.")
+                logAction("FLING", "Gagal: Tidak ada tool di backpack! Ambil Punch dulu.")
                 return
             end
             
-            local oldPos = root.CFrame
-            local hum = char:FindFirstChildOfClass("Humanoid")
+            logAction("FLING", "Auto-Punch ke " .. targetName .. " menggunakan " .. punchTool.Name)
             
-            -- Pindahkan tool ke character (equip) agar handle-nya aktif sebagai BasePart
+            -- Equip tool ke karakter
             punchTool.Parent = char
-            wait(0.1)
+            wait(0.15)
             
-            -- Ambil handle tool
-            local handle = punchTool:FindFirstChild("Handle") or punchTool:FindFirstChildOfClass("BasePart")
+            -- Simpan posisi awal
+            local oldPos = root.CFrame
             
-            if not handle then
-                logAction("FLING", "Gagal: Tool tidak punya Handle.")
-                punchTool.Parent = backpack
-                return
+            -- Auto-punch 5x: setiap iterasi, TP ke samping target, hadap dia, pukul
+            for i = 1, 5 do
+                if not (targetRoot and targetRoot.Parent) then break end
+                
+                -- Berdiri tepat di depan target (jarak 2.5 stud)
+                local targetCF = targetRoot.CFrame
+                root.CFrame = CFrame.lookAt(
+                    targetCF.Position + targetCF.LookVector * 2.5,
+                    targetCF.Position
+                )
+                wait(0.05)
+                punchTool:Activate()
+                wait(0.12)
             end
             
-            -- Paksa handle tool ke dalam tubuh target berulang-ulang
-            -- Server akan memproses tabrakan tool (BasePart) ke player lain
-            local oldHandleCollide = handle.CanCollide
-            handle.CanCollide = true
-            
-            for i = 1, 15 do
-                if targetRoot and targetRoot.Parent then
-                    handle.CFrame = targetRoot.CFrame
-                end
-                RunService.Heartbeat:Wait()
-            end
-            
-            -- Aktifkan tool (swing punch)
-            punchTool:Activate()
-            wait(0.2)
-            
-            -- Bersihkan
-            handle.CanCollide = oldHandleCollide
+            -- Kembali ke posisi awal
             root.CFrame = oldPos
             
             -- Kembalikan tool ke backpack
-            punchTool.Parent = backpack
+            if punchTool and punchTool.Parent == char then
+                punchTool.Parent = backpack
+            end
             
-            logAction("FLING", "Berhasil menendang " .. targetName .. " dengan " .. punchTool.Name .. "!")
+            logAction("FLING", "Auto-Punch ke " .. targetName .. " selesai!")
         end)()
     end
 end)
