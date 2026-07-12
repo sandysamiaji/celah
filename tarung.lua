@@ -592,8 +592,8 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
             logAction("FLING", "Melancarkan tendangan gaib ke " .. targetName .. "!")
             
             local oldPos = root.CFrame
-            local oldCollide = root.CanCollide
             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Sit = true end
             
             local bav = Instance.new("BodyAngularVelocity")
             bav.Name = "NendangVelocity"
@@ -601,22 +601,49 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
             bav.AngularVelocity = Vector3.new(0, 999999, 0)
             bav.Parent = root
             
-            root.CanCollide = true
-            if hum then hum.Sit = true end
+            local bp = Instance.new("BodyPosition")
+            bp.Name = "NendangPosition"
+            bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bp.P = 100000
+            bp.D = 100
+            bp.Parent = root
             
-            -- Menubruk target berturut-turut untuk menghasilkan memental ekstrem
-            for i = 1, 10 do
-                root.CFrame = targetRoot.CFrame
+            -- Tingkatkan massa tubuh agar momentum transfer lebih besar
+            local oldProps = {}
+            for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    oldProps[v] = {v.CustomPhysicalProperties, v.CanCollide}
+                    v.CustomPhysicalProperties = PhysicalProperties.new(100, 0, 1)
+                    v.CanCollide = true
+                end
+            end
+            
+            -- Mengejar target secara fisik selama setengah detik
+            for i = 1, 30 do
+                if targetRoot and targetRoot.Parent then
+                    bp.Position = targetRoot.Position
+                    root.Velocity = Vector3.new(10000, 10000, 10000)
+                end
                 RunService.Heartbeat:Wait()
             end
             
-            -- Kembalikan posisi dan normalkan
+            -- Hapus BodyMovers
             bav:Destroy()
+            bp:Destroy()
+            
+            -- Kembalikan posisi dan keadaan normal
             root.Velocity = Vector3.zero
             root.RotVelocity = Vector3.zero
             root.CFrame = oldPos
-            root.CanCollide = oldCollide
             if hum then hum.Sit = false end
+            
+            -- Kembalikan fisika bagian tubuh
+            for part, data in pairs(oldProps) do
+                if part and part.Parent then
+                    part.CustomPhysicalProperties = data[1]
+                    part.CanCollide = data[2]
+                end
+            end
             
             logAction("FLING", "Berhasil menendang " .. targetName .. "!")
         end)()
