@@ -400,6 +400,37 @@ end)
 
 createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 7, cheatsTab)
 
+local scanRemoteBtn = Instance.new("TextButton")
+scanRemoteBtn.Size = UDim2.new(0.9, 0, 0, 30)
+scanRemoteBtn.Position = UDim2.new(0.05, 0, 0, 0) -- Akan dikendalikan oleh UIListLayout
+scanRemoteBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+scanRemoteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+scanRemoteBtn.Font = Enum.Font.GothamBold
+scanRemoteBtn.TextSize = 13
+scanRemoteBtn.Text = "Scan RemoteEvents (Lihat Log)"
+scanRemoteBtn.LayoutOrder = 8
+scanRemoteBtn.Parent = cheatsTab
+
+scanRemoteBtn.MouseButton1Click:Connect(function()
+    logAction("SCAN", "Mencari semua RemoteEvent di game...")
+    local count = 0
+    local function scan(parent)
+        for _, v in ipairs(parent:GetChildren()) do
+            if v:IsA("RemoteEvent") then
+                logAction("SCAN", "Ditemukan RemoteEvent: " .. v.GetFullName(v))
+                count = count + 1
+            end
+            pcall(function() scan(v) end)
+        end
+    end
+    
+    pcall(function() scan(game:GetService("ReplicatedStorage")) end)
+    pcall(function() scan(game:GetService("Workspace")) end)
+    pcall(function() scan(game:GetService("Players")) end)
+    
+    logAction("SCAN", "Total " .. count .. " RemoteEvent ditemukan!")
+end)
+
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
 tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
