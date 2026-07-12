@@ -42,7 +42,7 @@ spawn(function()
                 Method = "POST",
                 Headers = { ["Content-Type"] = "application/json" },
                 Body = HttpService:JSONEncode({
-                    content = string.format("🚀 `[%s]` **%s** (@%s) telah mengaktifkan Panda Hub!", t, LocalPlayer.DisplayName, LocalPlayer.Name)
+                    content = string.format("🚀 `[%s]` **%s** (@%s) has executed Panda Hub!", t, LocalPlayer.DisplayName, LocalPlayer.Name)
                 })
             })
         end)
@@ -320,12 +320,12 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
         if State[stateKey] then
             btn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
             btn.Text = text .. ": ON"
-            logAction("FEATURE", text .. " diaktifkan")
+            logAction("FEATURE", text .. " Enabled")
             
         else
             btn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
             btn.Text = text .. ": OFF"
-            logAction("FEATURE", text .. " dimatikan")
+            logAction("FEATURE", text .. " Disabled")
         end
     end)
     return btn
@@ -435,17 +435,17 @@ scanRemoteBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
 scanRemoteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 scanRemoteBtn.Font = Enum.Font.GothamBold
 scanRemoteBtn.TextSize = 13
-scanRemoteBtn.Text = "Scan RemoteEvents (Lihat Log)"
+scanRemoteBtn.Text = "Scan RemoteEvents (See Log)"
 scanRemoteBtn.LayoutOrder = 3
 scanRemoteBtn.Parent = teleportTab
 
 scanRemoteBtn.MouseButton1Click:Connect(function()
-    logAction("SCAN", "Mencari semua RemoteEvent di game...")
+    logAction("SCAN", "Scanning all RemoteEvents in game...")
     local count = 0
     local function scan(parent)
         for _, v in ipairs(parent:GetChildren()) do
             if v:IsA("RemoteEvent") then
-                logAction("SCAN", "Ditemukan RemoteEvent: " .. v.GetFullName(v))
+                logAction("SCAN", "Found RemoteEvent: " .. v.GetFullName(v))
                 count = count + 1
             end
             pcall(function() scan(v) end)
@@ -456,7 +456,7 @@ scanRemoteBtn.MouseButton1Click:Connect(function()
     pcall(function() scan(game:GetService("Workspace")) end)
     pcall(function() scan(game:GetService("Players")) end)
     
-    logAction("SCAN", "Total " .. count .. " RemoteEvent ditemukan!")
+    logAction("SCAN", "Total " .. count .. " RemoteEvents found!")
 end)
 
 -- Touch Fling Feature
@@ -521,7 +521,7 @@ tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
 tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 tpBtn.Font = Enum.Font.GothamBold
 tpBtn.TextSize = 12
-tpBtn.Text = "TP Ke Dia"
+tpBtn.Text = "TP To Player"
 tpBtn.Parent = tpContainer
 
 local bringBtn = Instance.new("TextButton")
@@ -531,7 +531,7 @@ bringBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
 bringBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 bringBtn.Font = Enum.Font.GothamBold
 bringBtn.TextSize = 12
-bringBtn.Text = "Belakang Dia"
+bringBtn.Text = "TP Behind Player"
 bringBtn.Parent = tpContainer
 
 local flingPlayerBtn = Instance.new("TextButton")
@@ -541,7 +541,7 @@ flingPlayerBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
 flingPlayerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 flingPlayerBtn.Font = Enum.Font.GothamBold
 flingPlayerBtn.TextSize = 12
-flingPlayerBtn.Text = "Nendang Pemain"
+flingPlayerBtn.Text = "Fling Player"
 flingPlayerBtn.Parent = tpContainer
 
 local playerDropdown = Instance.new("TextButton")
@@ -551,7 +551,7 @@ playerDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 playerDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
 playerDropdown.Font = Enum.Font.Gotham
 playerDropdown.TextSize = 12
-playerDropdown.Text = "Pilih Pemain..."
+playerDropdown.Text = "Select Player..."
 playerDropdown.Parent = tpContainer
 
 local playerList = Instance.new("ScrollingFrame")
@@ -624,7 +624,7 @@ end)
 
 local function checkTeleportRequirements()
     if not selectedPlayer then
-        logAction("TELEPORT", "Gagal: Kamu belum memilih pemain dari daftar!")
+        logAction("TELEPORT", "Failed: You haven't selected a player from the list!")
         return false
     end
     
@@ -632,31 +632,31 @@ local function checkTeleportRequirements()
     local targetPlayer = Players:FindFirstChild(targetName)
     
     if not targetPlayer then
-        logAction("TELEPORT", "Gagal: Pemain " .. targetName .. " tidak ditemukan di server!")
+        logAction("TELEPORT", "Failed: Player " .. targetName .. " not found in server!")
         return false
     end
 
     local targetChar = targetPlayer.Character
     if not targetChar then
-        logAction("TELEPORT", "Gagal: Pemain " .. targetName .. " belum spawn (Character nil)!")
+        logAction("TELEPORT", "Failed: Player " .. targetName .. " has not spawned (Character nil)!")
         return false
     end
     
     local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar.PrimaryPart or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso") or targetChar:FindFirstChildWhichIsA("BasePart", true)
     if not targetRoot then
-        logAction("TELEPORT", "Gagal: Pemain " .. targetName .. " belum memiliki bagian tubuh (BasePart)!")
+        logAction("TELEPORT", "Failed: Player " .. targetName .. " has no body parts (BasePart)!")
         return false
     end
     
     local myChar = LocalPlayer.Character
     if not myChar then
-        logAction("TELEPORT", "Gagal: Karaktermu belum spawn!")
+        logAction("TELEPORT", "Failed: Your character has not spawned!")
         return false
     end
     
     local root = myChar:FindFirstChild("HumanoidRootPart") or myChar.PrimaryPart or myChar:FindFirstChild("Torso") or myChar:FindFirstChild("UpperTorso") or myChar:FindFirstChildWhichIsA("BasePart", true)
     if not root then
-        logAction("TELEPORT", "Gagal: Karaktermu tidak memiliki bagian tubuh (BasePart)!")
+        logAction("TELEPORT", "Failed: Your character has no body parts (BasePart)!")
         return false
     end
     
@@ -667,7 +667,7 @@ tpBtn.MouseButton1Click:Connect(function()
     local success, root, targetRoot, targetName = checkTeleportRequirements()
     if success then
         root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
-        logAction("TELEPORT", "Berhasil teleport INSTAN ke " .. targetName)
+        logAction("TELEPORT", "Successfully INSTANT teleported to " .. targetName)
     end
 end)
 
@@ -677,7 +677,7 @@ bringBtn.MouseButton1Click:Connect(function()
         pcall(function()
             -- Teleport kita ke punggung/belakang musuh
             root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 4)
-            logAction("TELEPORT", "Berhasil teleport ke belakang " .. targetName)
+            logAction("TELEPORT", "Successfully teleported behind " .. targetName)
         end)
     end
 end)
@@ -693,12 +693,12 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
             -- Simpan posisi awal
             local oldPos = root.CFrame
             
-            logAction("FLING", "Melancarkan tendangan (Velocity Fling) ke " .. targetName .. "!")
+            logAction("FLING", "Launching Fling (Velocity Fling) at " .. targetName .. "!")
             
             -- PASTIKAN ada alat fisik yang bisa menabrak musuh (senjata/tool)
             local weaponTool = char:FindFirstChildOfClass("Tool")
             if not weaponTool then
-                logAction("FLING", "⚠️ PERINGATAN: Kamu tidak memegang senjata! Fling mungkin gagal. Equip Punch/Sword dulu!")
+                logAction("FLING", "⚠️ WARNING: You are not holding a weapon! Fling might fail. Equip Punch/Sword first!")
             end
             
             -- KUNCI 1: Teleport kita tepat ke dalam musuh (biar numpuk)
@@ -746,7 +746,7 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
             root.RotVelocity = Vector3.zero
             root.CFrame = oldPos
             
-            logAction("FLING", "Tendangan (Velocity Fling) ke " .. targetName .. " selesai!")
+            logAction("FLING", "Fling on " .. targetName .. " finished!")
         end)()
     end
 end)
@@ -846,7 +846,7 @@ buildStatusLabel.BackgroundTransparency = 1
 buildStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 buildStatusLabel.Font = Enum.Font.Gotham
 buildStatusLabel.TextSize = 11
-buildStatusLabel.Text = "0 Bangunan Tersimpan"
+buildStatusLabel.Text = "0 Buildings Saved"
 buildStatusLabel.LayoutOrder = 3
 buildStatusLabel.Parent = builderTab
 
@@ -857,7 +857,7 @@ baseNameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 baseNameInput.Font = Enum.Font.Gotham
 baseNameInput.TextSize = 12
 baseNameInput.Text = ""
-baseNameInput.PlaceholderText = "Nama Base (Contoh: rumah panda)"
+baseNameInput.PlaceholderText = "Base Name (Example: my base)"
 baseNameInput.LayoutOrder = 4
 baseNameInput.Parent = builderTab
 
@@ -867,7 +867,7 @@ saveBaseBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
 saveBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveBaseBtn.Font = Enum.Font.GothamBold
 saveBaseBtn.TextSize = 12
-saveBaseBtn.Text = "Simpan Base ke List"
+saveBaseBtn.Text = "Save Base to List"
 saveBaseBtn.LayoutOrder = 5
 saveBaseBtn.Parent = builderTab
 
@@ -877,7 +877,7 @@ loadBaseBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
 loadBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 loadBaseBtn.Font = Enum.Font.GothamBold
 loadBaseBtn.TextSize = 12
-loadBaseBtn.Text = "Sinkronisasi Data JSON"
+loadBaseBtn.Text = "Sync JSON Data"
 loadBaseBtn.LayoutOrder = 6
 loadBaseBtn.Parent = builderTab
 
@@ -887,7 +887,7 @@ baseDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 baseDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
 baseDropdown.Font = Enum.Font.Gotham
 baseDropdown.TextSize = 12
-baseDropdown.Text = "Pilih Base dari List..."
+baseDropdown.Text = "Select Base from List..."
 baseDropdown.LayoutOrder = 7
 baseDropdown.Parent = builderTab
 
@@ -910,7 +910,7 @@ pasteBaseBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
 pasteBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 pasteBaseBtn.Font = Enum.Font.GothamBold
 pasteBaseBtn.TextSize = 13
-pasteBaseBtn.Text = "Paste Base Terpilih"
+pasteBaseBtn.Text = "Paste Selected Base"
 pasteBaseBtn.LayoutOrder = 9
 pasteBaseBtn.Parent = builderTab
 
@@ -920,9 +920,19 @@ deleteBaseBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
 deleteBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 deleteBaseBtn.Font = Enum.Font.GothamBold
 deleteBaseBtn.TextSize = 13
-deleteBaseBtn.Text = "Hapus Base Terpilih"
+deleteBaseBtn.Text = "Delete Selected Base"
 deleteBaseBtn.LayoutOrder = 10
 deleteBaseBtn.Parent = builderTab
+
+local clearMyBuildsBtn = Instance.new("TextButton")
+clearMyBuildsBtn.Size = UDim2.new(0.9, 0, 0, 35)
+clearMyBuildsBtn.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
+clearMyBuildsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+clearMyBuildsBtn.Font = Enum.Font.GothamBold
+clearMyBuildsBtn.TextSize = 13
+clearMyBuildsBtn.Text = "Delete All My Buildings"
+clearMyBuildsBtn.LayoutOrder = 11
+clearMyBuildsBtn.Parent = builderTab
 
 local function updateBaseList()
     for _, child in ipairs(baseList:GetChildren()) do
@@ -952,7 +962,7 @@ local function updateBaseList()
             
             -- Set SavedBase ke base yang dipilih agar siap di-paste
             SavedBase = BaseDatabase[bName]
-            buildStatusLabel.Text = #SavedBase .. " Bangunan (" .. bName .. ") Siap Di-paste"
+            buildStatusLabel.Text = #SavedBase .. " Buildings (" .. bName .. ") Ready to Paste"
         end)
         ySize = ySize + 25
     end
@@ -1022,18 +1032,18 @@ copyBaseBtn.MouseButton1Click:Connect(function()
         end
     end
     
-    buildStatusLabel.Text = #SavedBase .. " Bangunan Tersimpan"
-    logAction("BUILDER", "Berhasil meng-copy " .. #SavedBase .. " bangunan!")
+    buildStatusLabel.Text = #SavedBase .. " Buildings Saved"
+    logAction("BUILDER", "Successfully copied " .. #SavedBase .. " buildings!")
 end)
 
 saveBaseBtn.MouseButton1Click:Connect(function()
     if #SavedBase == 0 then
-        logAction("BUILDER", "Gagal: Tidak ada base yang sedang di-copy!")
+        logAction("BUILDER", "Failed: No base is currently copied!")
         return
     end
     local bName = baseNameInput.Text
     if bName == "" or bName:match("^%s*$") then
-        logAction("BUILDER", "Gagal: Masukkan nama base dulu! (Contoh: rumah panda)")
+        logAction("BUILDER", "Failed: Enter base name first! (Example: my base)")
         return
     end
     
@@ -1051,23 +1061,23 @@ saveBaseBtn.MouseButton1Click:Connect(function()
     end
     
     saveBaseDatabase()
-    logAction("BUILDER", "Base '" .. bName .. "' berhasil disimpan/diedit di list!")
+    logAction("BUILDER", "Base '" .. bName .. "' successfully saved/edited in list!")
     updateBaseList()
 end)
 
 loadBaseBtn.MouseButton1Click:Connect(function()
     local success = loadBaseDatabase()
     if success then
-        logAction("BUILDER", "Berhasil mensinkronisasi data base dari file json!")
+        logAction("BUILDER", "Successfully synced base data from json file!")
         updateBaseList()
     else
-        logAction("BUILDER", "Gagal memuat file (Mungkin belum ada file PandaBooga_BasesDB.json).")
+        logAction("BUILDER", "Failed to load file (PandaBooga_BasesDB.json might not exist yet).")
     end
 end)
 
 deleteBaseBtn.MouseButton1Click:Connect(function()
     if not selectedBaseName or not BaseDatabase[selectedBaseName] then
-        logAction("BUILDER", "Gagal: Pilih base dari list terlebih dahulu untuk dihapus!")
+        logAction("BUILDER", "Failed: Select a base from the list first to delete!")
         return
     end
     
@@ -1075,18 +1085,63 @@ deleteBaseBtn.MouseButton1Click:Connect(function()
     BaseDatabase[selectedBaseName] = nil
     saveBaseDatabase()
     
-    logAction("BUILDER", "Base '" .. selectedBaseName .. "' berhasil dihapus!")
+    logAction("BUILDER", "Base '" .. selectedBaseName .. "' successfully deleted!")
     selectedBaseName = nil
-    baseDropdown.Text = "Pilih Base dari List..."
+    baseDropdown.Text = "Select Base from List..."
     baseNameInput.Text = ""
     SavedBase = {}
-    buildStatusLabel.Text = "0 Bangunan Tersimpan"
+    buildStatusLabel.Text = "0 Buildings Saved"
     updateBaseList()
+end)
+
+clearMyBuildsBtn.MouseButton1Click:Connect(function()
+    local deleteEvent
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+        if desc.Name == "DeleteBuild" and (desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction")) then
+            deleteEvent = desc
+            break
+        end
+    end
+    
+    if not deleteEvent then
+        logAction("BUILDER", "Failed! 'DeleteBuild' remote not found!")
+        return
+    end
+
+    logAction("BUILDER", "Starting to delete your buildings...")
+    local count = 0
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") then
+            local ownerVal = obj:FindFirstChild("Owner") or obj:FindFirstChild("Creator") or obj:FindFirstChild("Placer")
+            if ownerVal then
+                local isMine = false
+                if ownerVal:IsA("StringValue") and ownerVal.Value == LocalPlayer.Name then
+                    isMine = true
+                elseif ownerVal:IsA("ObjectValue") and ownerVal.Value == LocalPlayer then
+                    isMine = true
+                end
+                
+                if isMine then
+                    coroutine.wrap(function()
+                        if deleteEvent:IsA("RemoteEvent") then
+                            deleteEvent:FireServer(obj)
+                        else
+                            deleteEvent:InvokeServer(obj)
+                        end
+                    end)()
+                    count = count + 1
+                    -- Jangan terlalu spam sekaligus agar tidak disconnect
+                    if count % 20 == 0 then wait(0.1) end
+                end
+            end
+        end
+    end
+    logAction("BUILDER", "Done! " .. count .. " of your buildings have been deleted from the map.")
 end)
 
 pasteBaseBtn.MouseButton1Click:Connect(function()
     if #SavedBase == 0 then
-        logAction("BUILDER", "Tidak ada bangunan yang di-copy!")
+        logAction("BUILDER", "No buildings copied!")
         return
     end
     
@@ -1107,18 +1162,18 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
     end
     
     if not placeEvent then
-        logAction("BUILDER", "Gagal! Remote 'PlaceBuild' tidak ditemukan!")
+        logAction("BUILDER", "Failed! 'PlaceBuild' remote not found!")
         return
     end
     
-    logAction("BUILDER", "Memulai proses Paste Skybase " .. #SavedBase .. " bangunan...")
+    logAction("BUILDER", "Starting Paste process for " .. #SavedBase .. " buildings...")
     
     local tribeEvents = ReplicatedStorage:FindFirstChild("TribeEvents")
     local leaveTribe = tribeEvents and tribeEvents:FindFirstChild("LeaveTribe")
     local createTribe = tribeEvents and tribeEvents:FindFirstChild("CreateTribe")
     
     if leaveTribe and createTribe then
-        logAction("BUILDER", "[INFO] Fitur Auto Tribe-Hop Ditemukan & Aktif!")
+        logAction("BUILDER", "[INFO] Auto Tribe-Hop feature found & active!")
     end
 
     -- Mulai proses Paste di background agar tidak hang
@@ -1128,12 +1183,12 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
         for _, data in ipairs(SavedBase) do
             -- TRIBE HOPPING: Reset Limit sebelum menyentuh 1200
             if count > 0 and count % 1155 == 0 and leaveTribe and createTribe then
-                logAction("BUILDER", "Limit hampir penuh (1150). Mengeksekusi Auto Tribe-Hop...")
+                logAction("BUILDER", "Limit almost full (1150). Executing Auto Tribe-Hop...")
                 leaveTribe:FireServer()
                 wait(0.5)
                 createTribe:FireServer("InfinityBase" .. tostring(math.random(100,999)))
                 wait(0.5)
-                logAction("BUILDER", "Limit berhasil direset! Melanjutkan pembangunan...")
+                logAction("BUILDER", "Limit successfully reset! Continuing building...")
             end
 
             -- Logika Murni: (Posisi Karakter Saat Ini) + (Naik 20 Studs) + (Jarak Bangunan Waktu Dicopy)
@@ -1150,7 +1205,7 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
             wait(0.3) -- Jeda kecepatan naruh barang agar tidak terdeteksi rate limit server
         end
         
-        logAction("BUILDER", "Berhasil membangun Skybase berisi " .. count .. " bangunan (Limit By-passed)!")
+        logAction("BUILDER", "Successfully built Skybase with " .. count .. " buildings (Limit By-passed)!")
     end)()
 end)
 
@@ -1175,7 +1230,7 @@ dupeLimitBtn.MouseButton1Click:Connect(function()
     end
     
     if not deleteEvent then
-        logAction("BUILDER", "Gagal! Remote 'DeleteBuild' tidak ditemukan!")
+        logAction("BUILDER", "Failed! 'DeleteBuild' remote not found!")
         return
     end
 
@@ -1189,11 +1244,11 @@ dupeLimitBtn.MouseButton1Click:Connect(function()
     end
 
     if not tumbalObj then
-        logAction("BUILDER", "Gagal! Kamu butuh minimal 1 bangunan (Wood Wall) di tanah sebagai tumbal.")
+        logAction("BUILDER", "Failed! You need at least 1 building (Wood Wall) on the ground as a sacrifice.")
         return
     end
 
-    logAction("BUILDER", "Mengeksekusi EXTREME SPAM pada DeleteBuild (Menembus Limit)...")
+    logAction("BUILDER", "Executing EXTREME SPAM on DeleteBuild (Bypassing Limit)...")
     
     -- Eksekusi bom 10000 sinyal bersamaan TANPA JEDA (Race Condition)
     for i = 1, 10000 do
@@ -1206,7 +1261,7 @@ dupeLimitBtn.MouseButton1Click:Connect(function()
         end)()
     end
     
-    logAction("BUILDER", "Serangan 10000 request selesai! Limitmu sekarang Minus drastis/Infinite!")
+    logAction("BUILDER", "10000 requests attack finished! Your limit is now drastically Minus/Infinite!")
 end)
 
 --------------------------------------------------------------------------------
@@ -1374,7 +1429,7 @@ end
 --------------------------------------------------------------------------------
 -- MAIN LOOP EKSKUSI SEMUA FITUR
 --------------------------------------------------------------------------------
-logAction("SYSTEM", "All-In-One Hub berhasil diluncurkan!")
+logAction("SYSTEM", "All-In-One Hub successfully launched!")
 
 track(RunService.RenderStepped:Connect(function()
     processLogQueue()
@@ -1426,7 +1481,7 @@ track(RunService.RenderStepped:Connect(function()
         end
         
         if hitCount > 0 and (currentTime - lastLogTime > 4) then
-            logAction("AURA", "Berhasil mengeksekusi " .. hitCount .. " objek dari kejauhan!")
+            logAction("AURA", "Successfully executed " .. hitCount .. " objects from a distance!")
             lastLogTime = currentTime
         end
         
