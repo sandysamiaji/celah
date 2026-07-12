@@ -595,64 +595,82 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
             if not hum then return end
             
             -- Deteksi otomatis senjata yang sedang di-equip atau ada di backpack
-            local punchTool = nil
+            local weaponTool = nil
             -- Prioritas 1: Tool yang SEDANG di-equip di karakter
             for _, v in ipairs(char:GetChildren()) do
                 if v:IsA("Tool") then
-                    punchTool = v
+                    weaponTool = v
                     logAction("FLING", "Menggunakan senjata yang sedang di-equip: " .. v.Name)
                     break
                 end
             end
             -- Prioritas 2: Tool pertama di backpack jika tidak ada yang di-equip
-            if not punchTool and backpack then
+            if not weaponTool and backpack then
                 for _, v in ipairs(backpack:GetChildren()) do
                     if v:IsA("Tool") then
-                        punchTool = v
+                        weaponTool = v
                         logAction("FLING", "Senjata di-equip dari backpack: " .. v.Name)
                         break
                     end
                 end
             end
             
-            if not punchTool then
-                logAction("FLING", "Gagal: Tidak ada tool di backpack! Ambil Punch dulu.")
+            if not weaponTool then
+                logAction("FLING", "Gagal: Tidak ada senjata! Pegang Punch atau Pedang dulu.")
                 return
             end
             
-            logAction("FLING", "Auto-Punch ke " .. targetName .. " menggunakan " .. punchTool.Name)
-            
-            -- Equip tool ke karakter
-            punchTool.Parent = char
-            wait(0.15)
+            -- Equip senjata ke karakter
+            weaponTool.Parent = char
+            wait(0.1)
             
             -- Simpan posisi awal
             local oldPos = root.CFrame
             
-            -- Auto-punch 5x: setiap iterasi, TP ke samping target, hadap dia, pukul
-            for i = 1, 5 do
-                if not (targetRoot and targetRoot.Parent) then break end
-                
-                -- Berdiri tepat di depan target (jarak 2.5 stud)
-                local targetCF = targetRoot.CFrame
+            logAction("FLING", "SitSpin ke " .. targetName .. " dengan " .. weaponTool.Name .. "!")
+            
+            -- Teleport tepat di samping target menghadap ke dia
+            if targetRoot and targetRoot.Parent then
                 root.CFrame = CFrame.lookAt(
-                    targetCF.Position + targetCF.LookVector * 2.5,
-                    targetCF.Position
+                    targetRoot.Position + Vector3.new(2, 0, 0),
+                    targetRoot.Position
                 )
-                wait(0.05)
-                punchTool:Activate()
-                wait(0.12)
+            end
+            wait(0.05)
+            
+            -- KUNCI: mode duduk agar fisika bergerak bebas
+            hum.Sit = true
+            wait(0.05)
+            
+            -- Pasang BodyAngularVelocity sumbu X+Z (flip vertikal atas-bawah seperti kincir)
+            -- Handle senjata akan menyapu area secara vertikal dan menghantam target
+            local bav = Instance.new("BodyAngularVelocity")
+            bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            bav.AngularVelocity = Vector3.new(999999, 0, 999999)
+            bav.Parent = root
+            
+            -- Berputar selama 0.5 detik sambil menempel di samping target
+            local elapsed = 0
+            while elapsed < 0.5 do
+                if targetRoot and targetRoot.Parent then
+                    root.Position = targetRoot.Position + Vector3.new(2, 0, 0)
+                end
+                elapsed = elapsed + RunService.Heartbeat:Wait()
             end
             
-            -- Kembali ke posisi awal
+            -- Bersihkan dan kembali ke posisi semula
+            bav:Destroy()
+            root.Velocity = Vector3.zero
+            root.RotVelocity = Vector3.zero
             root.CFrame = oldPos
+            hum.Sit = false
             
-            -- Kembalikan tool ke backpack
-            if punchTool and punchTool.Parent == char then
-                punchTool.Parent = backpack
+            -- Kembalikan senjata ke backpack
+            if weaponTool and weaponTool.Parent == char then
+                weaponTool.Parent = backpack
             end
             
-            logAction("FLING", "Auto-Punch ke " .. targetName .. " selesai!")
+            logAction("FLING", "SitSpin selesai!")
         end)()
     end
 end)
