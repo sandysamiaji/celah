@@ -248,8 +248,7 @@ builderTab.Size = UDim2.new(1, 0, 1, 0)
 builderTab.BackgroundTransparency = 1
 builderTab.BorderSizePixel = 0
 builderTab.ScrollBarThickness = 4
-builderTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
-builderTab.CanvasSize = UDim2.new(0, 0, 0, 0)
+builderTab.CanvasSize = UDim2.new(0, 0, 0, 500) -- Default fall-back
 builderTab.Visible = false
 builderTab.Parent = contentContainer
 
@@ -258,6 +257,10 @@ builderLayout.Parent = builderTab
 builderLayout.SortOrder = Enum.SortOrder.LayoutOrder
 builderLayout.Padding = UDim.new(0, 5)
 builderLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+builderLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    builderTab.CanvasSize = UDim2.new(0, 0, 0, builderLayout.AbsoluteContentSize.Y + 20)
+end)
 
 local function switchTab(tab)
     farmTab.Visible = (tab == farmTab)
