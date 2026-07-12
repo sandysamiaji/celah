@@ -294,63 +294,6 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
             btn.Text = text .. ": ON"
             logAction("FEATURE", text .. " diaktifkan")
             
-            if stateKey == "FlingAura" then
-                coroutine.wrap(function()
-                    logAction("FLING", "Aura Nendang aktif! Mendekati musuh < 35 stud akan mementalkan mereka.")
-                    
-                    local bav = Instance.new("BodyAngularVelocity")
-                    bav.Name = "NendangVelocity"
-                    bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                    bav.AngularVelocity = Vector3.new(0, 999999, 0)
-                    
-                    while State.FlingAura do
-                        local char = LocalPlayer.Character
-                        local root = char and char:FindFirstChild("HumanoidRootPart")
-                        local hum = char and char:FindFirstChildOfClass("Humanoid")
-                        
-                        if root and hum and hum.Health > 0 then
-                            if not root:FindFirstChild("NendangVelocity") then
-                                bav:Clone().Parent = root
-                            end
-                            
-                            for _, p in ipairs(Players:GetPlayers()) do
-                                if p ~= LocalPlayer and p.Character then
-                                    local targetRoot = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso") or p.Character:FindFirstChild("UpperTorso")
-                                    if targetRoot and (targetRoot.Position - root.Position).Magnitude <= 35 then
-                                        local oldPos = root.CFrame
-                                        
-                                        local oldCollide = root.CanCollide
-                                        root.CanCollide = true
-                                        hum.Sit = true -- Menonaktifkan perlawanan Humanoid dengan aman
-                                        
-                                        -- Menubruk target berturut-turut untuk menghasilkan memental ekstrem
-                                        for i = 1, 3 do
-                                            root.CFrame = targetRoot.CFrame
-                                            RunService.Heartbeat:Wait()
-                                        end
-                                        
-                                        -- Kembalikan posisi dan normalkan agar kita tidak ikut mental
-                                        root.Velocity = Vector3.zero
-                                        root.RotVelocity = Vector3.zero
-                                        root.CFrame = oldPos
-                                        root.CanCollide = oldCollide
-                                        hum.Sit = false
-                                    end
-                                end
-                            end
-                        end
-                        wait(0.1)
-                    end
-                    
-                    -- Bersihkan efek ketika fitur dimatikan
-                    local char = LocalPlayer.Character
-                    local root = char and char:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        local v = root:FindFirstChild("NendangVelocity")
-                        if v then v:Destroy() end
-                    end
-                end)()
-            end
         else
             btn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
             btn.Text = text .. ": OFF"
@@ -456,28 +399,27 @@ flySpeedInput.FocusLost:Connect(function()
 end)
 
 createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 7, cheatsTab)
-createToggle("FlingToggle", "Fling Aura (Nendang)", "FlingAura", 8, cheatsTab)
 
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
-tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
+tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
 tpContainer.BackgroundTransparency = 1
 tpContainer.LayoutOrder = 1
 tpContainer.Parent = teleportTab
 
 local refreshBtn = Instance.new("TextButton")
-refreshBtn.Size = UDim2.new(0.32, 0, 0, 30)
+refreshBtn.Size = UDim2.new(0.48, 0, 0, 30)
 refreshBtn.Position = UDim2.new(0, 0, 0, 0)
 refreshBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
 refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 refreshBtn.Font = Enum.Font.GothamBold
 refreshBtn.TextSize = 12
-refreshBtn.Text = "Refresh"
+refreshBtn.Text = "Refresh List"
 refreshBtn.Parent = tpContainer
 
 local tpBtn = Instance.new("TextButton")
-tpBtn.Size = UDim2.new(0.32, 0, 0, 30)
-tpBtn.Position = UDim2.new(0.34, 0, 0, 0)
+tpBtn.Size = UDim2.new(0.48, 0, 0, 30)
+tpBtn.Position = UDim2.new(0.52, 0, 0, 0)
 tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
 tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 tpBtn.Font = Enum.Font.GothamBold
@@ -486,8 +428,8 @@ tpBtn.Text = "TP Ke Dia"
 tpBtn.Parent = tpContainer
 
 local bringBtn = Instance.new("TextButton")
-bringBtn.Size = UDim2.new(0.32, 0, 0, 30)
-bringBtn.Position = UDim2.new(0.68, 0, 0, 0)
+bringBtn.Size = UDim2.new(0.48, 0, 0, 30)
+bringBtn.Position = UDim2.new(0, 0, 0, 35)
 bringBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
 bringBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 bringBtn.Font = Enum.Font.GothamBold
@@ -495,9 +437,19 @@ bringBtn.TextSize = 12
 bringBtn.Text = "Belakang Dia"
 bringBtn.Parent = tpContainer
 
+local flingPlayerBtn = Instance.new("TextButton")
+flingPlayerBtn.Size = UDim2.new(0.48, 0, 0, 30)
+flingPlayerBtn.Position = UDim2.new(0.52, 0, 0, 35)
+flingPlayerBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+flingPlayerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+flingPlayerBtn.Font = Enum.Font.GothamBold
+flingPlayerBtn.TextSize = 12
+flingPlayerBtn.Text = "Nendang Pemain"
+flingPlayerBtn.Parent = tpContainer
+
 local playerDropdown = Instance.new("TextButton")
 playerDropdown.Size = UDim2.new(1, 0, 0, 30)
-playerDropdown.Position = UDim2.new(0, 0, 0, 35)
+playerDropdown.Position = UDim2.new(0, 0, 0, 70)
 playerDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 playerDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
 playerDropdown.Font = Enum.Font.Gotham
@@ -546,7 +498,7 @@ local function updatePlayerList()
                 State.SelectedPlayer = player.Name
                 playerDropdown.Text = player.Name
                 playerList.Visible = false
-                tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
+                tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
             end)
             ySize = ySize + 25
         end
@@ -559,7 +511,7 @@ refreshBtn.MouseButton1Click:Connect(function()
     playerDropdown.Text = "Pilih Pemain..."
     selectedPlayer = nil
     if playerList.Visible then
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 270)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 305)
     end
 end)
 
@@ -567,9 +519,9 @@ playerDropdown.MouseButton1Click:Connect(function()
     playerList.Visible = not playerList.Visible
     if playerList.Visible then
         updatePlayerList()
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 270)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 305)
     else
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 70)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
     end
 end)
 
@@ -630,6 +582,44 @@ bringBtn.MouseButton1Click:Connect(function()
             root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 4)
             logAction("TELEPORT", "Berhasil teleport ke belakang " .. targetName)
         end)
+    end
+end)
+
+flingPlayerBtn.MouseButton1Click:Connect(function()
+    local success, root, targetRoot, targetName = checkTeleportRequirements()
+    if success then
+        coroutine.wrap(function()
+            logAction("FLING", "Melancarkan tendangan gaib ke " .. targetName .. "!")
+            
+            local oldPos = root.CFrame
+            local oldCollide = root.CanCollide
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            
+            local bav = Instance.new("BodyAngularVelocity")
+            bav.Name = "NendangVelocity"
+            bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            bav.AngularVelocity = Vector3.new(0, 999999, 0)
+            bav.Parent = root
+            
+            root.CanCollide = true
+            if hum then hum.Sit = true end
+            
+            -- Menubruk target berturut-turut untuk menghasilkan memental ekstrem
+            for i = 1, 10 do
+                root.CFrame = targetRoot.CFrame
+                RunService.Heartbeat:Wait()
+            end
+            
+            -- Kembalikan posisi dan normalkan
+            bav:Destroy()
+            root.Velocity = Vector3.zero
+            root.RotVelocity = Vector3.zero
+            root.CFrame = oldPos
+            root.CanCollide = oldCollide
+            if hum then hum.Sit = false end
+            
+            logAction("FLING", "Berhasil menendang " .. targetName .. "!")
+        end)()
     end
 end)
 
