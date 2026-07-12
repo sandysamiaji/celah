@@ -667,9 +667,19 @@ flingPlayerBtn.MouseButton1Click:Connect(function()
             
             logAction("FLING", "Melancarkan tendangan (Velocity Fling) ke " .. targetName .. "!")
             
+            -- PASTIKAN ada alat fisik yang bisa menabrak musuh (senjata/tool)
+            local weaponTool = char:FindFirstChildOfClass("Tool")
+            if not weaponTool then
+                logAction("FLING", "⚠️ PERINGATAN: Kamu tidak memegang senjata! Fling mungkin gagal. Equip Punch/Sword dulu!")
+            end
+            
             -- KUNCI 1: Teleport kita tepat ke dalam musuh (biar numpuk)
             root.CFrame = targetRoot.CFrame
-            wait(0.05)
+            
+            -- JEDA PENTING: Biarkan server Roblox mendaftarkan posisi baru kita
+            -- sebelum kita mengacaukan fisika/velocity-nya.
+            wait(0.15) 
+
             
             -- KUNCI 2: Paksa kecepatan root part kita menjadi luar biasa tinggi 
             -- (Berdasarkan skrip VIP yang terbukti sukses)
