@@ -243,9 +243,13 @@ teleportLayout.SortOrder = Enum.SortOrder.LayoutOrder
 teleportLayout.Padding = UDim.new(0, 5)
 teleportLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-local builderTab = Instance.new("Frame")
+local builderTab = Instance.new("ScrollingFrame")
 builderTab.Size = UDim2.new(1, 0, 1, 0)
 builderTab.BackgroundTransparency = 1
+builderTab.BorderSizePixel = 0
+builderTab.ScrollBarThickness = 4
+builderTab.AutomaticCanvasSize = Enum.AutomaticSize.Y
+builderTab.CanvasSize = UDim2.new(0, 0, 0, 0)
 builderTab.Visible = false
 builderTab.Parent = contentContainer
 
