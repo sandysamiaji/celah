@@ -4,6 +4,7 @@ local LocalPlayer = Players.LocalPlayer
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
 
 -- =================================================================
 -- PROTEKSI MULTIPLE EXECUTION & CLEANUP (Mencegah Ghost Loop/Log)
@@ -92,6 +93,7 @@ local State = {
     AntiFallDamage = false,
     Noclip = false,
     SpyTrace = false,
+    NightMode = false,
     InfiniteDrop = false,
     Fly = false,
     FlySpeed = 16,
@@ -465,12 +467,13 @@ createInfoBox("Anti Fall Dmg", "Completely disables fall damage. You can jump fr
 createInfoBox("Noclip", "Allows your character to walk straight through solid walls, objects, and terrain. Essential for quick escapes or accessing hidden areas.", 5)
 createInfoBox("Infinite Drop", "Bypasses item dropping limits or restrictions in the game. Highly useful for transferring mass amounts of items to your friends.", 6)
 createInfoBox("Spy Trace", "A diagnostic tool to help find bugs or glitches within the application. If you experience any issues, enable this feature so Panda can check the automatically generated bug reports.", 7)
-createInfoBox("Fly & Fly Speed", "Enables true flight for your character. You can adjust your flying speed dynamically using the 'Fly Speed' input box right below the toggle.", 8)
-createInfoBox("Teleport Options", "Instantly teleport to any player using 'TP To Player', or sneak up right behind them using 'TP Behind Player' for a surprise attack.", 9)
-createInfoBox("Fling Player", "Select a target from the list, equip any Tool/Weapon in your hand, and click this to violently launch them into the sky using physics manipulation!", 10)
-createInfoBox("Touch Fling", "Turns your character into a walking hazard. Anyone who physically touches your character will instantly be flung away. Excellent for passive defense.", 11)
-createInfoBox("Scan RemoteEvents", "An advanced debugging feature that logs all RemoteEvents in the server. Helpful for developers analyzing the game's network structure.", 12)
-createInfoBox("Builder System", "A comprehensive saving system for your structures. Use 'Copy Base' to save buildings within a radius to your local file, and 'Load Base' to rebuild them instantly anywhere.", 13)
+createInfoBox("Night Mode", "Client-side visual change that forces the game time to night. Helps reduce eye strain while AFK farming. Only visible to you.", 8)
+createInfoBox("Fly & Fly Speed", "Enables true flight for your character. You can adjust your flying speed dynamically using the 'Fly Speed' input box right below the toggle.", 9)
+createInfoBox("Teleport Options", "Instantly teleport to any player using 'TP To Player', or sneak up right behind them using 'TP Behind Player' for a surprise attack.", 10)
+createInfoBox("Fling Player", "Select a target from the list, equip any Tool/Weapon in your hand, and click this to violently launch them into the sky using physics manipulation!", 11)
+createInfoBox("Touch Fling", "Turns your character into a walking hazard. Anyone who physically touches your character will instantly be flung away. Excellent for passive defense.", 12)
+createInfoBox("Scan RemoteEvents", "An advanced debugging feature that logs all RemoteEvents in the server. Helpful for developers analyzing the game's network structure.", 13)
+createInfoBox("Builder System", "A comprehensive saving system for your structures. Use 'Copy Base' to save buildings within a radius to your local file, and 'Load Base' to rebuild them instantly anywhere.", 14)
 
 -- FARM TAB
 createToggle("AuraToggle", "Aura Farm", "AuraEnabled", 1, farmTab)
@@ -523,11 +526,12 @@ local noclipBtn = createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
 createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
 createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
 createToggle("FlyToggle", "Fly", "Fly", 5, cheatsTab)
+createToggle("NightModeToggle", "Night Mode", "NightMode", 6, cheatsTab)
 
 local flySpeedContainer = Instance.new("Frame")
 flySpeedContainer.Size = UDim2.new(0.9, 0, 0, 35)
 flySpeedContainer.BackgroundTransparency = 1
-flySpeedContainer.LayoutOrder = 6
+flySpeedContainer.LayoutOrder = 7
 flySpeedContainer.Parent = cheatsTab
 
 local flySpeedLabel = Instance.new("TextLabel")
@@ -563,7 +567,7 @@ flySpeedInput.FocusLost:Connect(function()
     end
 end)
 
-createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 7, cheatsTab)
+createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 8, cheatsTab)
 
 local scanRemoteBtn = Instance.new("TextButton")
 scanRemoteBtn.Size = UDim2.new(0.9, 0, 0, 30)
@@ -630,6 +634,13 @@ spawn(function()
                 touchFlingThread = coroutine.create(touchFlingLoop)
                 coroutine.resume(touchFlingThread)
             end
+        end
+        if State.NightMode then
+            pcall(function()
+                Lighting.ClockTime = 0 -- Tengah malam
+                Lighting.Brightness = 0.5
+                Lighting.GlobalShadows = false
+            end)
         end
     end
 end)
@@ -803,7 +814,15 @@ end
 tpBtn.MouseButton1Click:Connect(function()
     local success, root, targetRoot, targetName = checkTeleportRequirements()
     if success then
-        root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.Sit = false end -- Lepaskan dari kursi jika sedang duduk
+        
+        -- Tambahkan offset Y (+2) agar kita jatuh perlahan dari atas musuh dan tidak tersangkut tanah
+        root.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 3)
+        
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end -- Force physics update
+        
         logAction("TELEPORT", "Successfully INSTANT teleported to " .. targetName)
     end
 end)
@@ -812,8 +831,15 @@ bringBtn.MouseButton1Click:Connect(function()
     local success, root, targetRoot, targetName = checkTeleportRequirements()
     if success then
         pcall(function()
-            -- Teleport kita ke punggung/belakang musuh
-            root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 4)
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Sit = false end
+            
+            -- Teleport kita ke punggung/belakang musuh, dengan offset Y (+2) menghindari tanah
+            root.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 4)
+            
+            if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end
+            
             logAction("TELEPORT", "Successfully teleported behind " .. targetName)
         end)
     end
