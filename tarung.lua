@@ -94,6 +94,7 @@ local State = {
     Noclip = false,
     SpyTrace = false,
     NightMode = false,
+    NightBrightness = 0.5,
     InfiniteDrop = false,
     Fly = false,
     FlySpeed = 16,
@@ -528,10 +529,49 @@ createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
 createToggle("FlyToggle", "Fly", "Fly", 5, cheatsTab)
 createToggle("NightModeToggle", "Night Mode", "NightMode", 6, cheatsTab)
 
+local nightBrightContainer = Instance.new("Frame")
+nightBrightContainer.Size = UDim2.new(0.9, 0, 0, 35)
+nightBrightContainer.BackgroundTransparency = 1
+nightBrightContainer.LayoutOrder = 7
+nightBrightContainer.Parent = cheatsTab
+
+local nightBrightLabel = Instance.new("TextLabel")
+nightBrightLabel.Size = UDim2.new(0.55, 0, 1, 0)
+nightBrightLabel.BackgroundTransparency = 1
+nightBrightLabel.Text = "Brightness:"
+nightBrightLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+nightBrightLabel.Font = Enum.Font.GothamBold
+nightBrightLabel.TextSize = 13
+nightBrightLabel.TextXAlignment = Enum.TextXAlignment.Left
+nightBrightLabel.Parent = nightBrightContainer
+
+local nightBrightInput = Instance.new("TextBox")
+nightBrightInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+nightBrightInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+nightBrightInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+nightBrightInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+nightBrightInput.Font = Enum.Font.Gotham
+nightBrightInput.TextSize = 13
+nightBrightInput.Text = tostring(State.NightBrightness)
+nightBrightInput.PlaceholderText = "0 - 10"
+nightBrightInput.Parent = nightBrightContainer
+
+nightBrightInput.FocusLost:Connect(function()
+    local num = tonumber(nightBrightInput.Text)
+    if num then
+        if num < 0 then num = 0 end
+        if num > 10 then num = 10 end
+        State.NightBrightness = num
+        nightBrightInput.Text = tostring(num)
+    else
+        nightBrightInput.Text = tostring(State.NightBrightness)
+    end
+end)
+
 local flySpeedContainer = Instance.new("Frame")
 flySpeedContainer.Size = UDim2.new(0.9, 0, 0, 35)
 flySpeedContainer.BackgroundTransparency = 1
-flySpeedContainer.LayoutOrder = 7
+flySpeedContainer.LayoutOrder = 8
 flySpeedContainer.Parent = cheatsTab
 
 local flySpeedLabel = Instance.new("TextLabel")
@@ -567,7 +607,7 @@ flySpeedInput.FocusLost:Connect(function()
     end
 end)
 
-createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 8, cheatsTab)
+createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 9, cheatsTab)
 
 local scanRemoteBtn = Instance.new("TextButton")
 scanRemoteBtn.Size = UDim2.new(0.9, 0, 0, 30)
@@ -640,11 +680,9 @@ end)
 
 RunService.RenderStepped:Connect(function()
     if State.NightMode then
-        pcall(function()
-            Lighting.ClockTime = 0 -- Tengah malam secara instan tiap frame (anti-blink)
-            Lighting.Brightness = 0.5
-            Lighting.GlobalShadows = false
-        end)
+        Lighting.ClockTime = 0 -- Tengah malam secara instan tiap frame (anti-blink)
+        Lighting.Brightness = State.NightBrightness
+        Lighting.GlobalShadows = false
     end
 end)
 
@@ -823,6 +861,13 @@ tpBtn.MouseButton1Click:Connect(function()
         
         -- Offset Z (-3) untuk berada tepat di depan, Y (+2) agar tidak nyangkut tanah, dan berbalik badan menghadap musuh
         root.CFrame = targetRoot.CFrame * CFrame.new(0, 2, -3) * CFrame.Angles(0, math.pi, 0)
+        
+        -- Fix Kamera "Lemot/Lag": Memaksa kamera langsung pindah ke belakang karakter kita, 
+        -- karena putaran badan 180 derajat membuat kamera bawaan Roblox berputar dengan sangat lambat.
+        local cam = workspace.CurrentCamera
+        if cam then
+            cam.CFrame = CFrame.lookAt(root.Position + (root.CFrame.LookVector * -12) + Vector3.new(0, 5, 0), root.Position)
+        end
         
         if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end -- Force physics update
         
