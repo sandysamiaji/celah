@@ -766,6 +766,7 @@ local function loadBaseDatabase()
                 for key, baseArr in pairs(serializedDB) do
                     local arr = {}
                     for _, item in ipairs(baseArr) do
+                        table.insert(arr, {
                             Name = item.Name,
                             Offset = Vector3.new(item.OffsetX, item.OffsetY, item.OffsetZ),
                             Rotation = CFrame.new(unpack(item.RotComponents)),
