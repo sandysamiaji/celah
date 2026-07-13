@@ -850,47 +850,37 @@ local function checkTeleportRequirements()
     end
 
     local targetChar = targetPlayer.Character
-    if not targetChar then
-        logAction("TELEPORT", "Failed: Player " .. targetName .. " has not spawned (Character nil)!")
-        return false
-    end
-    
-    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar.PrimaryPart or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso") or targetChar:FindFirstChildWhichIsA("BasePart", true)
-    if not targetRoot then
-        logAction("TELEPORT", "Failed: Player " .. targetName .. " has no body parts (BasePart)!")
+    if not targetChar or not targetChar:GetPivot() then
+        logAction("TELEPORT", "Failed: Player " .. targetName .. " has not spawned or is dead!")
         return false
     end
     
     local myChar = LocalPlayer.Character
-    if not myChar then
-        logAction("TELEPORT", "Failed: Your character has not spawned!")
+    if not myChar or not myChar:GetPivot() then
+        logAction("TELEPORT", "Failed: Your character has not spawned or is dead!")
         return false
     end
     
-    local root = myChar:FindFirstChild("HumanoidRootPart") or myChar.PrimaryPart or myChar:FindFirstChild("Torso") or myChar:FindFirstChild("UpperTorso") or myChar:FindFirstChildWhichIsA("BasePart", true)
-    if not root then
-        logAction("TELEPORT", "Failed: Your character has no body parts (BasePart)!")
-        return false
-    end
-    
-    return true, root, targetRoot, targetName
+    return true, myChar, targetChar, targetName
 end
 
 tpBtn.MouseButton1Click:Connect(function()
-    local success, root, targetRoot, targetName = checkTeleportRequirements()
+    local success, char, targetChar, targetName = checkTeleportRequirements()
     if success then
-        local char = LocalPlayer.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then hum.Sit = false end -- Lepaskan dari kursi jika sedang duduk
         
-        -- Offset Z (-3) untuk berada tepat di depan, Y (+2) agar tidak nyangkut tanah, dan berbalik badan menghadap musuh
-        root.CFrame = targetRoot.CFrame * CFrame.new(0, 2, -3) * CFrame.Angles(0, math.pi, 0)
+        -- Gunakan PivotTo agar seluruh model karakter ikut berpindah tanpa terputus
+        local targetCFrame = targetChar:GetPivot()
+        char:PivotTo(targetCFrame * CFrame.new(0, 2, -3) * CFrame.Angles(0, math.pi, 0))
         
-        -- Fix Kamera "Lemot/Lag": Memaksa kamera langsung pindah ke belakang karakter kita, 
-        -- karena putaran badan 180 derajat membuat kamera bawaan Roblox berputar dengan sangat lambat.
-        local cam = workspace.CurrentCamera
-        if cam then
-            cam.CFrame = CFrame.lookAt(root.Position + (root.CFrame.LookVector * -12) + Vector3.new(0, 5, 0), root.Position)
+        local root = char.PrimaryPart or char:FindFirstChild("HumanoidRootPart")
+        if root then
+            -- Fix Kamera "Lemot/Lag"
+            local cam = workspace.CurrentCamera
+            if cam then
+                cam.CFrame = CFrame.lookAt(root.Position + (root.CFrame.LookVector * -12) + Vector3.new(0, 5, 0), root.Position)
+            end
         end
         
         if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end -- Force physics update
@@ -900,15 +890,15 @@ tpBtn.MouseButton1Click:Connect(function()
 end)
 
 bringBtn.MouseButton1Click:Connect(function()
-    local success, root, targetRoot, targetName = checkTeleportRequirements()
+    local success, char, targetChar, targetName = checkTeleportRequirements()
     if success then
         pcall(function()
-            local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum.Sit = false end
             
             -- Teleport kita ke punggung/belakang musuh, dengan offset Y (+2) menghindari tanah
-            root.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 4)
+            local targetCFrame = targetChar:GetPivot()
+            char:PivotTo(targetCFrame * CFrame.new(0, 2, 4))
             
             if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end
             
@@ -918,12 +908,13 @@ bringBtn.MouseButton1Click:Connect(function()
 end)
 
 flingPlayerBtn.MouseButton1Click:Connect(function()
-    local success, root, targetRoot, targetName = checkTeleportRequirements()
+    local success, char, targetChar, targetName = checkTeleportRequirements()
     if success then
         logAction("FLING", "Teleporting into " .. targetName .. " and activating Touch Fling!")
         
-        -- Teleport kita tepat ke dalam musuh (menyatukan posisi secara persis)
-        root.CFrame = targetRoot.CFrame
+        -- Teleport kita tepat ke dalam musuh menggunakan PivotTo
+        local targetCFrame = targetChar:GetPivot()
+        char:PivotTo(targetCFrame)
         
         -- Aktifkan state Touch Fling agar kita langsung bergetar dan melempar target
         State.TouchFling = true
