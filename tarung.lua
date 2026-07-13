@@ -1611,6 +1611,8 @@ local function getTargetsInRadius()
 
     local parts = workspace:GetPartBoundsInRadius(rootPart.Position, State.AuraRadius, params)
     for _, part in ipairs(parts) do
+        local isTarget = false
+        
         if State.AuraHarvest then
             if HARVEST_PART_NAMES[part.Name] or (part.Parent and HARVEST_PART_NAMES[part.Parent.Name]) then
                 table.insert(targetParts, {part = part, type = "Harvest"})
@@ -1667,13 +1669,13 @@ track(RunService.RenderStepped:Connect(function()
                 firetouchinterest(tPart, rootPart, 1)
             end
             
-            -- Trigger Attack Remote bawaan Tool jika ada
-            if weapon then
-                local atkEvt = weapon:FindFirstChild("AttackEvent")
-                if atkEvt and atkEvt:IsA("RemoteEvent") then atkEvt:FireServer() end
-            end
-            
             hitCount = hitCount + 1
+        end
+        
+        -- Trigger Attack Remote bawaan Tool jika ada (Cukup 1x per siklus, JANGAN di-spam)
+        if hitCount > 0 and weapon then
+            local atkEvt = weapon:FindFirstChild("AttackEvent")
+            if atkEvt and atkEvt:IsA("RemoteEvent") then atkEvt:FireServer() end
         end
         
         -- Eksekusi SEMUA ProximityPrompt & ClickDetector di radius (HANYA untuk Harvest)
