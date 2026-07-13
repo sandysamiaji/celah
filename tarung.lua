@@ -1596,7 +1596,7 @@ local function getTargetsInRadius()
                         local partsToHit = {"Torso", "UpperTorso", "Head", "Right Arm"}
                         for _, pName in ipairs(partsToHit) do
                             local p = player.Character:FindFirstChild(pName)
-                            if p then table.insert(targetParts, p) end
+                            if p then table.insert(targetParts, {part = p, type = "Kill"}) end
                         end
                     end
                 end
@@ -1611,26 +1611,22 @@ local function getTargetsInRadius()
 
     local parts = workspace:GetPartBoundsInRadius(rootPart.Position, State.AuraRadius, params)
     for _, part in ipairs(parts) do
-        local isTarget = false
-        
         if State.AuraHarvest then
             if HARVEST_PART_NAMES[part.Name] or (part.Parent and HARVEST_PART_NAMES[part.Parent.Name]) then
+                table.insert(targetParts, {part = part, type = "Harvest"})
                 isTarget = true
             end
             -- Deteksi jika itu adalah Tool yang jatuh (Handle) untuk dipanen
-            if part.Name == "Handle" and part.Parent:IsA("Tool") then
+            if not isTarget and part.Name == "Handle" and part.Parent:IsA("Tool") then
+                table.insert(targetParts, {part = part, type = "Harvest"})
                 isTarget = true
             end
         end
         
-        if State.AuraKill then
+        if not isTarget and State.AuraKill then
             if KILL_PART_NAMES[part.Name] or (part.Parent and KILL_PART_NAMES[part.Parent.Name]) then
-                isTarget = true
+                table.insert(targetParts, {part = part, type = "Kill"})
             end
-        end
-
-        if isTarget then
-            table.insert(targetParts, part)
         end
     end
 
@@ -1655,15 +1651,18 @@ track(RunService.RenderStepped:Connect(function()
         local targets = getTargetsInRadius()
         local hitCount = 0
         
-        for _, tPart in ipairs(targets) do
+        for _, t in ipairs(targets) do
+            local tPart = t.part
+            local tType = t.type
+            
             -- Sentuh dengan senjata (Damage)
             if weaponHandle and firetouchinterest then
                 firetouchinterest(tPart, weaponHandle, 0)
                 firetouchinterest(tPart, weaponHandle, 1)
             end
             
-            -- Sentuh dengan badan (Collect drop items)
-            if rootPart and firetouchinterest then
+            -- Sentuh dengan badan (Collect drop items) HANYA untuk Harvest
+            if tType == "Harvest" and rootPart and firetouchinterest then
                 firetouchinterest(tPart, rootPart, 0)
                 firetouchinterest(tPart, rootPart, 1)
             end
@@ -1677,8 +1676,8 @@ track(RunService.RenderStepped:Connect(function()
             hitCount = hitCount + 1
         end
         
-        -- Eksekusi SEMUA ProximityPrompt & ClickDetector di radius
-        if rootPart then
+        -- Eksekusi SEMUA ProximityPrompt & ClickDetector di radius (HANYA untuk Harvest)
+        if State.AuraHarvest and rootPart then
             local nearbyPrompts = getNearbyPrompts(rootPart.Position)
             for _, promptObj in ipairs(nearbyPrompts) do
                 if promptObj:IsA("ProximityPrompt") and fireproximityprompt then
