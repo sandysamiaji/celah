@@ -87,7 +87,8 @@ local lastLogSend = tick()
 
 -- State Management (Semua Fitur)
 local State = {
-    AuraEnabled = false,
+    AuraHarvest = false,
+    AuraKill = false,
     AutoClaimReward = false,
     AutoRespawn = false,
     AntiFallDamage = false,
@@ -102,7 +103,7 @@ local State = {
     FlingAura = false,
     CopyRadius = 500,
     AuraRadius = 35,
-    AttackCooldown = 0.2,
+    AttackCooldown = 0.4,
     SelectedPlayer = nil
 }
 
@@ -379,7 +380,8 @@ closeBtn.MouseButton1Click:Connect(function()
             _G.PandaBoogaHubConnections = {}
         end
         -- Matikan State agar tidak mengganggu jika dieksekusi ulang
-        State.AuraEnabled = false
+        State.AuraHarvest = false
+        State.AuraKill = false
         State.TouchFling = false
         State.SpyTrace = false
     end)
@@ -482,7 +484,7 @@ local function createInfoBox(titleText, descText, layoutOrder)
     container.Size = UDim2.new(0.95, 0, 0, 30 + textBounds.Y + 10)
 end
 
-createInfoBox("Aura Farm", "Automatically harvests resources or attacks enemies within the specified 'Aura Radius'. Perfect for AFK grinding. Adjust the radius to fit your weapon's reach or collection needs.", 1)
+createInfoBox("Aura Harvest & Kill", "Aura Harvest automatically gathers resources and items. Aura Kill specifically attacks nearby enemies or players. Split into two functions to reduce performance lag.", 1)
 createInfoBox("Auto Claim Reward", "Automatically claims any periodic or event rewards that pop up on your screen, ensuring you never miss free items while you're away.", 2)
 createInfoBox("Auto Respawn", "Bypasses the death screen and instantly respawns your character the moment you die, getting you back into the action without delay.", 3)
 createInfoBox("Anti Fall Dmg", "Completely disables fall damage. You can jump from any height without losing a single drop of health.", 4)
@@ -498,12 +500,13 @@ createInfoBox("Scan RemoteEvents", "An advanced debugging feature that logs all 
 createInfoBox("Builder System", "A comprehensive saving system for your structures. Use 'Copy Base' to save buildings within a radius to your local file, and 'Load Base' to rebuild them instantly anywhere.", 14)
 
 -- FARM TAB
-createToggle("AuraToggle", "Aura Farm", "AuraEnabled", 1, farmTab)
+createToggle("AuraHarvestToggle", "Aura Harvest", "AuraHarvest", 1, farmTab)
+createToggle("AuraKillToggle", "Aura Kill", "AuraKill", 2, farmTab)
 
 local radiusContainer = Instance.new("Frame")
 radiusContainer.Size = UDim2.new(0.9, 0, 0, 35)
 radiusContainer.BackgroundTransparency = 1
-radiusContainer.LayoutOrder = 2
+radiusContainer.LayoutOrder = 3
 radiusContainer.Parent = farmTab
 
 local radiusLabel = Instance.new("TextLabel")
@@ -539,8 +542,8 @@ radiusInput.FocusLost:Connect(function()
     end
 end)
 
-createToggle("RewardToggle", "Claim Reward", "AutoClaimReward", 3, farmTab)
-createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 4, farmTab)
+createToggle("RewardToggle", "Claim Reward", "AutoClaimReward", 4, farmTab)
+createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 5, farmTab)
 
 -- CHEATS TAB
 createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab)
@@ -1503,12 +1506,14 @@ end)
 --------------------------------------------------------------------------------
 -- SISTEM AURA & COLLECT
 --------------------------------------------------------------------------------
-local TARGET_PART_NAMES = {
+local HARVEST_PART_NAMES = {
     ["Hit"]=true, ["Trunk"]=true, ["TreeHingePart"]=true, ["Log"]=true, ["Soil"]=true, ["Bush"]=true,
     ["Wood"]=true, ["Stone"]=true, ["Fiber"]=true, ["Corn"]=true, ["Berries"]=true, ["Well"]=true, 
     ["Spring"]=true, ["Grill"]=true, ["Bed"]=true, ["Door"]=true, ["Forge"]=true, ["Cook Raw Meat"]=true, ["Save"]=true,
-    ["Rock"]=true, ["Iron"]=true, ["Gold"]=true, ["Leaves"]=true, ["Raw Meat"]=true, ["Cooked Meat"]=true, ["Plant"]=true,
-    -- Tambahan untuk mendeteksi Hewan (NPC) & Pemain secara universal
+    ["Rock"]=true, ["Iron"]=true, ["Gold"]=true, ["Leaves"]=true, ["Raw Meat"]=true, ["Cooked Meat"]=true, ["Plant"]=true
+}
+
+local KILL_PART_NAMES = {
     ["Head"]=true, ["Torso"]=true, ["UpperTorso"]=true, ["LowerTorso"]=true, ["HumanoidRootPart"]=true,
     ["Right Arm"]=true, ["Left Arm"]=true, ["Right Leg"]=true, ["Left Leg"]=true,
     ["RightHand"]=true, ["LeftHand"]=true, ["RightFoot"]=true, ["LeftFoot"]=true, ["RightLowerArm"]=true, ["LeftLowerArm"]=true, ["RightUpperArm"]=true, ["LeftUpperArm"]=true, ["RightLowerLeg"]=true, ["LeftLowerLeg"]=true, ["RightUpperLeg"]=true, ["LeftUpperLeg"]=true
@@ -1580,17 +1585,19 @@ local function getTargetsInRadius()
     if not char or not char:FindFirstChild("HumanoidRootPart") then return targetParts end
     local rootPart = char.HumanoidRootPart
 
-    -- Cek Pemain
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local hum = player.Character:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
-                if (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= State.AuraRadius then
-                    -- Ambil beberapa part penting dari pemain (R6 dan R15)
-                    local partsToHit = {"Torso", "UpperTorso", "Head", "Right Arm"}
-                    for _, pName in ipairs(partsToHit) do
-                        local p = player.Character:FindFirstChild(pName)
-                        if p then table.insert(targetParts, p) end
+    -- Cek Pemain & NPC
+    if State.AuraKill then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    if (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= State.AuraRadius then
+                        -- Ambil beberapa part penting dari pemain (R6 dan R15)
+                        local partsToHit = {"Torso", "UpperTorso", "Head", "Right Arm"}
+                        for _, pName in ipairs(partsToHit) do
+                            local p = player.Character:FindFirstChild(pName)
+                            if p then table.insert(targetParts, p) end
+                        end
                     end
                 end
             end
@@ -1606,14 +1613,20 @@ local function getTargetsInRadius()
     for _, part in ipairs(parts) do
         local isTarget = false
         
-        -- Cek nama part atau nama Parent (karena kadang item drop berupa Model bernama "Wood" yang berisi part bernama "Hitbox")
-        if TARGET_PART_NAMES[part.Name] or (part.Parent and TARGET_PART_NAMES[part.Parent.Name]) then
-            isTarget = true
+        if State.AuraHarvest then
+            if HARVEST_PART_NAMES[part.Name] or (part.Parent and HARVEST_PART_NAMES[part.Parent.Name]) then
+                isTarget = true
+            end
+            -- Deteksi jika itu adalah Tool yang jatuh (Handle) untuk dipanen
+            if part.Name == "Handle" and part.Parent:IsA("Tool") then
+                isTarget = true
+            end
         end
         
-        -- Deteksi jika itu adalah Tool yang jatuh (Handle)
-        if part.Name == "Handle" and part.Parent:IsA("Tool") then
-            isTarget = true
+        if State.AuraKill then
+            if KILL_PART_NAMES[part.Name] or (part.Parent and KILL_PART_NAMES[part.Parent.Name]) then
+                isTarget = true
+            end
         end
 
         if isTarget then
@@ -1634,7 +1647,7 @@ track(RunService.RenderStepped:Connect(function()
     local currentTime = tick()
     
     -- 1. AURA & COLLECT
-    if State.AuraEnabled and (currentTime - lastAttackTime >= State.AttackCooldown) then
+    if (State.AuraHarvest or State.AuraKill) and (currentTime - lastAttackTime >= State.AttackCooldown) then
         local weapon = getEquippedWeapon()
         local rootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         local weaponHandle = weapon and weapon:FindFirstChild("Handle")
