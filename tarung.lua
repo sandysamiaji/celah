@@ -252,9 +252,12 @@ contentContainer.BackgroundTransparency = 1
 contentContainer.LayoutOrder = 2
 contentContainer.Parent = bodyFrame
 
-local farmTab = Instance.new("Frame")
+local farmTab = Instance.new("ScrollingFrame")
 farmTab.Size = UDim2.new(1, 0, 1, 0)
 farmTab.BackgroundTransparency = 1
+farmTab.BorderSizePixel = 0
+farmTab.ScrollBarThickness = 4
+farmTab.CanvasSize = UDim2.new(0, 0, 0, 500)
 farmTab.Visible = true
 farmTab.Parent = contentContainer
 
@@ -264,9 +267,16 @@ farmLayout.SortOrder = Enum.SortOrder.LayoutOrder
 farmLayout.Padding = UDim.new(0, 5)
 farmLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-local cheatsTab = Instance.new("Frame")
+farmLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    farmTab.CanvasSize = UDim2.new(0, 0, 0, farmLayout.AbsoluteContentSize.Y + 20)
+end)
+
+local cheatsTab = Instance.new("ScrollingFrame")
 cheatsTab.Size = UDim2.new(1, 0, 1, 0)
 cheatsTab.BackgroundTransparency = 1
+cheatsTab.BorderSizePixel = 0
+cheatsTab.ScrollBarThickness = 4
+cheatsTab.CanvasSize = UDim2.new(0, 0, 0, 500)
 cheatsTab.Visible = false
 cheatsTab.Parent = contentContainer
 
@@ -276,9 +286,16 @@ cheatsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 cheatsLayout.Padding = UDim.new(0, 5)
 cheatsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-local teleportTab = Instance.new("Frame")
+cheatsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    cheatsTab.CanvasSize = UDim2.new(0, 0, 0, cheatsLayout.AbsoluteContentSize.Y + 20)
+end)
+
+local teleportTab = Instance.new("ScrollingFrame")
 teleportTab.Size = UDim2.new(1, 0, 1, 0)
 teleportTab.BackgroundTransparency = 1
+teleportTab.BorderSizePixel = 0
+teleportTab.ScrollBarThickness = 4
+teleportTab.CanvasSize = UDim2.new(0, 0, 0, 500)
 teleportTab.Visible = false
 teleportTab.Parent = contentContainer
 
@@ -287,6 +304,10 @@ teleportLayout.Parent = teleportTab
 teleportLayout.SortOrder = Enum.SortOrder.LayoutOrder
 teleportLayout.Padding = UDim.new(0, 5)
 teleportLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+teleportLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    teleportTab.CanvasSize = UDim2.new(0, 0, 0, teleportLayout.AbsoluteContentSize.Y + 20)
+end)
 
 local builderTab = Instance.new("ScrollingFrame")
 builderTab.Size = UDim2.new(1, 0, 1, 0)
