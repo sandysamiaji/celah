@@ -294,11 +294,31 @@ builderLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     builderTab.CanvasSize = UDim2.new(0, 0, 0, builderLayout.AbsoluteContentSize.Y + 20)
 end)
 
+local infoTab = Instance.new("ScrollingFrame")
+infoTab.Size = UDim2.new(1, 0, 1, 0)
+infoTab.BackgroundTransparency = 1
+infoTab.BorderSizePixel = 0
+infoTab.ScrollBarThickness = 4
+infoTab.CanvasSize = UDim2.new(0, 0, 0, 800) -- Default fall-back
+infoTab.Visible = false
+infoTab.Parent = contentContainer
+
+local infoLayout = Instance.new("UIListLayout")
+infoLayout.Parent = infoTab
+infoLayout.SortOrder = Enum.SortOrder.LayoutOrder
+infoLayout.Padding = UDim.new(0, 5)
+infoLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+infoLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    infoTab.CanvasSize = UDim2.new(0, 0, 0, infoLayout.AbsoluteContentSize.Y + 20)
+end)
+
 local function switchTab(tab)
     farmTab.Visible = (tab == farmTab)
     cheatsTab.Visible = (tab == cheatsTab)
     teleportTab.Visible = (tab == teleportTab)
     builderTab.Visible = (tab == builderTab)
+    infoTab.Visible = (tab == infoTab)
 end
 
 minimizeBtn.MouseButton1Click:Connect(function()
@@ -335,6 +355,7 @@ local farmNav = createNavBtn("Farm", farmTab)
 local cheatsNav = createNavBtn("Cheats", cheatsTab)
 local teleportNav = createNavBtn("Teleport", teleportTab)
 local builderNav = createNavBtn("Builder", builderTab)
+local infoNav = createNavBtn("Info", infoTab)
 
 local function createToggle(name, text, stateKey, layoutOrder, parentTab)
     local btn = Instance.new("TextButton")
@@ -366,6 +387,59 @@ end
 -- =======================
 -- TABS POPULATION
 -- =======================
+
+-- INFO TAB
+local function createInfoBox(titleText, descText, layoutOrder)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(0.9, 0, 0, 0) -- Height akan otomatis
+    container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    container.BorderSizePixel = 0
+    container.LayoutOrder = layoutOrder
+    container.Parent = infoTab
+
+    local uicorner = Instance.new("UICorner")
+    uicorner.CornerRadius = UDim.new(0, 5)
+    uicorner.Parent = container
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -10, 0, 25)
+    title.Position = UDim2.new(0, 5, 0, 5)
+    title.BackgroundTransparency = 1
+    title.Text = titleText
+    title.TextColor3 = Color3.fromRGB(241, 196, 15)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 14
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = container
+
+    local desc = Instance.new("TextLabel")
+    desc.Size = UDim2.new(1, -10, 0, 0)
+    desc.Position = UDim2.new(0, 5, 0, 30)
+    desc.BackgroundTransparency = 1
+    desc.Text = descText
+    desc.TextColor3 = Color3.fromRGB(200, 200, 200)
+    desc.Font = Enum.Font.Gotham
+    desc.TextSize = 12
+    desc.TextXAlignment = Enum.TextXAlignment.Left
+    desc.TextYAlignment = Enum.TextYAlignment.Top
+    desc.TextWrapped = true
+    desc.Parent = container
+
+    -- Hitung ukuran deskripsi dengan asumsi lebar 230px
+    local textBounds = game:GetService("TextService"):GetTextSize(descText, 12, Enum.Font.Gotham, Vector2.new(230, 9999))
+    desc.Size = UDim2.new(1, -10, 0, textBounds.Y + 10)
+    container.Size = UDim2.new(0.95, 0, 0, 30 + textBounds.Y + 10)
+end
+
+createInfoBox("Aura Farm", "Automatically harvests resources or attacks enemies within the specified 'Aura Radius'. Perfect for AFK grinding. Adjust the radius to fit your weapon's reach or collection needs.", 1)
+createInfoBox("Auto Claim Reward", "Automatically claims any periodic or event rewards that pop up on your screen, ensuring you never miss free items while you're away.", 2)
+createInfoBox("Anti Fall Dmg", "Completely disables fall damage. You can jump from any height without losing a single drop of health.", 3)
+createInfoBox("Noclip", "Allows your character to walk straight through solid walls, objects, and terrain. Essential for quick escapes or accessing hidden areas.", 4)
+createInfoBox("Spy Trace", "A diagnostic tool to help find bugs or glitches within the application. If you experience any issues, enable this feature so Panda can check the automatically generated bug reports.", 5)
+createInfoBox("Fly", "Enables true flight for your character. You can adjust your flying speed dynamically using the 'Fly Speed' input box right below this toggle.", 6)
+createInfoBox("Fling Player", "Select a target from the 'Teleport' tab, equip any Tool/Weapon in your hand, and click this to violently launch them into the sky! Note: You MUST hold a Tool for the physics glitch to work.", 7)
+createInfoBox("Touch Fling", "Turns your character into a walking hazard. Anyone who physically touches your character will instantly be flung away. Excellent for defense.", 8)
+createInfoBox("Builder", "A comprehensive saving system for your structures. Save your current base layout to a local file, and load it anytime in the future to instantly rebuild your base.", 9)
 
 -- FARM TAB
 createToggle("AuraToggle", "Aura Farm", "AuraEnabled", 1, farmTab)
