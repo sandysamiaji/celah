@@ -635,13 +635,16 @@ spawn(function()
                 coroutine.resume(touchFlingThread)
             end
         end
-        if State.NightMode then
-            pcall(function()
-                Lighting.ClockTime = 0 -- Tengah malam
-                Lighting.Brightness = 0.5
-                Lighting.GlobalShadows = false
-            end)
-        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if State.NightMode then
+        pcall(function()
+            Lighting.ClockTime = 0 -- Tengah malam secara instan tiap frame (anti-blink)
+            Lighting.Brightness = 0.5
+            Lighting.GlobalShadows = false
+        end)
     end
 end)
 
@@ -818,8 +821,8 @@ tpBtn.MouseButton1Click:Connect(function()
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum then hum.Sit = false end -- Lepaskan dari kursi jika sedang duduk
         
-        -- Tambahkan offset Y (+2) agar kita jatuh perlahan dari atas musuh dan tidak tersangkut tanah
-        root.CFrame = targetRoot.CFrame * CFrame.new(0, 2, 3)
+        -- Offset Z (-3) untuk berada tepat di depan, Y (+2) agar tidak nyangkut tanah, dan berbalik badan menghadap musuh
+        root.CFrame = targetRoot.CFrame * CFrame.new(0, 2, -3) * CFrame.Angles(0, math.pi, 0)
         
         if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end -- Force physics update
         
