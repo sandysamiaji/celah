@@ -200,13 +200,23 @@ title.Parent = spacer
 
 local minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -35, 0.5, -15)
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60) -- Diubah jadi MERAH terang agar terlihat
+minimizeBtn.Position = UDim2.new(1, -70, 0.5, -15) -- Geser ke kiri
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(243, 156, 18) -- ORANYE
 minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 minimizeBtn.Font = Enum.Font.GothamBlack
 minimizeBtn.TextSize = 20
 minimizeBtn.Text = "-"
 minimizeBtn.Parent = spacer
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0.5, -15) -- Paling kanan
+closeBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60) -- MERAH
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Font = Enum.Font.GothamBlack
+closeBtn.TextSize = 16
+closeBtn.Text = "X"
+closeBtn.Parent = spacer
 
 local isMinimized = false
 
@@ -334,6 +344,23 @@ minimizeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+closeBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        gui:Destroy()
+        -- Bersihkan semua koneksi/event listener
+        if _G.PandaBoogaHubConnections then
+            for _, conn in ipairs(_G.PandaBoogaHubConnections) do
+                pcall(function() conn:Disconnect() end)
+            end
+            _G.PandaBoogaHubConnections = {}
+        end
+        -- Matikan State agar tidak mengganggu jika dieksekusi ulang
+        State.AuraEnabled = false
+        State.TouchFling = false
+        State.SpyTrace = false
+    end)
+end)
+
 local function createNavBtn(text, tabToOpen)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -4, 0, 35) -- Menyisakan sedikit margin
@@ -433,13 +460,17 @@ end
 
 createInfoBox("Aura Farm", "Automatically harvests resources or attacks enemies within the specified 'Aura Radius'. Perfect for AFK grinding. Adjust the radius to fit your weapon's reach or collection needs.", 1)
 createInfoBox("Auto Claim Reward", "Automatically claims any periodic or event rewards that pop up on your screen, ensuring you never miss free items while you're away.", 2)
-createInfoBox("Anti Fall Dmg", "Completely disables fall damage. You can jump from any height without losing a single drop of health.", 3)
-createInfoBox("Noclip", "Allows your character to walk straight through solid walls, objects, and terrain. Essential for quick escapes or accessing hidden areas.", 4)
-createInfoBox("Spy Trace", "A diagnostic tool to help find bugs or glitches within the application. If you experience any issues, enable this feature so Panda can check the automatically generated bug reports.", 5)
-createInfoBox("Fly", "Enables true flight for your character. You can adjust your flying speed dynamically using the 'Fly Speed' input box right below this toggle.", 6)
-createInfoBox("Fling Player", "Select a target from the 'Teleport' tab, equip any Tool/Weapon in your hand, and click this to violently launch them into the sky! Note: You MUST hold a Tool for the physics glitch to work.", 7)
-createInfoBox("Touch Fling", "Turns your character into a walking hazard. Anyone who physically touches your character will instantly be flung away. Excellent for defense.", 8)
-createInfoBox("Builder", "A comprehensive saving system for your structures. Save your current base layout to a local file, and load it anytime in the future to instantly rebuild your base.", 9)
+createInfoBox("Auto Respawn", "Bypasses the death screen and instantly respawns your character the moment you die, getting you back into the action without delay.", 3)
+createInfoBox("Anti Fall Dmg", "Completely disables fall damage. You can jump from any height without losing a single drop of health.", 4)
+createInfoBox("Noclip", "Allows your character to walk straight through solid walls, objects, and terrain. Essential for quick escapes or accessing hidden areas.", 5)
+createInfoBox("Infinite Drop", "Bypasses item dropping limits or restrictions in the game. Highly useful for transferring mass amounts of items to your friends.", 6)
+createInfoBox("Spy Trace", "A diagnostic tool to help find bugs or glitches within the application. If you experience any issues, enable this feature so Panda can check the automatically generated bug reports.", 7)
+createInfoBox("Fly & Fly Speed", "Enables true flight for your character. You can adjust your flying speed dynamically using the 'Fly Speed' input box right below the toggle.", 8)
+createInfoBox("Teleport Options", "Instantly teleport to any player using 'TP To Player', or sneak up right behind them using 'TP Behind Player' for a surprise attack.", 9)
+createInfoBox("Fling Player", "Select a target from the list, equip any Tool/Weapon in your hand, and click this to violently launch them into the sky using physics manipulation!", 10)
+createInfoBox("Touch Fling", "Turns your character into a walking hazard. Anyone who physically touches your character will instantly be flung away. Excellent for passive defense.", 11)
+createInfoBox("Scan RemoteEvents", "An advanced debugging feature that logs all RemoteEvents in the server. Helpful for developers analyzing the game's network structure.", 12)
+createInfoBox("Builder System", "A comprehensive saving system for your structures. Use 'Copy Base' to save buildings within a radius to your local file, and 'Load Base' to rebuild them instantly anywhere.", 13)
 
 -- FARM TAB
 createToggle("AuraToggle", "Aura Farm", "AuraEnabled", 1, farmTab)
@@ -791,69 +822,21 @@ end)
 flingPlayerBtn.MouseButton1Click:Connect(function()
     local success, root, targetRoot, targetName = checkTeleportRequirements()
     if success then
-        coroutine.wrap(function()
-            local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if not hum then return end
-            
-            -- Simpan posisi awal
-            local oldPos = root.CFrame
-            
-            logAction("FLING", "Launching Fling (Velocity Fling) at " .. targetName .. "!")
-            
-            -- PASTIKAN ada alat fisik yang bisa menabrak musuh (senjata/tool)
-            local weaponTool = char:FindFirstChildOfClass("Tool")
-            if not weaponTool then
-                logAction("FLING", "⚠️ WARNING: You are not holding a weapon! Fling might fail. Equip Punch/Sword first!")
-            end
-            
-            -- KUNCI 1: Teleport kita tepat ke dalam musuh (biar numpuk)
-            root.CFrame = targetRoot.CFrame
-            
-            -- JEDA PENTING: Biarkan server Roblox mendaftarkan posisi baru kita
-            -- sebelum kita mengacaukan fisika/velocity-nya.
-            wait(0.15) 
-
-            
-            -- KUNCI 2: Paksa kecepatan root part kita menjadi luar biasa tinggi 
-            -- (Berdasarkan skrip VIP yang terbukti sukses)
-            local startTime = tick()
-            local movel = 0.1
-            
-            -- Loop selama 0.2 detik untuk memastikan hit detection server menyadari tabrakan
-            while tick() - startTime < 0.2 do
-                if targetRoot and targetRoot.Parent then
-                    -- Terus menempel pada target
-                    root.CFrame = targetRoot.CFrame
-                    
-                    local vel = root.Velocity
-                    -- Berikan velocity yang luar biasa ekstrem ke tubuh kita sendiri
-                    root.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
-                    
-                    -- OTOMATIS NONJOK/MUKUL PAKAI SENJATA
-                    if weaponTool then
-                        pcall(function() weaponTool:Activate() end)
-                    end
-                    
-                    RunService.RenderStepped:Wait()
-                    
-                    root.Velocity = vel
-                    RunService.Stepped:Wait()
-                    
-                    root.Velocity = vel + Vector3.new(0, movel, 0)
-                    movel = -movel
-                else
-                    break
-                end
-            end
-            
-            -- Bersihkan dan kembali ke posisi semula
-            root.Velocity = Vector3.zero
-            root.RotVelocity = Vector3.zero
-            root.CFrame = oldPos
-            
-            logAction("FLING", "Fling on " .. targetName .. " finished!")
-        end)()
+        logAction("FLING", "Teleporting into " .. targetName .. " and activating Touch Fling!")
+        
+        -- Teleport kita tepat ke dalam musuh (menyatukan posisi secara persis)
+        root.CFrame = targetRoot.CFrame
+        
+        -- Aktifkan state Touch Fling agar kita langsung bergetar dan melempar target
+        State.TouchFling = true
+        
+        -- Pastikan thread Touch Fling langsung berjalan jika sebelumnya mati
+        if not touchFlingThread or coroutine.status(touchFlingThread) == "dead" then
+            touchFlingThread = coroutine.create(touchFlingLoop)
+            coroutine.resume(touchFlingThread)
+        end
+        
+        logAction("FLING", "Now inside " .. targetName .. ". Move slightly to fling them away!")
     end
 end)
 
