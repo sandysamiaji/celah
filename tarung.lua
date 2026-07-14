@@ -95,15 +95,15 @@ local State = {
     Noclip = false,
     SpyTrace = false,
     NightMode = false,
-    NightBrightness = 0.5,
+    NightBrightness = 0.2,
     InfiniteDrop = false,
     Fly = false,
     FlySpeed = 16,
     WebhookLogs = false, -- Default mati
     FlingAura = false,
-    CopyRadius = 500,
-    AuraRadius = 35,
-    AttackCooldown = 0.4,
+    CopyRadius = 200,
+    AuraRadius = 40,
+    AttackCooldown = 0.2,
     SelectedPlayer = nil
 }
 
