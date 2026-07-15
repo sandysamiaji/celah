@@ -104,6 +104,7 @@ local State = {
     CopyRadius = 200,
     AuraRadius = 40,
     AttackCooldown = 0,
+    FEInvisible = false,
     SelectedPlayer = nil
 }
 
@@ -672,6 +673,92 @@ end)
 
 createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 9, cheatsTab)
 
+local isInvisible = false
+local invisibleThread = nil
+
+local function setVisible()
+    local char = LocalPlayer.Character
+    if not char then return end
+    for _, part in pairs(char:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.Transparency = 0
+            part.LocalTransparencyModifier = 0
+        end
+        if part:IsA("Accessory") then
+            local handle = part:FindFirstChild("Handle")
+            if handle then
+                handle.Transparency = 0
+                handle.LocalTransparencyModifier = 0
+            end
+        end
+    end
+    LocalPlayer.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Everyone
+end
+
+local function setInvisible()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    for _, part in pairs(char:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.Transparency = 1
+            part.LocalTransparencyModifier = 0
+        end
+        if part:IsA("Accessory") then
+            local handle = part:FindFirstChild("Handle")
+            if handle then
+                handle.Transparency = 1
+                handle.LocalTransparencyModifier = 0
+            end
+        end
+    end
+    
+    LocalPlayer.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.MaxHealth = math.huge
+        hum.Health = math.huge
+    end
+end
+
+local function invisibleLoop()
+    while State.FEInvisible do
+        setInvisible()
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.Health = math.huge
+            end
+        end
+        wait(0.01)
+    end
+    setVisible()
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.MaxHealth = 100
+            hum.Health = 100
+        end
+    end
+end
+
+local feInvisibleBtn = createToggle("FEInvisibleToggle", "👻 FE Invisible + God", "FEInvisible", 10, cheatsTab)
+
+spawn(function()
+    while true do
+        wait(0.5)
+        if State.FEInvisible then
+            if not invisibleThread or coroutine.status(invisibleThread) == "dead" then
+                invisibleThread = coroutine.create(invisibleLoop)
+                coroutine.resume(invisibleThread)
+            end
+        end
+    end
+end)
+
 local scanRemoteBtn = Instance.new("TextButton")
 scanRemoteBtn.Size = UDim2.new(0.9, 0, 0, 30)
 scanRemoteBtn.Position = UDim2.new(0.05, 0, 0, 0) -- Akan dikendalikan oleh UIListLayout
@@ -717,7 +804,7 @@ local function touchFlingLoop()
         
         if hrp then
             local vel = hrp.Velocity
-            hrp.Velocity = vel * 100000 + Vector3.new(0, 100000, 0)
+            hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
             RunService.RenderStepped:Wait()
             hrp.Velocity = vel
             RunService.Stepped:Wait()
