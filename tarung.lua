@@ -101,6 +101,11 @@ local State = {
     NightMode = false,
     NightBrightness = 0.2,
     InfiniteDrop = false,
+    AutoGift = false,
+    IsLoopDropping = false,
+    GiftTargets = {},
+    GiftRemote = nil,
+    GiftArgs = nil,
     Fly = false,
     FlySpeed = 16,
     WebhookLogs = false, -- Default mati
@@ -354,6 +359,25 @@ infoLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 infoLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     infoTab.CanvasSize = UDim2.new(0, 0, 0, infoLayout.AbsoluteContentSize.Y + 20)
 end)
+local giftTab = Instance.new("ScrollingFrame")
+giftTab.Size = UDim2.new(1, 0, 1, 0)
+giftTab.BackgroundTransparency = 1
+giftTab.BorderSizePixel = 0
+giftTab.ScrollBarThickness = 4
+giftTab.CanvasSize = UDim2.new(0, 0, 0, 800)
+giftTab.Visible = false
+giftTab.Parent = contentContainer
+
+local giftLayout = Instance.new("UIListLayout")
+giftLayout.Parent = giftTab
+giftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+giftLayout.Padding = UDim.new(0, 5)
+giftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+giftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    giftTab.CanvasSize = UDim2.new(0, 0, 0, giftLayout.AbsoluteContentSize.Y + 20)
+end)
+
 
 local function switchTab(tab)
     farmTab.Visible = (tab == farmTab)
@@ -361,6 +385,7 @@ local function switchTab(tab)
     teleportTab.Visible = (tab == teleportTab)
     builderTab.Visible = (tab == builderTab)
     infoTab.Visible = (tab == infoTab)
+    giftTab.Visible = (tab == giftTab)
 end
 
 minimizeBtn.MouseButton1Click:Connect(function()
@@ -416,6 +441,7 @@ local cheatsNav = createNavBtn("Cheats", cheatsTab)
 local teleportNav = createNavBtn("Teleport", teleportTab)
 local builderNav = createNavBtn("Builder", builderTab)
 local infoNav = createNavBtn("Info", infoTab)
+local giftNav = createNavBtn("Gift", giftTab)
 
 local function createToggle(name, text, stateKey, layoutOrder, parentTab)
     local btn = Instance.new("TextButton")
@@ -449,13 +475,14 @@ end
 -- =======================
 
 -- INFO TAB
-local function createInfoBox(titleText, descText, layoutOrder)
+local function createInfoBox(titleText, descText, layoutOrder, parentTab)
+    parentTab = parentTab or infoTab
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(0.9, 0, 0, 0) -- Height akan otomatis
+    container.Size = UDim2.new(0.9, 0, 0, 0)
     container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     container.BorderSizePixel = 0
     container.LayoutOrder = layoutOrder
-    container.Parent = infoTab
+    container.Parent = parentTab
 
     local uicorner = Instance.new("UICorner")
     uicorner.CornerRadius = UDim.new(0, 5)
@@ -912,29 +939,35 @@ local function autoEatLoop()
     end
 
     while State.AutoEat do
-        wait(State.EatCooldown) -- Cek setiap X detik
+        for i = 1, (State.EatCooldown * 10) do
+            if not State.AutoEat then break end
+            wait(0.1)
+        end
+        if not State.AutoEat then break end
         
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health > 0 then
             local prevTool = char:FindFirstChildOfClass("Tool")
+            local consumed = false
             
             if useEvent then
-                -- Common food & drink names in Booga Booga based on spy logs
                 local consumeList = {
                     "Cooked Meat", "Raw Meat", "Sun Fruit", "Blood Fruit", "Blue Fruit", 
                     "Jelly", "Leaves", "Ice", "Coconut", "Cooked Fish", "Fish", "Water"
                 }
                 for _, item in ipairs(consumeList) do
+                    if not State.AutoEat then break end
                     pcall(function()
                         useEvent:FireServer(item)
                     end)
                 end
+                consumed = true
             else
-                -- Fallback untuk game lain: Cek Backpack
                 local bp = LocalPlayer:FindFirstChild("Backpack")
                 if bp then
                     for _, tool in ipairs(bp:GetChildren()) do
+                        if not State.AutoEat then break end
                         if tool:IsA("Tool") then
                             local n = tool.Name:lower()
                             if string.find(n, "meat") or string.find(n, "fruit") or string.find(n, "berry") or string.find(n, "apple") or string.find(n, "water") or string.find(n, "drink") or string.find(n, "food") then
@@ -945,6 +978,8 @@ local function autoEatLoop()
                                     wait(0.2)
                                     hum:UnequipTools()
                                 end)
+                                consumed = true
+                                break -- Eat only 1 food per cycle!
                             end
                         end
                     end
@@ -985,10 +1020,12 @@ local autoCookThread = nil
 local function autoCookLoop()
     while State.AutoCook do
         wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
+        if not State.AutoCook then break end
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
             for _, prompt in ipairs(getWorkspaceCache()) do
+                if not State.AutoCook then break end
                 if prompt:IsA("ProximityPrompt") then
                     local part = prompt:FindFirstAncestorOfClass("BasePart")
                     if part then
@@ -1002,7 +1039,7 @@ local function autoCookLoop()
                                     prompt.RequiresLineOfSight = false
                                     
                                     if fireproximityprompt then
-                                        fireproximityprompt(prompt, 1, true)
+                                        fireproximityprompt(prompt)
                                     else
                                         prompt:InputHoldBegin()
                                         task.wait(prompt.HoldDuration + 0.05)
@@ -1054,7 +1091,7 @@ local function auraHarvestLoop()
                 if obj:IsA("Model") or obj:IsA("BasePart") then
                     local primary = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")) or obj
                     if primary and (primary.Position - root.Position).Magnitude <= State.AuraRadius then
-                        local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
+                        local prompt = obj:FindFirstDescendant("ProximityPrompt")
                         if prompt then
                             local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
                             if string.find(txt, "take") or string.find(txt, "pick") or string.find(txt, "harvest") or string.find(txt, "gather") or string.find(txt, "grab") then
@@ -1065,7 +1102,7 @@ local function auraHarvestLoop()
                                     prompt.RequiresLineOfSight = false
                                     
                                     if fireproximityprompt then
-                                        fireproximityprompt(prompt, 1, true)
+                                        fireproximityprompt(prompt)
                                     else
                                         prompt:InputHoldBegin()
                                         task.wait(prompt.HoldDuration + 0.05)
@@ -2148,6 +2185,171 @@ dupeLimitBtn.MouseButton1Click:Connect(function()
     logAction("BUILDER", "10000 requests attack finished! Your limit is now drastically Minus/Infinite!")
 end)
 
+
+--------------------------------------------------------------------------------
+-- GIFT TAB LOGIC
+--------------------------------------------------------------------------------
+createInfoBox("Auto Gift", "Drops the intercepted item -10 below selected player feet. Enable, then manually Drop any item to capture it.", 1, giftTab)
+
+local autoGiftBtn = Instance.new("TextButton")
+autoGiftBtn.Size = UDim2.new(0.9, 0, 0, 35)
+autoGiftBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+autoGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoGiftBtn.Font = Enum.Font.GothamBold
+autoGiftBtn.TextSize = 13
+autoGiftBtn.Text = "Auto Gift: OFF"
+autoGiftBtn.LayoutOrder = 2
+autoGiftBtn.Parent = giftTab
+
+local giftStatus = Instance.new("TextLabel")
+giftStatus.Name = "GiftStatusLabel"
+giftStatus.Size = UDim2.new(0.9, 0, 0, 30)
+giftStatus.BackgroundTransparency = 1
+giftStatus.Text = "Status: Drop an item to capture..."
+giftStatus.TextColor3 = Color3.fromRGB(241, 196, 15)
+giftStatus.Font = Enum.Font.GothamBold
+giftStatus.TextSize = 12
+giftStatus.LayoutOrder = 3
+giftStatus.Parent = giftTab
+
+local refreshGiftBtn = Instance.new("TextButton")
+refreshGiftBtn.Size = UDim2.new(0.9, 0, 0, 30)
+refreshGiftBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+refreshGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+refreshGiftBtn.Font = Enum.Font.GothamBold
+refreshGiftBtn.TextSize = 12
+refreshGiftBtn.Text = "Refresh Player List"
+refreshGiftBtn.LayoutOrder = 4
+refreshGiftBtn.Parent = giftTab
+
+local giftBtnContainer = Instance.new("Frame")
+giftBtnContainer.Size = UDim2.new(0.9, 0, 0, 30)
+giftBtnContainer.BackgroundTransparency = 1
+giftBtnContainer.LayoutOrder = 5
+giftBtnContainer.Parent = giftTab
+
+local selectAllGiftBtn = Instance.new("TextButton")
+selectAllGiftBtn.Size = UDim2.new(0.48, 0, 1, 0)
+selectAllGiftBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+selectAllGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+selectAllGiftBtn.Font = Enum.Font.GothamBold
+selectAllGiftBtn.TextSize = 12
+selectAllGiftBtn.Text = "Select All"
+selectAllGiftBtn.Parent = giftBtnContainer
+
+local deselectAllGiftBtn = Instance.new("TextButton")
+deselectAllGiftBtn.Size = UDim2.new(0.48, 0, 1, 0)
+deselectAllGiftBtn.Position = UDim2.new(0.52, 0, 0, 0)
+deselectAllGiftBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+deselectAllGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+deselectAllGiftBtn.Font = Enum.Font.GothamBold
+deselectAllGiftBtn.TextSize = 12
+deselectAllGiftBtn.Text = "Deselect All"
+deselectAllGiftBtn.Parent = giftBtnContainer
+
+local giftPlayerList = Instance.new("ScrollingFrame")
+giftPlayerList.Size = UDim2.new(0.9, 0, 0, 200)
+giftPlayerList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+giftPlayerList.BorderSizePixel = 0
+giftPlayerList.ScrollBarThickness = 4
+giftPlayerList.LayoutOrder = 6
+giftPlayerList.Parent = giftTab
+
+local giftPlayerLayout = Instance.new("UIListLayout")
+giftPlayerLayout.Parent = giftPlayerList
+giftPlayerLayout.SortOrder = Enum.SortOrder.Name
+
+local function populateGiftList()
+    for _, child in ipairs(giftPlayerList:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    local ySize = 0
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 0, 25)
+            local isSelected = State.GiftTargets[player.Name] or false
+            btn.BackgroundColor3 = isSelected and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(60, 60, 60)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 12
+            btn.Text = player.Name
+            btn.Parent = giftPlayerList
+            btn.MouseButton1Click:Connect(function()
+                State.GiftTargets[player.Name] = not State.GiftTargets[player.Name]
+                btn.BackgroundColor3 = State.GiftTargets[player.Name] and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(60, 60, 60)
+            end)
+            ySize = ySize + 25
+        end
+    end
+    giftPlayerList.CanvasSize = UDim2.new(0, 0, 0, ySize)
+end
+
+refreshGiftBtn.MouseButton1Click:Connect(populateGiftList)
+selectAllGiftBtn.MouseButton1Click:Connect(function()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then State.GiftTargets[player.Name] = true end
+    end
+    populateGiftList()
+end)
+deselectAllGiftBtn.MouseButton1Click:Connect(function()
+    State.GiftTargets = {}
+    populateGiftList()
+end)
+populateGiftList()
+
+local autoGiftThread = nil
+local function autoGiftLoop()
+    while State.AutoGift do
+        wait(0.5)
+        if State.GiftRemote and State.GiftArgs then
+            for targetName, isSelected in pairs(State.GiftTargets) do
+                if isSelected then
+                    local targetPlayer = Players:FindFirstChild(targetName)
+                    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        local targetPos = targetPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, -10, 0)
+                        local newArgs = {}
+                        local foundPos = false
+                        for i, v in ipairs(State.GiftArgs) do
+                            if typeof(v) == "CFrame" then
+                                newArgs[i] = CFrame.new(targetPos)
+                                foundPos = true
+                            elseif typeof(v) == "Vector3" then
+                                newArgs[i] = targetPos
+                                foundPos = true
+                            else
+                                newArgs[i] = v
+                            end
+                        end
+                        if not foundPos then
+                            table.insert(newArgs, CFrame.new(targetPos))
+                        end
+                        pcall(function()
+                            State.IsLoopDropping = true
+                            State.GiftRemote:FireServer(unpack(newArgs))
+                            State.IsLoopDropping = false
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end
+
+autoGiftBtn.MouseButton1Click:Connect(function()
+    State.AutoGift = not State.AutoGift
+    if State.AutoGift then
+        autoGiftBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        autoGiftBtn.Text = "Auto Gift: ON"
+        if not autoGiftThread or coroutine.status(autoGiftThread) == "dead" then
+            autoGiftThread = coroutine.create(autoGiftLoop)
+            coroutine.resume(autoGiftThread)
+        end
+    else
+        autoGiftBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        autoGiftBtn.Text = "Auto Gift: OFF"
+    end
+end)
 --------------------------------------------------------------------------------
 -- SISTEM DRAG GUI
 --------------------------------------------------------------------------------
@@ -2531,6 +2733,7 @@ local fallDamageEvent = ReplicatedStorage:FindFirstChild("GUIs")
     and ReplicatedStorage.GUIs.Vitals:FindFirstChild("FallDamageEvent")
 
 local oldNamecall
+pcall(function()
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     local args = {...}
@@ -2550,6 +2753,17 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         return oldNamecall(self, unpack(args))
     end
     
+    -- Auto Gift Interception
+    if State.AutoGift and not State.IsLoopDropping and method == "FireServer" and (self.Name == "Drop" or self.Name == "DropItem" or self.Name == "DropItems") then
+        State.GiftRemote = self
+        State.GiftArgs = args
+        pcall(function()
+            giftStatus.Text = "Status: Captured [" .. tostring(args[1] or "item") .. "]!"
+            giftStatus.TextColor3 = Color3.fromRGB(46, 204, 113)
+        end)
+        return
+    end
+    
     -- Sistem Trace & Logging
     if State.SpyTrace and (method == "FireServer" or method == "InvokeServer") then
         if self.Name ~= "Sync" and self.Name ~= "RequestSync" and self.Name ~= "Update" and self.Name ~= "Mouse" and self.Name ~= "Ping" then
@@ -2566,11 +2780,13 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     
     return oldNamecall(self, unpack(args))
 end)
+end) -- end pcall for hookmetamethod
 
 local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, key)
-    -- Jika di masa depan ada manipulasi Index lainnya bisa ditambah di sini
-    return oldIndex(self, key)
+pcall(function()
+    oldIndex = hookmetamethod(game, "__index", function(self, key)
+        return oldIndex(self, key)
+    end)
 end)
 
 -- 6. EQUIP TOOL TRACKER
