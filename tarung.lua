@@ -2192,7 +2192,15 @@ end)
 --------------------------------------------------------------------------------
 createInfoBox("Auto Gift", "Drops the intercepted item at -10 studs below selected players. Drop an item while this is ON to capture it.", 1, giftTab)
 
-local autoGiftBtn = createToggle("GiftToggle", "Enable Auto Gift", "AutoGift", 2, giftTab)
+local autoGiftBtn = Instance.new("TextButton")
+autoGiftBtn.Size = UDim2.new(0.9, 0, 0, 35)
+autoGiftBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+autoGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoGiftBtn.Font = Enum.Font.GothamBold
+autoGiftBtn.TextSize = 13
+autoGiftBtn.Text = "Auto Gift: OFF"
+autoGiftBtn.LayoutOrder = 2
+autoGiftBtn.Parent = giftTab
 
 local giftStatus = Instance.new("TextLabel")
 giftStatus.Name = "GiftStatusLabel"
@@ -2337,11 +2345,19 @@ local function autoGiftLoop()
 end
 
 autoGiftBtn.MouseButton1Click:Connect(function()
+    State.AutoGift = not State.AutoGift
     if State.AutoGift then
+        autoGiftBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        autoGiftBtn.Text = "Auto Gift: ON"
+        logAction("FEATURE", "Auto Gift Enabled")
         if not autoGiftThread or coroutine.status(autoGiftThread) == "dead" then
             autoGiftThread = coroutine.create(autoGiftLoop)
             coroutine.resume(autoGiftThread)
         end
+    else
+        autoGiftBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        autoGiftBtn.Text = "Auto Gift: OFF"
+        logAction("FEATURE", "Auto Gift Disabled")
     end
 end)
 
