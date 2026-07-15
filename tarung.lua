@@ -105,6 +105,7 @@ local State = {
     AuraRadius = 40,
     AttackCooldown = 0,
     FEInvisible = false,
+    UndergroundMode = false,
     SelectedPlayer = nil
 }
 
@@ -590,7 +591,7 @@ createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab
 local noclipBtn = createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
 createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
 createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
-createToggle("FlyToggle", "Fly", "Fly", 5, cheatsTab)
+local flyBtn = createToggle("FlyToggle", "Fly", "Fly", 5, cheatsTab)
 createToggle("NightModeToggle", "Night Mode", "NightMode", 6, cheatsTab)
 
 local nightBrightContainer = Instance.new("Frame")
@@ -746,6 +747,93 @@ local function invisibleLoop()
 end
 
 local feInvisibleBtn = createToggle("FEInvisibleToggle", "👻 FE Invisible + God", "FEInvisible", 10, cheatsTab)
+
+local undergroundFloor = nil
+local surfaceCamPart = nil
+local isUnderground = false
+
+local function toggleUnderground(enabled)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    if enabled then
+        local surfaceY = hrp.Position.Y
+        hrp.CFrame = hrp.CFrame * CFrame.new(0, -15, 0)
+        
+        if not undergroundFloor then
+            undergroundFloor = Instance.new("Part")
+            undergroundFloor.Size = Vector3.new(100, 1, 100)
+            undergroundFloor.Anchored = true
+            undergroundFloor.Transparency = 1
+            undergroundFloor.Parent = workspace
+        end
+        
+        if not surfaceCamPart then
+            surfaceCamPart = Instance.new("Part")
+            surfaceCamPart.Size = Vector3.new(1, 1, 1)
+            surfaceCamPart.Anchored = true
+            surfaceCamPart.Transparency = 1
+            surfaceCamPart.CanCollide = false
+            surfaceCamPart.Parent = workspace
+        end
+        
+        workspace.CurrentCamera.CameraSubject = surfaceCamPart
+        State.Noclip = true
+        
+        spawn(function()
+            while State.UndergroundMode do
+                local c = LocalPlayer.Character
+                local h = c and c:FindFirstChild("HumanoidRootPart")
+                if h and undergroundFloor and surfaceCamPart then
+                    undergroundFloor.Position = Vector3.new(h.Position.X, h.Position.Y - 3.5, h.Position.Z)
+                    surfaceCamPart.Position = Vector3.new(h.Position.X, surfaceY + 2, h.Position.Z)
+                end
+                RunService.RenderStepped:Wait()
+            end
+        end)
+    else
+        if undergroundFloor then undergroundFloor:Destroy(); undergroundFloor = nil end
+        if surfaceCamPart then surfaceCamPart:Destroy(); surfaceCamPart = nil end
+        hrp.CFrame = hrp.CFrame * CFrame.new(0, 15, 0)
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            workspace.CurrentCamera.CameraSubject = hum
+        end
+    end
+end
+
+spawn(function()
+    while wait(0.1) do
+        if State.UndergroundMode and not isUnderground then
+            isUnderground = true
+            toggleUnderground(true)
+        elseif not State.UndergroundMode and isUnderground then
+            isUnderground = false
+            toggleUnderground(false)
+        end
+    end
+end)
+
+local undergroundBtn = createToggle("UndergroundToggle", "⛏️ Underground Mode", "UndergroundMode", 11, cheatsTab)
+
+flyBtn.MouseButton1Click:Connect(function()
+    if State.Fly and State.UndergroundMode then
+        State.UndergroundMode = false
+        undergroundBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        undergroundBtn.Text = "⛏️ Underground Mode: OFF"
+        logAction("FEATURE", "Underground Mode Auto-Disabled for Fly")
+    end
+end)
+
+undergroundBtn.MouseButton1Click:Connect(function()
+    if State.UndergroundMode and State.Fly then
+        State.Fly = false
+        flyBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        flyBtn.Text = "Fly: OFF"
+        logAction("FEATURE", "Fly Auto-Disabled for Underground Mode")
+    end
+end)
 
 spawn(function()
     while true do
