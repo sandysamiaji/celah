@@ -102,6 +102,7 @@ local State = {
     WebhookLogs = false, -- Default mati
     FlingAura = false,
     CopyRadius = 200,
+    DeleteRadius = 200,
     AuraRadius = 40,
     AttackCooldown = 0.1,
     FEInvisible = false,
@@ -1225,14 +1226,25 @@ copyBaseBtn.Text = "Copy Base (Radius " .. State.CopyRadius .. ")"
 copyBaseBtn.LayoutOrder = 2
 copyBaseBtn.Parent = builderTab
 
+local deleteRadiusInput = Instance.new("TextBox")
+deleteRadiusInput.Size = UDim2.new(0.9, 0, 0, 30)
+deleteRadiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+deleteRadiusInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+deleteRadiusInput.Font = Enum.Font.Gotham
+deleteRadiusInput.TextSize = 13
+deleteRadiusInput.Text = tostring(State.DeleteRadius)
+deleteRadiusInput.PlaceholderText = "Delete Radius (Studs)"
+deleteRadiusInput.LayoutOrder = 12
+deleteRadiusInput.Parent = builderTab
+
 local deleteRadiusBtn = Instance.new("TextButton")
 deleteRadiusBtn.Size = UDim2.new(0.9, 0, 0, 35)
 deleteRadiusBtn.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
 deleteRadiusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 deleteRadiusBtn.Font = Enum.Font.GothamBold
 deleteRadiusBtn.TextSize = 13
-deleteRadiusBtn.Text = "Delete in Area (Radius " .. State.CopyRadius .. ")"
-deleteRadiusBtn.LayoutOrder = 12
+deleteRadiusBtn.Text = "Delete in Area (Radius " .. State.DeleteRadius .. ")"
+deleteRadiusBtn.LayoutOrder = 13
 deleteRadiusBtn.Parent = builderTab
 
 builderRadiusInput.FocusLost:Connect(function()
@@ -1243,9 +1255,21 @@ builderRadiusInput.FocusLost:Connect(function()
         State.CopyRadius = num
         builderRadiusInput.Text = tostring(num)
         copyBaseBtn.Text = "Copy Base (Radius " .. num .. ")"
-        deleteRadiusBtn.Text = "Delete in Area (Radius " .. num .. ")"
     else
         builderRadiusInput.Text = tostring(State.CopyRadius)
+    end
+end)
+
+deleteRadiusInput.FocusLost:Connect(function()
+    local num = tonumber(deleteRadiusInput.Text)
+    if num then
+        if num < 10 then num = 10 end
+        if num > 5000 then num = 5000 end
+        State.DeleteRadius = num
+        deleteRadiusInput.Text = tostring(num)
+        deleteRadiusBtn.Text = "Delete in Area (Radius " .. num .. ")"
+    else
+        deleteRadiusInput.Text = tostring(State.DeleteRadius)
     end
 end)
 
@@ -1568,7 +1592,7 @@ deleteRadiusBtn.MouseButton1Click:Connect(function()
     end
 
     local originPos = root.Position
-    logAction("BUILDER", "Starting to delete your buildings in area (Radius " .. State.CopyRadius .. ")...")
+    logAction("BUILDER", "Starting to delete your buildings in area (Radius " .. State.DeleteRadius .. ")...")
     local count = 0
 
     for _, obj in ipairs(workspace:GetDescendants()) do
@@ -1586,7 +1610,7 @@ deleteRadiusBtn.MouseButton1Click:Connect(function()
                     local primary = obj.PrimaryPart or obj:FindFirstChild("Hitbox") or obj:FindFirstChildOfClass("BasePart")
                     if primary then
                         local dist = (primary.Position - originPos).Magnitude
-                        if dist <= State.CopyRadius then
+                        if dist <= State.DeleteRadius then
                             coroutine.wrap(function()
                                 if deleteEvent:IsA("RemoteEvent") then
                                     deleteEvent:FireServer(obj)
