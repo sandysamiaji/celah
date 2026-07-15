@@ -901,6 +901,15 @@ end)
 
 local autoEatThread = nil
 local function autoEatLoop()
+    -- Caching remote event di luar loop biar gak bikin nge-lag parah
+    local useEvent
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+        if desc:IsA("RemoteEvent") and (desc.Name == "UseConsumable" or desc.Name == "UseBagItem" or desc.Name == "UseItem" or desc.Name == "Consume" or desc.Name == "EatItem") then
+            useEvent = desc
+            break
+        end
+    end
+
     while State.AutoEat do
         wait(State.EatCooldown) -- Cek setiap X detik
         
@@ -908,13 +917,6 @@ local function autoEatLoop()
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health > 0 then
             local prevTool = char:FindFirstChildOfClass("Tool")
-            local useEvent
-            for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
-                if desc:IsA("RemoteEvent") and (desc.Name == "UseConsumable" or desc.Name == "UseBagItem" or desc.Name == "UseItem" or desc.Name == "Consume" or desc.Name == "EatItem") then
-                    useEvent = desc
-                    break
-                end
-            end
             
             if useEvent then
                 -- Common food & drink names in Booga Booga based on spy logs
@@ -967,6 +969,17 @@ spawn(function()
     end
 end)
 
+local cachedWorkspaceDescendants = {}
+local lastWorkspaceCache = 0
+
+local function getWorkspaceCache()
+    if tick() - lastWorkspaceCache > 2 then
+        cachedWorkspaceDescendants = workspace:GetDescendants()
+        lastWorkspaceCache = tick()
+    end
+    return cachedWorkspaceDescendants
+end
+
 local autoCookThread = nil
 local function autoCookLoop()
     while State.AutoCook do
@@ -974,21 +987,29 @@ local function autoCookLoop()
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
-            for _, prompt in ipairs(workspace:GetDescendants()) do
+            for _, prompt in ipairs(getWorkspaceCache()) do
                 if prompt:IsA("ProximityPrompt") then
                     local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
-                    if (string.find(txt, "cook") or string.find(txt, "grill") or string.find(txt, "roast")) and not string.find(txt, "take") and not string.find(txt, "pick") and not string.find(txt, "grab") then
+                    if string.find(txt, "cook") and not string.find(txt, "cooked") then
                         local part = prompt.Parent
                         if part and part:IsA("BasePart") then
                             if (part.Position - root.Position).Magnitude <= State.AuraRadius then
                                 pcall(function()
+                                    local oldDist = prompt.MaxActivationDistance
+                                    local oldLOS = prompt.RequiresLineOfSight
+                                    prompt.MaxActivationDistance = math.huge
+                                    prompt.RequiresLineOfSight = false
+                                    
                                     if fireproximityprompt then
-                                        fireproximityprompt(prompt)
+                                        fireproximityprompt(prompt, 1, true)
                                     else
                                         prompt:InputHoldBegin()
-                                        task.wait(prompt.HoldDuration + 0.1)
+                                        task.wait(prompt.HoldDuration + 0.05)
                                         prompt:InputHoldEnd()
                                     end
+                                    
+                                    prompt.MaxActivationDistance = oldDist
+                                    prompt.RequiresLineOfSight = oldLOS
                                 end)
                             end
                         end
@@ -1020,7 +1041,7 @@ local function auraHarvestLoop()
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
-            for _, obj in ipairs(workspace:GetDescendants()) do
+            for _, obj in ipairs(getWorkspaceCache()) do
                 if obj:IsA("Model") or obj:IsA("BasePart") then
                     local primary = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")) or obj
                     if primary and (primary.Position - root.Position).Magnitude <= State.AuraRadius then
@@ -1029,13 +1050,21 @@ local function auraHarvestLoop()
                             local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
                             if string.find(txt, "take") or string.find(txt, "pick") or string.find(txt, "harvest") or string.find(txt, "gather") or string.find(txt, "grab") then
                                 pcall(function()
+                                    local oldDist = prompt.MaxActivationDistance
+                                    local oldLOS = prompt.RequiresLineOfSight
+                                    prompt.MaxActivationDistance = math.huge
+                                    prompt.RequiresLineOfSight = false
+                                    
                                     if fireproximityprompt then
-                                        fireproximityprompt(prompt)
+                                        fireproximityprompt(prompt, 1, true)
                                     else
                                         prompt:InputHoldBegin()
-                                        task.wait(prompt.HoldDuration + 0.1)
+                                        task.wait(prompt.HoldDuration + 0.05)
                                         prompt:InputHoldEnd()
                                     end
+                                    
+                                    prompt.MaxActivationDistance = oldDist
+                                    prompt.RequiresLineOfSight = oldLOS
                                 end)
                             end
                         else
