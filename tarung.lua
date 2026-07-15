@@ -1081,8 +1081,8 @@ local function auraHarvestLoop()
                 local obj = part:FindFirstAncestorOfClass("Model") or part
                 if not processed[obj] then
                     processed[obj] = true
-                    local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
-                        if prompt then
+                    local prompt = obj:FindFirstDescendant("ProximityPrompt")
+                    if prompt then
                             local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
                             if string.find(txt, "take") or string.find(txt, "pick") or string.find(txt, "harvest") or string.find(txt, "gather") or string.find(txt, "grab") then
                                 pcall(function()
