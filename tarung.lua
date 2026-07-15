@@ -102,6 +102,7 @@ local State = {
     NightBrightness = 0.2,
     InfiniteDrop = false,
     AutoGift = false,
+    IsLoopDropping = false,
     GiftTargets = {},
     GiftRemote = nil,
     GiftArgs = nil,
@@ -2324,7 +2325,9 @@ local function autoGiftLoop()
                         end
                         
                         pcall(function()
+                            State.IsLoopDropping = true
                             State.GiftRemote:FireServer(unpack(newArgs))
+                            State.IsLoopDropping = false
                         end)
                     end
                 end
@@ -2745,7 +2748,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     end
     
     -- Auto Gift Interception
-    if State.AutoGift and method == "FireServer" and (self.Name == "Drop" or self.Name == "DropItem" or self.Name == "DropItems") then
+    if State.AutoGift and not State.IsLoopDropping and method == "FireServer" and (self.Name == "Drop" or self.Name == "DropItem" or self.Name == "DropItems") then
         State.GiftRemote = self
         State.GiftArgs = args
         
