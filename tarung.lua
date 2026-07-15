@@ -475,13 +475,14 @@ end
 -- =======================
 
 -- INFO TAB
-local function createInfoBox(titleText, descText, layoutOrder)
+local function createInfoBox(titleText, descText, layoutOrder, parentTab)
+    parentTab = parentTab or infoTab
     local container = Instance.new("Frame")
     container.Size = UDim2.new(0.9, 0, 0, 0) -- Height akan otomatis
     container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     container.BorderSizePixel = 0
     container.LayoutOrder = layoutOrder
-    container.Parent = infoTab
+    container.Parent = parentTab
 
     local uicorner = Instance.new("UICorner")
     uicorner.CornerRadius = UDim.new(0, 5)
@@ -996,16 +997,7 @@ spawn(function()
     end
 end)
 
-local cachedWorkspaceDescendants = {}
-local lastWorkspaceCache = 0
 
-local function getWorkspaceCache()
-    if tick() - lastWorkspaceCache > 2 then
-        cachedWorkspaceDescendants = workspace:GetDescendants()
-        lastWorkspaceCache = tick()
-    end
-    return cachedWorkspaceDescendants
-end
 
 local autoCookThread = nil
 local function autoCookLoop()
@@ -1033,7 +1025,7 @@ local function autoCookLoop()
                                     prompt.RequiresLineOfSight = false
                                     
                                     if fireproximityprompt then
-                                        fireproximityprompt(prompt, 1, true)
+                                        fireproximityprompt(prompt)
                                     else
                                         prompt:InputHoldBegin()
                                         task.wait(prompt.HoldDuration + 0.05)
@@ -1100,7 +1092,7 @@ local function auraHarvestLoop()
                                     prompt.RequiresLineOfSight = false
                                     
                                     if fireproximityprompt then
-                                        fireproximityprompt(prompt, 1, true)
+                                        fireproximityprompt(prompt)
                                     else
                                         prompt:InputHoldBegin()
                                         task.wait(prompt.HoldDuration + 0.05)
