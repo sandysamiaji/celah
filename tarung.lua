@@ -759,7 +759,8 @@ local function toggleUnderground(enabled)
 
     if enabled then
         local surfaceY = hrp.Position.Y
-        hrp.CFrame = hrp.CFrame * CFrame.new(0, -15, 0)
+        -- Kita teleport ke bawah tanah menggunakan World Space (Position) agar pasti ke bawah
+        hrp.CFrame = CFrame.new(hrp.Position - Vector3.new(0, 15, 0)) * hrp.CFrame.Rotation
         
         if not undergroundFloor then
             undergroundFloor = Instance.new("Part")
@@ -795,7 +796,7 @@ local function toggleUnderground(enabled)
     else
         if undergroundFloor then undergroundFloor:Destroy(); undergroundFloor = nil end
         if surfaceCamPart then surfaceCamPart:Destroy(); surfaceCamPart = nil end
-        hrp.CFrame = hrp.CFrame * CFrame.new(0, 15, 0)
+        hrp.CFrame = CFrame.new(hrp.Position + Vector3.new(0, 15, 0)) * hrp.CFrame.Rotation
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then
             workspace.CurrentCamera.CameraSubject = hum
