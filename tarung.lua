@@ -782,12 +782,15 @@ local function toggleUnderground(enabled)
         workspace.CurrentCamera.CameraSubject = surfaceCamPart
         State.Noclip = true
         
+        local floorY = surfaceY - 18.5
+        
         spawn(function()
             while State.UndergroundMode do
                 local c = LocalPlayer.Character
                 local h = c and c:FindFirstChild("HumanoidRootPart")
                 if h and undergroundFloor and surfaceCamPart then
-                    undergroundFloor.Position = Vector3.new(h.Position.X, h.Position.Y - 3.5, h.Position.Z)
+                    -- Fix Y position for the floor so they can walk properly!
+                    undergroundFloor.Position = Vector3.new(h.Position.X, floorY, h.Position.Z)
                     surfaceCamPart.Position = Vector3.new(h.Position.X, surfaceY + 2, h.Position.Z)
                 end
                 RunService.RenderStepped:Wait()
