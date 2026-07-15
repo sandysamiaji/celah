@@ -2301,37 +2301,74 @@ populateGiftList()
 local autoGiftThread = nil
 local function autoGiftLoop()
     while State.AutoGift do
-        wait(0.5)
+        if not State.AutoGift then break end
+        
         if State.GiftRemote and State.GiftArgs then
-            for targetName, isSelected in pairs(State.GiftTargets) do
-                if isSelected then
-                    local targetPlayer = Players:FindFirstChild(targetName)
-                    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                        local targetPos = targetPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, -10, 0)
-                        local newArgs = {}
-                        local foundPos = false
-                        for i, v in ipairs(State.GiftArgs) do
-                            if typeof(v) == "CFrame" then
-                                newArgs[i] = CFrame.new(targetPos)
-                                foundPos = true
-                            elseif typeof(v) == "Vector3" then
-                                newArgs[i] = targetPos
-                                foundPos = true
-                            else
-                                newArgs[i] = v
+            local myChar = LocalPlayer.Character
+            local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            
+            if myRoot then
+                local originalCFrame = myRoot.CFrame
+                
+                for targetName, isSelected in pairs(State.GiftTargets) do
+                    if not State.AutoGift then break end
+                    
+                    if isSelected then
+                        local targetPlayer = Players:FindFirstChild(targetName)
+                        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                            local targetRoot = targetPlayer.Character.HumanoidRootPart
+                            local targetPos = targetRoot.Position + Vector3.new(0, -5, 0) -- Di bawah kaki
+                            
+                            -- 1. Teleport ke atas kepala pemain target
+                            myRoot.CFrame = targetRoot.CFrame + Vector3.new(0, 10, 0)
+                            
+                            -- 2. Jeda agar server mendaftarkan posisi baru kita
+                            wait(0.5)
+                            
+                            if not State.AutoGift then break end
+                            
+                            -- 3. Siapkan argumen drop (paksa posisi di bawah kaki target)
+                            local newArgs = {}
+                            local foundPos = false
+                            for i, v in ipairs(State.GiftArgs) do
+                                if typeof(v) == "CFrame" then
+                                    newArgs[i] = CFrame.new(targetPos)
+                                    foundPos = true
+                                elseif typeof(v) == "Vector3" then
+                                    newArgs[i] = targetPos
+                                    foundPos = true
+                                else
+                                    newArgs[i] = v
+                                end
                             end
+                            if not foundPos then
+                                table.insert(newArgs, CFrame.new(targetPos))
+                            end
+                            
+                            -- 4. Jatuhkan barang 10 kali
+                            for dropCount = 1, 10 do
+                                if not State.AutoGift then break end
+                                pcall(function()
+                                    State.IsLoopDropping = true
+                                    State.GiftRemote:FireServer(unpack(newArgs))
+                                    State.IsLoopDropping = false
+                                end)
+                                wait(0.1) -- Jeda tipis antar drop biar tidak dianggap spam/kick
+                            end
+                            
+                            -- 5. Jeda sebelum pindah ke pemain berikutnya
+                            wait(0.5)
                         end
-                        if not foundPos then
-                            table.insert(newArgs, CFrame.new(targetPos))
-                        end
-                        pcall(function()
-                            State.IsLoopDropping = true
-                            State.GiftRemote:FireServer(unpack(newArgs))
-                            State.IsLoopDropping = false
-                        end)
                     end
                 end
+                
+                -- Kembalikan ke posisi awal setelah selesai 1 putaran atau jika dimatikan
+                if myRoot then
+                    myRoot.CFrame = originalCFrame
+                end
             end
+        else
+            wait(1) -- Tunggu sampai ada barang yang dicapture
         end
     end
 end
