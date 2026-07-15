@@ -101,6 +101,10 @@ local State = {
     NightMode = false,
     NightBrightness = 0.2,
     InfiniteDrop = false,
+    AutoGift = false,
+    GiftTargets = {},
+    GiftRemote = nil,
+    GiftArgs = nil,
     Fly = false,
     FlySpeed = 16,
     WebhookLogs = false, -- Default mati
@@ -355,12 +359,32 @@ infoLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     infoTab.CanvasSize = UDim2.new(0, 0, 0, infoLayout.AbsoluteContentSize.Y + 20)
 end)
 
+local giftTab = Instance.new("ScrollingFrame")
+giftTab.Size = UDim2.new(1, 0, 1, 0)
+giftTab.BackgroundTransparency = 1
+giftTab.BorderSizePixel = 0
+giftTab.ScrollBarThickness = 4
+giftTab.CanvasSize = UDim2.new(0, 0, 0, 800)
+giftTab.Visible = false
+giftTab.Parent = contentContainer
+
+local giftLayout = Instance.new("UIListLayout")
+giftLayout.Parent = giftTab
+giftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+giftLayout.Padding = UDim.new(0, 5)
+giftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+giftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    giftTab.CanvasSize = UDim2.new(0, 0, 0, giftLayout.AbsoluteContentSize.Y + 20)
+end)
+
 local function switchTab(tab)
     farmTab.Visible = (tab == farmTab)
     cheatsTab.Visible = (tab == cheatsTab)
     teleportTab.Visible = (tab == teleportTab)
     builderTab.Visible = (tab == builderTab)
     infoTab.Visible = (tab == infoTab)
+    giftTab.Visible = (tab == giftTab)
 end
 
 minimizeBtn.MouseButton1Click:Connect(function()
@@ -416,6 +440,7 @@ local cheatsNav = createNavBtn("Cheats", cheatsTab)
 local teleportNav = createNavBtn("Teleport", teleportTab)
 local builderNav = createNavBtn("Builder", builderTab)
 local infoNav = createNavBtn("Info", infoTab)
+local giftNav = createNavBtn("Gift", giftTab)
 
 local function createToggle(name, text, stateKey, layoutOrder, parentTab)
     local btn = Instance.new("TextButton")
@@ -983,16 +1008,21 @@ end
 
 local autoCookThread = nil
 local function autoCookLoop()
+    local params = OverlapParams.new()
+    params.MaxParts = 1000
     while State.AutoCook do
         wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
-            for _, prompt in ipairs(getWorkspaceCache()) do
-                if prompt:IsA("ProximityPrompt") then
-                    local part = prompt:FindFirstAncestorOfClass("BasePart")
-                    if part then
-                        if (part.Position - root.Position).Magnitude <= State.AuraRadius then
+            local parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, params)
+            local processed = {}
+            for _, part in ipairs(parts) do
+                local obj = part:FindFirstAncestorOfClass("Model") or part
+                if not processed[obj] then
+                    processed[obj] = true
+                    for _, prompt in ipairs(obj:GetDescendants()) do
+                        if prompt:IsA("ProximityPrompt") then
                             local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
                             if (string.find(txt, "cook") or string.find(txt, "grill") or string.find(txt, "roast")) and not string.find(txt, "cooked") and not string.find(txt, "take") and not string.find(txt, "pick") and not string.find(txt, "grab") then
                                 pcall(function()
@@ -1045,16 +1075,20 @@ local function auraHarvestLoop()
         end
     end
 
+    local params = OverlapParams.new()
+    params.MaxParts = 1000
     while State.AuraHarvest do
         wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
-            for _, obj in ipairs(getWorkspaceCache()) do
-                if obj:IsA("Model") or obj:IsA("BasePart") then
-                    local primary = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")) or obj
-                    if primary and (primary.Position - root.Position).Magnitude <= State.AuraRadius then
-                        local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
+            local parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, params)
+            local processed = {}
+            for _, part in ipairs(parts) do
+                local obj = part:FindFirstAncestorOfClass("Model") or part
+                if not processed[obj] then
+                    processed[obj] = true
+                    local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
                         if prompt then
                             local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
                             if string.find(txt, "take") or string.find(txt, "pick") or string.find(txt, "harvest") or string.find(txt, "gather") or string.find(txt, "grab") then
@@ -1126,11 +1160,15 @@ local function auraKillLoop()
             
             -- 2. Cek Pohon / Batu / Resource (kalau gak ada musuh)
             if not shouldAttack then
-                for _, obj in ipairs(getWorkspaceCache()) do
-                    if obj:IsA("Model") and (obj:FindFirstChild("Durability") or obj:FindFirstChild("Health") or obj:FindFirstChild("Resource") or obj:FindFirstChild("Toughness")) then
-                        local primary = obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")
-                        if primary and (primary.Position - root.Position).Magnitude <= State.AuraRadius then
-                            local n = obj.Name:lower()
+                local params = OverlapParams.new()
+                params.MaxParts = 500
+                local parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, params)
+                local processed = {}
+                for _, part in ipairs(parts) do
+                    local obj = part:FindFirstAncestorOfClass("Model") or part
+                    if not processed[obj] and obj:IsA("Model") and (obj:FindFirstChild("Durability") or obj:FindFirstChild("Health") or obj:FindFirstChild("Resource") or obj:FindFirstChild("Toughness")) then
+                        processed[obj] = true
+                        local n = obj.Name:lower()
                             if string.find(n, "rock") or string.find(n, "iron") or string.find(n, "gold") or string.find(n, "ore") or string.find(n, "stone") or string.find(n, "meteor") or string.find(n, "adaman") then
                                 targetType = "Rock"
                             elseif string.find(n, "tree") or string.find(n, "log") or string.find(n, "wood") or string.find(n, "bush") or string.find(n, "plant") then
@@ -2149,6 +2187,162 @@ dupeLimitBtn.MouseButton1Click:Connect(function()
 end)
 
 --------------------------------------------------------------------------------
+-- GIFT TAB LOGIC
+--------------------------------------------------------------------------------
+createInfoBox("Auto Gift", "Drops the intercepted item at -10 studs below selected players. Drop an item while this is ON to capture it.", 1, giftTab)
+
+local autoGiftBtn = createToggle("GiftToggle", "Enable Auto Gift", "AutoGift", 2, giftTab)
+
+local giftStatus = Instance.new("TextLabel")
+giftStatus.Name = "GiftStatusLabel"
+giftStatus.Size = UDim2.new(0.9, 0, 0, 30)
+giftStatus.BackgroundTransparency = 1
+giftStatus.Text = "Status: Drop an item to capture..."
+giftStatus.TextColor3 = Color3.fromRGB(241, 196, 15)
+giftStatus.Font = Enum.Font.GothamBold
+giftStatus.TextSize = 12
+giftStatus.LayoutOrder = 3
+giftStatus.Parent = giftTab
+
+local refreshGiftBtn = Instance.new("TextButton")
+refreshGiftBtn.Size = UDim2.new(0.9, 0, 0, 30)
+refreshGiftBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+refreshGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+refreshGiftBtn.Font = Enum.Font.GothamBold
+refreshGiftBtn.TextSize = 12
+refreshGiftBtn.Text = "Refresh Player List"
+refreshGiftBtn.LayoutOrder = 4
+refreshGiftBtn.Parent = giftTab
+
+local btnContainer = Instance.new("Frame")
+btnContainer.Size = UDim2.new(0.9, 0, 0, 30)
+btnContainer.BackgroundTransparency = 1
+btnContainer.LayoutOrder = 5
+btnContainer.Parent = giftTab
+
+local selectAllGiftBtn = Instance.new("TextButton")
+selectAllGiftBtn.Size = UDim2.new(0.48, 0, 1, 0)
+selectAllGiftBtn.Position = UDim2.new(0, 0, 0, 0)
+selectAllGiftBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+selectAllGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+selectAllGiftBtn.Font = Enum.Font.GothamBold
+selectAllGiftBtn.TextSize = 12
+selectAllGiftBtn.Text = "Select All"
+selectAllGiftBtn.Parent = btnContainer
+
+local deselectAllGiftBtn = Instance.new("TextButton")
+deselectAllGiftBtn.Size = UDim2.new(0.48, 0, 1, 0)
+deselectAllGiftBtn.Position = UDim2.new(0.52, 0, 0, 0)
+deselectAllGiftBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+deselectAllGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+deselectAllGiftBtn.Font = Enum.Font.GothamBold
+deselectAllGiftBtn.TextSize = 12
+deselectAllGiftBtn.Text = "Deselect All"
+deselectAllGiftBtn.Parent = btnContainer
+
+local giftPlayerList = Instance.new("ScrollingFrame")
+giftPlayerList.Size = UDim2.new(0.9, 0, 0, 200)
+giftPlayerList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+giftPlayerList.BorderSizePixel = 0
+giftPlayerList.ScrollBarThickness = 4
+giftPlayerList.LayoutOrder = 6
+giftPlayerList.Parent = giftTab
+
+local giftPlayerLayout = Instance.new("UIListLayout")
+giftPlayerLayout.Parent = giftPlayerList
+giftPlayerLayout.SortOrder = Enum.SortOrder.Name
+
+local function populateGiftList()
+    for _, child in ipairs(giftPlayerList:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    
+    local ySize = 0
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 0, 25)
+            
+            local isSelected = State.GiftTargets[player.Name] or false
+            btn.BackgroundColor3 = isSelected and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(60, 60, 60)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 12
+            btn.Text = player.Name
+            btn.Parent = giftPlayerList
+            
+            btn.MouseButton1Click:Connect(function()
+                State.GiftTargets[player.Name] = not State.GiftTargets[player.Name]
+                btn.BackgroundColor3 = State.GiftTargets[player.Name] and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(60, 60, 60)
+            end)
+            ySize = ySize + 25
+        end
+    end
+    giftPlayerList.CanvasSize = UDim2.new(0, 0, 0, ySize)
+end
+
+refreshGiftBtn.MouseButton1Click:Connect(populateGiftList)
+selectAllGiftBtn.MouseButton1Click:Connect(function()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then State.GiftTargets[player.Name] = true end
+    end
+    populateGiftList()
+end)
+deselectAllGiftBtn.MouseButton1Click:Connect(function()
+    State.GiftTargets = {}
+    populateGiftList()
+end)
+populateGiftList()
+
+local autoGiftThread = nil
+local function autoGiftLoop()
+    while State.AutoGift do
+        wait(0.5)
+        if State.GiftRemote and State.GiftArgs then
+            for targetName, isSelected in pairs(State.GiftTargets) do
+                if isSelected then
+                    local targetPlayer = Players:FindFirstChild(targetName)
+                    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        local targetPos = targetPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, -10, 0)
+                        
+                        local newArgs = {}
+                        local foundPos = false
+                        for i, v in ipairs(State.GiftArgs) do
+                            if typeof(v) == "CFrame" then
+                                newArgs[i] = CFrame.new(targetPos)
+                                foundPos = true
+                            elseif typeof(v) == "Vector3" then
+                                newArgs[i] = targetPos
+                                foundPos = true
+                            else
+                                newArgs[i] = v
+                            end
+                        end
+                        
+                        if not foundPos then
+                            table.insert(newArgs, CFrame.new(targetPos))
+                        end
+                        
+                        pcall(function()
+                            State.GiftRemote:FireServer(unpack(newArgs))
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end
+
+autoGiftBtn.MouseButton1Click:Connect(function()
+    if State.AutoGift then
+        if not autoGiftThread or coroutine.status(autoGiftThread) == "dead" then
+            autoGiftThread = coroutine.create(autoGiftLoop)
+            coroutine.resume(autoGiftThread)
+        end
+    end
+end)
+
+--------------------------------------------------------------------------------
 -- SISTEM DRAG GUI
 --------------------------------------------------------------------------------
 local UserInputService = game:GetService("UserInputService")
@@ -2548,6 +2742,21 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             end
         end
         return oldNamecall(self, unpack(args))
+    end
+    
+    -- Auto Gift Interception
+    if State.AutoGift and method == "FireServer" and (self.Name == "Drop" or self.Name == "DropItem" or self.Name == "DropItems") then
+        State.GiftRemote = self
+        State.GiftArgs = args
+        
+        for _, obj in ipairs(giftTab:GetChildren()) do
+            if obj:IsA("TextLabel") and obj.Name == "GiftStatusLabel" then
+                local itemName = tostring(args[1] or "Unknown")
+                obj.Text = "Status: Captured [" .. itemName .. "]!"
+                obj.TextColor3 = Color3.fromRGB(46, 204, 113)
+            end
+        end
+        return
     end
     
     -- Sistem Trace & Logging
