@@ -103,7 +103,7 @@ local State = {
     FlingAura = false,
     CopyRadius = 200,
     AuraRadius = 40,
-    AttackCooldown = 0.2,
+    AttackCooldown = 0,
     SelectedPlayer = nil
 }
 
@@ -542,8 +542,47 @@ radiusInput.FocusLost:Connect(function()
     end
 end)
 
-createToggle("RewardToggle", "Claim Reward", "AutoClaimReward", 4, farmTab)
-createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 5, farmTab)
+local attackCooldownContainer = Instance.new("Frame")
+attackCooldownContainer.Size = UDim2.new(0.9, 0, 0, 35)
+attackCooldownContainer.BackgroundTransparency = 1
+attackCooldownContainer.LayoutOrder = 4
+attackCooldownContainer.Parent = farmTab
+
+local attackCooldownLabel = Instance.new("TextLabel")
+attackCooldownLabel.Size = UDim2.new(0.55, 0, 1, 0)
+attackCooldownLabel.BackgroundTransparency = 1
+attackCooldownLabel.Text = "Attack Cooldown:"
+attackCooldownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+attackCooldownLabel.Font = Enum.Font.GothamBold
+attackCooldownLabel.TextSize = 13
+attackCooldownLabel.TextXAlignment = Enum.TextXAlignment.Left
+attackCooldownLabel.Parent = attackCooldownContainer
+
+local attackCooldownInput = Instance.new("TextBox")
+attackCooldownInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+attackCooldownInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+attackCooldownInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+attackCooldownInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+attackCooldownInput.Font = Enum.Font.Gotham
+attackCooldownInput.TextSize = 13
+attackCooldownInput.Text = tostring(State.AttackCooldown)
+attackCooldownInput.PlaceholderText = "Cooldown (sec)"
+attackCooldownInput.Parent = attackCooldownContainer
+
+attackCooldownInput.FocusLost:Connect(function()
+    local num = tonumber(attackCooldownInput.Text)
+    if num then
+        if num < 0 then num = 0 end
+        if num > 10 then num = 10 end
+        State.AttackCooldown = num
+        attackCooldownInput.Text = tostring(num)
+    else
+        attackCooldownInput.Text = tostring(State.AttackCooldown)
+    end
+end)
+
+createToggle("RewardToggle", "Claim Reward", "AutoClaimReward", 5, farmTab)
+createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 6, farmTab)
 
 -- CHEATS TAB
 createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab)
@@ -678,7 +717,7 @@ local function touchFlingLoop()
         
         if hrp then
             local vel = hrp.Velocity
-            hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+            hrp.Velocity = vel * 100000 + Vector3.new(0, 100000, 0)
             RunService.RenderStepped:Wait()
             hrp.Velocity = vel
             RunService.Stepped:Wait()
