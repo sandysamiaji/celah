@@ -94,7 +94,6 @@ local State = {
     AutoEat = false,
     EatCooldown = 5,
     AutoCook = false,
-    CookRadius = 40,
     AntiFallDamage = false,
     Noclip = false,
     SpyTrace = false,
@@ -635,45 +634,6 @@ end)
 
 local autoCookBtn = createToggle("AutoCookToggle", "Auto Cook in Area", "AutoCook", 9, farmTab)
 
-local cookRadiusContainer = Instance.new("Frame")
-cookRadiusContainer.Size = UDim2.new(0.9, 0, 0, 35)
-cookRadiusContainer.BackgroundTransparency = 1
-cookRadiusContainer.LayoutOrder = 10
-cookRadiusContainer.Parent = farmTab
-
-local cookRadiusLabel = Instance.new("TextLabel")
-cookRadiusLabel.Size = UDim2.new(0.55, 0, 1, 0)
-cookRadiusLabel.BackgroundTransparency = 1
-cookRadiusLabel.Text = "Cook Radius:"
-cookRadiusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-cookRadiusLabel.Font = Enum.Font.GothamBold
-cookRadiusLabel.TextSize = 13
-cookRadiusLabel.TextXAlignment = Enum.TextXAlignment.Left
-cookRadiusLabel.Parent = cookRadiusContainer
-
-local cookRadiusInput = Instance.new("TextBox")
-cookRadiusInput.Size = UDim2.new(0.4, 0, 0.8, 0)
-cookRadiusInput.Position = UDim2.new(0.6, 0, 0.1, 0)
-cookRadiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-cookRadiusInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-cookRadiusInput.Font = Enum.Font.Gotham
-cookRadiusInput.TextSize = 13
-cookRadiusInput.Text = tostring(State.CookRadius)
-cookRadiusInput.PlaceholderText = "Radius"
-cookRadiusInput.Parent = cookRadiusContainer
-
-cookRadiusInput.FocusLost:Connect(function()
-    local num = tonumber(cookRadiusInput.Text)
-    if num then
-        if num < 5 then num = 5 end
-        if num > 1000 then num = 1000 end
-        State.CookRadius = num
-        cookRadiusInput.Text = tostring(num)
-    else
-        cookRadiusInput.Text = tostring(State.CookRadius)
-    end
-end)
-
 -- CHEATS TAB
 createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab)
 local noclipBtn = createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
@@ -1020,7 +980,7 @@ local function autoCookLoop()
                     if string.find(txt, "cook") or string.find(txt, "grill") or string.find(txt, "roast") then
                         local part = prompt.Parent
                         if part and part:IsA("BasePart") then
-                            if (part.Position - root.Position).Magnitude <= State.CookRadius then
+                            if (part.Position - root.Position).Magnitude <= State.AuraRadius then
                                 pcall(function()
                                     if fireproximityprompt then
                                         fireproximityprompt(prompt)
