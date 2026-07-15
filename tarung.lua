@@ -91,6 +91,7 @@ local State = {
     AuraKill = false,
     AutoClaimReward = false,
     AutoRespawn = false,
+    AutoEat = false,
     AntiFallDamage = false,
     Noclip = false,
     SpyTrace = false,
@@ -501,6 +502,7 @@ createInfoBox("Fling Player", "Select a target from the list, equip any Tool/Wea
 createInfoBox("Touch Fling", "Turns your character into a walking hazard. Anyone who physically touches your character will instantly be flung away. Excellent for passive defense.", 12)
 createInfoBox("Scan RemoteEvents", "An advanced debugging feature that logs all RemoteEvents in the server. Helpful for developers analyzing the game's network structure.", 13)
 createInfoBox("Builder System", "A comprehensive saving system for your structures. Use 'Copy Base' to save buildings within a radius to your local file, and 'Load Base' to rebuild them instantly anywhere.", 14)
+createInfoBox("Auto Eat & Drink", "Automatically consumes food and water from your inventory in the background so you never starve or dehydrate while AFK farming.", 15)
 
 -- FARM TAB
 createToggle("AuraHarvestToggle", "Aura Harvest", "AuraHarvest", 1, farmTab)
@@ -586,6 +588,7 @@ end)
 
 createToggle("RewardToggle", "Claim Reward", "AutoClaimReward", 5, farmTab)
 createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 6, farmTab)
+createToggle("AutoEatToggle", "Auto Eat & Drink", "AutoEat", 7, farmTab)
 
 -- CHEATS TAB
 createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab)
@@ -847,6 +850,69 @@ spawn(function()
             if not invisibleThread or coroutine.status(invisibleThread) == "dead" then
                 invisibleThread = coroutine.create(invisibleLoop)
                 coroutine.resume(invisibleThread)
+            end
+        end
+    end
+end)
+
+local autoEatThread = nil
+local function autoEatLoop()
+    while State.AutoEat do
+        wait(5) -- Cek setiap 5 detik agar tidak spam
+        
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health > 0 then
+            local useEvent
+            for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+                if desc:IsA("RemoteEvent") and (desc.Name == "UseConsumable" or desc.Name == "UseBagItem" or desc.Name == "UseItem" or desc.Name == "Consume" or desc.Name == "EatItem") then
+                    useEvent = desc
+                    break
+                end
+            end
+            
+            if useEvent then
+                -- Common food & drink names in Booga Booga based on spy logs
+                local consumeList = {
+                    "Cooked Meat", "Raw Meat", "Sun Fruit", "Blood Fruit", "Blue Fruit", 
+                    "Jelly", "Leaves", "Ice", "Coconut", "Cooked Fish", "Fish", "Water"
+                }
+                for _, item in ipairs(consumeList) do
+                    pcall(function()
+                        useEvent:FireServer(item)
+                    end)
+                end
+            else
+                -- Fallback untuk game lain: Cek Backpack
+                local bp = LocalPlayer:FindFirstChild("Backpack")
+                if bp then
+                    for _, tool in ipairs(bp:GetChildren()) do
+                        if tool:IsA("Tool") then
+                            local n = tool.Name:lower()
+                            if string.find(n, "meat") or string.find(n, "fruit") or string.find(n, "berry") or string.find(n, "apple") or string.find(n, "water") or string.find(n, "drink") or string.find(n, "food") then
+                                pcall(function()
+                                    hum:EquipTool(tool)
+                                    wait(0.2)
+                                    tool:Activate()
+                                    wait(0.2)
+                                    hum:UnequipTools()
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+spawn(function()
+    while true do
+        wait(1)
+        if State.AutoEat then
+            if not autoEatThread or coroutine.status(autoEatThread) == "dead" then
+                autoEatThread = coroutine.create(autoEatLoop)
+                coroutine.resume(autoEatThread)
             end
         end
     end
