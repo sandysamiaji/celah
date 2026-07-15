@@ -977,7 +977,7 @@ local function autoCookLoop()
             for _, prompt in ipairs(workspace:GetDescendants()) do
                 if prompt:IsA("ProximityPrompt") then
                     local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
-                    if string.find(txt, "cook") or string.find(txt, "grill") or string.find(txt, "roast") then
+                    if (string.find(txt, "cook") or string.find(txt, "grill") or string.find(txt, "roast")) and not string.find(txt, "take") and not string.find(txt, "pick") and not string.find(txt, "grab") then
                         local part = prompt.Parent
                         if part and part:IsA("BasePart") then
                             if (part.Position - root.Position).Magnitude <= State.AuraRadius then
