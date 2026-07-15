@@ -94,6 +94,7 @@ local State = {
     AutoEat = false,
     EatCooldown = 5,
     AutoCook = false,
+    PasteHeight = 20,
     AntiFallDamage = false,
     Noclip = false,
     SpyTrace = false,
@@ -989,11 +990,11 @@ local function autoCookLoop()
         if root then
             for _, prompt in ipairs(getWorkspaceCache()) do
                 if prompt:IsA("ProximityPrompt") then
-                    local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
-                    if string.find(txt, "cook") and not string.find(txt, "cooked") then
-                        local part = prompt.Parent
-                        if part and part:IsA("BasePart") then
-                            if (part.Position - root.Position).Magnitude <= State.AuraRadius then
+                    local part = prompt.Parent
+                    if part and part:IsA("BasePart") then
+                        if (part.Position - root.Position).Magnitude <= State.AuraRadius then
+                            local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
+                            if string.find(txt, "cook") and not string.find(txt, "cooked") then
                                 pcall(function()
                                     local oldDist = prompt.MaxActivationDistance
                                     local oldLOS = prompt.RequiresLineOfSight
@@ -1632,6 +1633,43 @@ local baseListLayout = Instance.new("UIListLayout")
 baseListLayout.Parent = baseList
 baseListLayout.SortOrder = Enum.SortOrder.Name
 
+local pasteHeightContainer = Instance.new("Frame")
+pasteHeightContainer.Size = UDim2.new(0.9, 0, 0, 35)
+pasteHeightContainer.BackgroundTransparency = 1
+pasteHeightContainer.LayoutOrder = 9
+pasteHeightContainer.Parent = builderTab
+
+local pasteHeightLabel = Instance.new("TextLabel")
+pasteHeightLabel.Size = UDim2.new(0.55, 0, 1, 0)
+pasteHeightLabel.BackgroundTransparency = 1
+pasteHeightLabel.Text = "Paste Height (Y):"
+pasteHeightLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+pasteHeightLabel.Font = Enum.Font.GothamBold
+pasteHeightLabel.TextSize = 13
+pasteHeightLabel.TextXAlignment = Enum.TextXAlignment.Left
+pasteHeightLabel.Parent = pasteHeightContainer
+
+local pasteHeightInput = Instance.new("TextBox")
+pasteHeightInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+pasteHeightInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+pasteHeightInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+pasteHeightInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+pasteHeightInput.Font = Enum.Font.Gotham
+pasteHeightInput.TextSize = 13
+pasteHeightInput.Text = tostring(State.PasteHeight)
+pasteHeightInput.PlaceholderText = "Height"
+pasteHeightInput.Parent = pasteHeightContainer
+
+pasteHeightInput.FocusLost:Connect(function()
+    local num = tonumber(pasteHeightInput.Text)
+    if num then
+        State.PasteHeight = num
+        pasteHeightInput.Text = tostring(num)
+    else
+        pasteHeightInput.Text = tostring(State.PasteHeight)
+    end
+end)
+
 local pasteBaseBtn = Instance.new("TextButton")
 pasteBaseBtn.Size = UDim2.new(0.9, 0, 0, 35)
 pasteBaseBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
@@ -1639,7 +1677,7 @@ pasteBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 pasteBaseBtn.Font = Enum.Font.GothamBold
 pasteBaseBtn.TextSize = 13
 pasteBaseBtn.Text = "Paste Selected Base"
-pasteBaseBtn.LayoutOrder = 9
+pasteBaseBtn.LayoutOrder = 10
 pasteBaseBtn.Parent = builderTab
 
 local deleteBaseBtn = Instance.new("TextButton")
@@ -1649,7 +1687,7 @@ deleteBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 deleteBaseBtn.Font = Enum.Font.GothamBold
 deleteBaseBtn.TextSize = 13
 deleteBaseBtn.Text = "Delete Selected Base"
-deleteBaseBtn.LayoutOrder = 10
+deleteBaseBtn.LayoutOrder = 11
 deleteBaseBtn.Parent = builderTab
 
 local clearMyBuildsBtn = Instance.new("TextButton")
@@ -1659,7 +1697,7 @@ clearMyBuildsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 clearMyBuildsBtn.Font = Enum.Font.GothamBold
 clearMyBuildsBtn.TextSize = 13
 clearMyBuildsBtn.Text = "Delete All My Buildings"
-clearMyBuildsBtn.LayoutOrder = 11
+clearMyBuildsBtn.LayoutOrder = 12
 clearMyBuildsBtn.Parent = builderTab
 
 local function updateBaseList()
@@ -1974,11 +2012,11 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
                 -- Sistem Baru: Mengikuti arah hadap (rotasi) karakter
                 local relativeBaseCFrame = CFrame.new(data.Offset) * data.Rotation
                 targetCFrame = currentCFrame * relativeBaseCFrame
-                -- Angkat 20 stud untuk skybase
-                targetCFrame = targetCFrame + Vector3.new(0, 20, 0)
+                -- Tambah offset Y sesuai setingan di UI
+                targetCFrame = targetCFrame + Vector3.new(0, State.PasteHeight, 0)
             else
                 -- Sistem Lama (Backward Compatibility): Tetap menghadap arah asli dunia
-                local targetPos = currentPos + Vector3.new(0, 20, 0) + data.Offset
+                local targetPos = currentPos + Vector3.new(0, State.PasteHeight, 0) + data.Offset
                 targetCFrame = CFrame.new(targetPos) * data.Rotation
             end
             
