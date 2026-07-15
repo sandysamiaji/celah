@@ -1225,6 +1225,16 @@ copyBaseBtn.Text = "Copy Base (Radius " .. State.CopyRadius .. ")"
 copyBaseBtn.LayoutOrder = 2
 copyBaseBtn.Parent = builderTab
 
+local deleteRadiusBtn = Instance.new("TextButton")
+deleteRadiusBtn.Size = UDim2.new(0.9, 0, 0, 35)
+deleteRadiusBtn.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
+deleteRadiusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+deleteRadiusBtn.Font = Enum.Font.GothamBold
+deleteRadiusBtn.TextSize = 13
+deleteRadiusBtn.Text = "Delete in Area (Radius " .. State.CopyRadius .. ")"
+deleteRadiusBtn.LayoutOrder = 12
+deleteRadiusBtn.Parent = builderTab
+
 builderRadiusInput.FocusLost:Connect(function()
     local num = tonumber(builderRadiusInput.Text)
     if num then
@@ -1233,6 +1243,7 @@ builderRadiusInput.FocusLost:Connect(function()
         State.CopyRadius = num
         builderRadiusInput.Text = tostring(num)
         copyBaseBtn.Text = "Copy Base (Radius " .. num .. ")"
+        deleteRadiusBtn.Text = "Delete in Area (Radius " .. num .. ")"
     else
         builderRadiusInput.Text = tostring(State.CopyRadius)
     end
@@ -1536,6 +1547,62 @@ clearMyBuildsBtn.MouseButton1Click:Connect(function()
         end
     end
     logAction("BUILDER", "Done! " .. count .. " of your buildings have been deleted from the map.")
+end)
+
+deleteRadiusBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local deleteEvent
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+        if desc.Name == "DeleteBuild" and (desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction")) then
+            deleteEvent = desc
+            break
+        end
+    end
+    
+    if not deleteEvent then
+        logAction("BUILDER", "Failed! 'DeleteBuild' remote not found!")
+        return
+    end
+
+    local originPos = root.Position
+    logAction("BUILDER", "Starting to delete your buildings in area (Radius " .. State.CopyRadius .. ")...")
+    local count = 0
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") then
+            local ownerVal = obj:FindFirstChild("Owner") or obj:FindFirstChild("Creator") or obj:FindFirstChild("Placer")
+            if ownerVal then
+                local isMine = false
+                if ownerVal:IsA("StringValue") and ownerVal.Value == LocalPlayer.Name then
+                    isMine = true
+                elseif ownerVal:IsA("ObjectValue") and ownerVal.Value == LocalPlayer then
+                    isMine = true
+                end
+                
+                if isMine then
+                    local primary = obj.PrimaryPart or obj:FindFirstChild("Hitbox") or obj:FindFirstChildOfClass("BasePart")
+                    if primary then
+                        local dist = (primary.Position - originPos).Magnitude
+                        if dist <= State.CopyRadius then
+                            coroutine.wrap(function()
+                                if deleteEvent:IsA("RemoteEvent") then
+                                    deleteEvent:FireServer(obj)
+                                else
+                                    deleteEvent:InvokeServer(obj)
+                                end
+                            end)()
+                            count = count + 1
+                            if count % 20 == 0 then wait(0.1) end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    logAction("BUILDER", "Done! " .. count .. " of your buildings in area deleted.")
 end)
 
 pasteBaseBtn.MouseButton1Click:Connect(function()
