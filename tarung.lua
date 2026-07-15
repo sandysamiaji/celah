@@ -841,14 +841,25 @@ spawn(function()
 end)
 local autoCookThread = nil
 local function autoCookLoop()
-    local params = OverlapParams.new()
-    params.MaxParts = 1000
     while State.AutoCook do
         wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
-            local parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, params)
+            local parts = {}
+            pcall(function()
+                local p = OverlapParams.new()
+                p.MaxParts = 1000
+                parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, p)
+            end)
+            if #parts == 0 then
+                for _, d in ipairs(workspace:GetDescendants()) do
+                    local bp = d:IsA("BasePart") and d or nil
+                    if bp and (bp.Position - root.Position).Magnitude <= State.AuraRadius then
+                        table.insert(parts, bp)
+                    end
+                end
+            end
             local processed = {}
             for _, part in ipairs(parts) do
                 local obj = part:FindFirstAncestorOfClass("Model") or part
@@ -902,14 +913,25 @@ local function auraHarvestLoop()
             break
         end
     end
-    local params = OverlapParams.new()
-    params.MaxParts = 1000
     while State.AuraHarvest do
         wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
-            local parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, params)
+            local parts = {}
+            pcall(function()
+                local p = OverlapParams.new()
+                p.MaxParts = 1000
+                parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, p)
+            end)
+            if #parts == 0 then
+                for _, d in ipairs(workspace:GetDescendants()) do
+                    local bp = d:IsA("BasePart") and d or nil
+                    if bp and (bp.Position - root.Position).Magnitude <= State.AuraRadius then
+                        table.insert(parts, bp)
+                    end
+                end
+            end
             local processed = {}
             for _, part in ipairs(parts) do
                 local obj = part:FindFirstAncestorOfClass("Model") or part
@@ -979,9 +1001,20 @@ local function auraKillLoop()
                 end
             end
             if not shouldAttack then
-                local params = OverlapParams.new()
-                params.MaxParts = 500
-                local parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, params)
+                local parts = {}
+                pcall(function()
+                    local p = OverlapParams.new()
+                    p.MaxParts = 500
+                    parts = workspace:GetPartBoundsInRadius(root.Position, State.AuraRadius, p)
+                end)
+                if #parts == 0 then
+                    for _, d in ipairs(workspace:GetDescendants()) do
+                        local bp = d:IsA("BasePart") and d or nil
+                        if bp and (bp.Position - root.Position).Magnitude <= State.AuraRadius then
+                            table.insert(parts, bp)
+                        end
+                    end
+                end
                 local processed = {}
                 for _, part in ipairs(parts) do
                     local obj = part:FindFirstAncestorOfClass("Model") or part
@@ -2109,10 +2142,21 @@ local function getTargetsInRadius()
             end
         end
     end
-    local params = OverlapParams.new()
-    params.FilterDescendantsInstances = {char}
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    local parts = workspace:GetPartBoundsInRadius(rootPart.Position, State.AuraRadius, params)
+    local parts = {}
+    pcall(function()
+        local p = OverlapParams.new()
+        p.FilterDescendantsInstances = {char}
+        p.FilterType = Enum.RaycastFilterType.Exclude
+        parts = workspace:GetPartBoundsInRadius(rootPart.Position, State.AuraRadius, p)
+    end)
+    if #parts == 0 then
+        for _, d in ipairs(workspace:GetDescendants()) do
+            local bp = d:IsA("BasePart") and d or nil
+            if bp and (bp.Position - rootPart.Position).Magnitude <= State.AuraRadius then
+                table.insert(parts, bp)
+            end
+        end
+    end
     for _, part in ipairs(parts) do
         local isTarget = false
         if State.AuraHarvest then
