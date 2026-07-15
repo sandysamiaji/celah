@@ -425,8 +425,8 @@ task.spawn(function()
                     hrp.Position.X, hrp.Position.Y, hrp.Position.Z, targetNuke.level, targetNuke.pos.X, targetNuke.pos.Y, targetNuke.pos.Z))
 
                 simulateTouch(targetNuke.part)
-                pcall(function() RS.NukeRemotes.MergeRequest:FireServer(targetNuke.model) end)
-                safeFire(mergeRE, targetNuke.model)
+                pcall(function() RS.NukeRemotes.MergeRequest:FireServer(targetNuke.part) end)
+                safeFire(mergeRE, targetNuke.part)
                 
                 -- Setelah merge sukses, server akan meng-hold bom yang levelnya naik 1
                 currentTargetLevel = currentTargetLevel + 1
@@ -439,9 +439,9 @@ task.spawn(function()
                 logLoopState("Kembaran Lvl " .. currentTargetLevel .. " tidak ditemukan! Melakukan Drop. (Isi: " .. isi .. ")")
                 
                 -- Tidak ada pasangan lagi untuk level ini, JATUHKAN!
-                local heldObj = State.HeldNukeModel
-                pcall(function() RS.NukeRemotes.Drop:FireServer(heldObj) end)
-                if dropRE then safeFire(dropRE, heldObj) end
+                local p = hrp.Position
+                pcall(function() RS.NukeRemotes.Drop:FireServer(p.X, p.Y, p.Z) end)
+                if dropRE then safeFire(dropRE, p.X, p.Y, p.Z) end
                 currentTargetLevel = nil
                 State.IsHolding = false
                 State.HeldNukeModel = nil
@@ -457,9 +457,9 @@ task.spawn(function()
             -- Tangan kosong (atau kita paksa kosongkan jika sinkronisasi salah)
             if State.IsHolding then
                 logLoopState("Sinkronisasi salah (IsHolding tapi currentLvl nil). Paksa Drop.")
-                local heldObj = State.HeldNukeModel
-                pcall(function() RS.NukeRemotes.Drop:FireServer(heldObj) end)
-                if dropRE then safeFire(dropRE, heldObj) end
+                local p = hrp.Position
+                pcall(function() RS.NukeRemotes.Drop:FireServer(p.X, p.Y, p.Z) end)
+                if dropRE then safeFire(dropRE, p.X, p.Y, p.Z) end
                 State.IsHolding = false
                 State.HeldNukeModel = nil
                 task.wait(0.2)
@@ -488,8 +488,8 @@ task.spawn(function()
                 
                 holdConfirmed = false
                 simulateTouch(firstNuke.part)
-                pcall(function() RS.NukeRemotes.PickUp:FireServer(firstNuke.model) end)
-                safeFire(pickUpRE, firstNuke.model)
+                pcall(function() RS.NukeRemotes.PickUp:FireServer(firstNuke.part) end)
+                safeFire(pickUpRE, firstNuke.part)
                 
                 local w = 0
                 while not holdConfirmed and w < 1.0 do
@@ -502,9 +502,9 @@ task.spawn(function()
                 else
                     logLoopState("Gagal PickUp (Timeout HoldStarted). Membatalkan PickUp.")
                     -- Gagal PickUp, reset
-                    local heldObj = State.HeldNukeModel
-                    pcall(function() RS.NukeRemotes.Drop:FireServer(heldObj) end)
-                    if dropRE then safeFire(dropRE, heldObj) end
+                    local p = hrp.Position
+                    pcall(function() RS.NukeRemotes.Drop:FireServer(p.X, p.Y, p.Z) end)
+                    if dropRE then safeFire(dropRE, p.X, p.Y, p.Z) end
                     State.IsHolding = false
                     State.HeldNukeModel = nil
                 end
@@ -596,13 +596,14 @@ local function triggerDefense(lock)
                 -- Cari model dengan level tertinggi
                 local bestModel, maxLvl = nil, 0
                 for _, v in pairs(workspace:GetDescendants()) do
-                    if v:IsA("Model") and tonumber(v.Name) then
-                        local lvl = tonumber(v.Name)
+                    if v:IsA("Model") and v.Name == "Nuke" then
+                        local lvl = getNukeLevel(v)
                         if lvl > maxLvl then maxLvl = lvl; bestModel = v end
                     end
                 end
                 if bestModel then
-                    safeFire(pickUpRE, bestModel)
+                    local part = bestModel.PrimaryPart or bestModel:FindFirstChildWhichIsA("BasePart")
+                    if part then safeFire(pickUpRE, part) end
                     logAction("Defense", true, "Mengambil bom level " .. maxLvl)
                 end
             end
