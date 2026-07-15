@@ -990,11 +990,11 @@ local function autoCookLoop()
         if root then
             for _, prompt in ipairs(getWorkspaceCache()) do
                 if prompt:IsA("ProximityPrompt") then
-                    local part = prompt.Parent
-                    if part and part:IsA("BasePart") then
+                    local part = prompt:FindFirstAncestorOfClass("BasePart")
+                    if part then
                         if (part.Position - root.Position).Magnitude <= State.AuraRadius then
                             local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
-                            if string.find(txt, "cook") and not string.find(txt, "cooked") then
+                            if (string.find(txt, "cook") or string.find(txt, "grill") or string.find(txt, "roast")) and not string.find(txt, "cooked") and not string.find(txt, "take") and not string.find(txt, "pick") and not string.find(txt, "grab") then
                                 pcall(function()
                                     local oldDist = prompt.MaxActivationDistance
                                     local oldLOS = prompt.RequiresLineOfSight
