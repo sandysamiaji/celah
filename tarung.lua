@@ -1037,6 +1037,14 @@ local scanRemoteBtn = Instance.new("TextButton")
 
 local auraHarvestThread = nil
 local function auraHarvestLoop()
+    local cachedPickupEvent
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+        if desc:IsA("RemoteEvent") and (desc.Name == "Pickup" or desc.Name == "TakeItem") then
+            cachedPickupEvent = desc
+            break
+        end
+    end
+
     while State.AuraHarvest do
         wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
         local char = LocalPlayer.Character
@@ -1069,12 +1077,11 @@ local function auraHarvestLoop()
                                 end)
                             end
                         else
-                            pcall(function()
-                                local pickupEvent = ReplicatedStorage:FindFirstChild("Pickup", true) or ReplicatedStorage:FindFirstChild("TakeItem", true)
-                                if pickupEvent and pickupEvent:IsA("RemoteEvent") then
-                                    pickupEvent:FireServer(obj)
-                                end
-                            end)
+                            if cachedPickupEvent then
+                                pcall(function()
+                                    cachedPickupEvent:FireServer(obj)
+                                end)
+                            end
                         end
                     end
                 end
@@ -1102,35 +1109,87 @@ local function auraKillLoop()
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
-            local weapon = char:FindFirstChildOfClass("Tool")
-            if not weapon then
-                local bp = LocalPlayer:FindFirstChild("Backpack")
-                if bp then
-                    weapon = bp:FindFirstChildOfClass("Tool")
-                    if weapon then
-                        pcall(function() char.Humanoid:EquipTool(weapon) end)
+            local targetType = nil
+            local shouldAttack = false
+            
+            -- 1. Cek Pemain / Musuh
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                    local eRoot = p.Character.HumanoidRootPart
+                    if (eRoot.Position - root.Position).Magnitude <= State.AuraRadius then
+                        targetType = "Player"
+                        shouldAttack = true
+                        break
                     end
                 end
             end
             
-            if weapon then
-                local attackEvent = weapon:FindFirstChild("AttackEvent") or weapon:FindFirstChild("ClientControl")
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-                        local eRoot = p.Character.HumanoidRootPart
-                        if (eRoot.Position - root.Position).Magnitude <= State.AuraRadius then
-                            pcall(function()
-                                if attackEvent then
-                                    if attackEvent:IsA("RemoteEvent") then
-                                        attackEvent:FireServer()
-                                    elseif attackEvent:IsA("RemoteFunction") then
-                                        attackEvent:InvokeServer()
-                                    end
-                                end
-                                weapon:Activate()
-                            end)
+            -- 2. Cek Pohon / Batu / Resource (kalau gak ada musuh)
+            if not shouldAttack then
+                for _, obj in ipairs(getWorkspaceCache()) do
+                    if obj:IsA("Model") and (obj:FindFirstChild("Durability") or obj:FindFirstChild("Health") or obj:FindFirstChild("Resource") or obj:FindFirstChild("Toughness")) then
+                        local primary = obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")
+                        if primary and (primary.Position - root.Position).Magnitude <= State.AuraRadius then
+                            local n = obj.Name:lower()
+                            if string.find(n, "rock") or string.find(n, "iron") or string.find(n, "gold") or string.find(n, "ore") or string.find(n, "stone") or string.find(n, "meteor") or string.find(n, "adaman") then
+                                targetType = "Rock"
+                            elseif string.find(n, "tree") or string.find(n, "log") or string.find(n, "wood") or string.find(n, "bush") or string.find(n, "plant") then
+                                targetType = "Tree"
+                            else
+                                targetType = "Other"
+                            end
+                            shouldAttack = true
+                            break
                         end
                     end
+                end
+            end
+            
+            if shouldAttack then
+                local bp = LocalPlayer:FindFirstChild("Backpack")
+                local allTools = {}
+                for _, t in ipairs(char:GetChildren()) do if t:IsA("Tool") then table.insert(allTools, t) end end
+                if bp then for _, t in ipairs(bp:GetChildren()) do if t:IsA("Tool") then table.insert(allTools, t) end end end
+                
+                local bestTool = nil
+                if targetType == "Rock" then
+                    for _, t in ipairs(allTools) do
+                        if string.find(t.Name:lower(), "pickaxe") or string.find(t.Name:lower(), "pick") or string.find(t.Name:lower(), "hammer") or string.find(t.Name:lower(), "magnet") then
+                            bestTool = t
+                            break
+                        end
+                    end
+                elseif targetType == "Tree" then
+                    for _, t in ipairs(allTools) do
+                        if string.find(t.Name:lower(), "axe") and not string.find(t.Name:lower(), "pickaxe") then
+                            bestTool = t
+                            break
+                        end
+                    end
+                end
+                
+                -- Default kalau gak nemu senjata spesifik
+                if not bestTool then
+                    bestTool = char:FindFirstChildOfClass("Tool") or allTools[1]
+                end
+                
+                if bestTool then
+                    if bestTool.Parent ~= char then
+                        pcall(function() char.Humanoid:EquipTool(bestTool) end)
+                        wait(0.1) -- Jeda kecil biar senjatanya terpegang dulu di server
+                    end
+                    
+                    local attackEvent = bestTool:FindFirstChild("AttackEvent") or bestTool:FindFirstChild("ClientControl")
+                    pcall(function()
+                        if attackEvent then
+                            if attackEvent:IsA("RemoteEvent") then
+                                attackEvent:FireServer()
+                            elseif attackEvent:IsA("RemoteFunction") then
+                                attackEvent:InvokeServer()
+                            end
+                        end
+                        bestTool:Activate()
+                    end)
                 end
             end
         end
