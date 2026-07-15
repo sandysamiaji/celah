@@ -92,6 +92,9 @@ local State = {
     AutoClaimReward = false,
     AutoRespawn = false,
     AutoEat = false,
+    EatCooldown = 5,
+    AutoCook = false,
+    CookRadius = 40,
     AntiFallDamage = false,
     Noclip = false,
     SpyTrace = false,
@@ -503,6 +506,7 @@ createInfoBox("Touch Fling", "Turns your character into a walking hazard. Anyone
 createInfoBox("Scan RemoteEvents", "An advanced debugging feature that logs all RemoteEvents in the server. Helpful for developers analyzing the game's network structure.", 13)
 createInfoBox("Builder System", "A comprehensive saving system for your structures. Use 'Copy Base' to save buildings within a radius to your local file, and 'Load Base' to rebuild them instantly anywhere.", 14)
 createInfoBox("Auto Eat & Drink", "Automatically consumes food and water from your inventory in the background so you never starve or dehydrate while AFK farming.", 15)
+createInfoBox("Auto Cook in Area", "Automatically interacts with any cooking stations (Campfires, Grills) within the specified radius to cook your raw food.", 16)
 
 -- FARM TAB
 createToggle("AuraHarvestToggle", "Aura Harvest", "AuraHarvest", 1, farmTab)
@@ -556,7 +560,7 @@ attackCooldownContainer.Parent = farmTab
 local attackCooldownLabel = Instance.new("TextLabel")
 attackCooldownLabel.Size = UDim2.new(0.55, 0, 1, 0)
 attackCooldownLabel.BackgroundTransparency = 1
-attackCooldownLabel.Text = "Attack Cooldown:"
+attackCooldownLabel.Text = "Aura Cooldown:"
 attackCooldownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 attackCooldownLabel.Font = Enum.Font.GothamBold
 attackCooldownLabel.TextSize = 13
@@ -589,6 +593,86 @@ end)
 createToggle("RewardToggle", "Claim Reward", "AutoClaimReward", 5, farmTab)
 createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 6, farmTab)
 createToggle("AutoEatToggle", "Auto Eat & Drink", "AutoEat", 7, farmTab)
+
+local eatCooldownContainer = Instance.new("Frame")
+eatCooldownContainer.Size = UDim2.new(0.9, 0, 0, 35)
+eatCooldownContainer.BackgroundTransparency = 1
+eatCooldownContainer.LayoutOrder = 8
+eatCooldownContainer.Parent = farmTab
+
+local eatCooldownLabel = Instance.new("TextLabel")
+eatCooldownLabel.Size = UDim2.new(0.55, 0, 1, 0)
+eatCooldownLabel.BackgroundTransparency = 1
+eatCooldownLabel.Text = "Eat Cooldown:"
+eatCooldownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+eatCooldownLabel.Font = Enum.Font.GothamBold
+eatCooldownLabel.TextSize = 13
+eatCooldownLabel.TextXAlignment = Enum.TextXAlignment.Left
+eatCooldownLabel.Parent = eatCooldownContainer
+
+local eatCooldownInput = Instance.new("TextBox")
+eatCooldownInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+eatCooldownInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+eatCooldownInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+eatCooldownInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+eatCooldownInput.Font = Enum.Font.Gotham
+eatCooldownInput.TextSize = 13
+eatCooldownInput.Text = tostring(State.EatCooldown)
+eatCooldownInput.PlaceholderText = "Seconds"
+eatCooldownInput.Parent = eatCooldownContainer
+
+eatCooldownInput.FocusLost:Connect(function()
+    local num = tonumber(eatCooldownInput.Text)
+    if num then
+        if num < 1 then num = 1 end
+        if num > 300 then num = 300 end
+        State.EatCooldown = num
+        eatCooldownInput.Text = tostring(num)
+    else
+        eatCooldownInput.Text = tostring(State.EatCooldown)
+    end
+end)
+
+local autoCookBtn = createToggle("AutoCookToggle", "Auto Cook in Area", "AutoCook", 9, farmTab)
+
+local cookRadiusContainer = Instance.new("Frame")
+cookRadiusContainer.Size = UDim2.new(0.9, 0, 0, 35)
+cookRadiusContainer.BackgroundTransparency = 1
+cookRadiusContainer.LayoutOrder = 10
+cookRadiusContainer.Parent = farmTab
+
+local cookRadiusLabel = Instance.new("TextLabel")
+cookRadiusLabel.Size = UDim2.new(0.55, 0, 1, 0)
+cookRadiusLabel.BackgroundTransparency = 1
+cookRadiusLabel.Text = "Cook Radius:"
+cookRadiusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+cookRadiusLabel.Font = Enum.Font.GothamBold
+cookRadiusLabel.TextSize = 13
+cookRadiusLabel.TextXAlignment = Enum.TextXAlignment.Left
+cookRadiusLabel.Parent = cookRadiusContainer
+
+local cookRadiusInput = Instance.new("TextBox")
+cookRadiusInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+cookRadiusInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+cookRadiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+cookRadiusInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+cookRadiusInput.Font = Enum.Font.Gotham
+cookRadiusInput.TextSize = 13
+cookRadiusInput.Text = tostring(State.CookRadius)
+cookRadiusInput.PlaceholderText = "Radius"
+cookRadiusInput.Parent = cookRadiusContainer
+
+cookRadiusInput.FocusLost:Connect(function()
+    local num = tonumber(cookRadiusInput.Text)
+    if num then
+        if num < 5 then num = 5 end
+        if num > 1000 then num = 1000 end
+        State.CookRadius = num
+        cookRadiusInput.Text = tostring(num)
+    else
+        cookRadiusInput.Text = tostring(State.CookRadius)
+    end
+end)
 
 -- CHEATS TAB
 createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab)
@@ -858,11 +942,12 @@ end)
 local autoEatThread = nil
 local function autoEatLoop()
     while State.AutoEat do
-        wait(5) -- Cek setiap 5 detik agar tidak spam
+        wait(State.EatCooldown) -- Cek setiap X detik
         
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health > 0 then
+            local prevTool = char:FindFirstChildOfClass("Tool")
             local useEvent
             for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
                 if desc:IsA("RemoteEvent") and (desc.Name == "UseConsumable" or desc.Name == "UseBagItem" or desc.Name == "UseItem" or desc.Name == "Consume" or desc.Name == "EatItem") then
@@ -902,6 +987,10 @@ local function autoEatLoop()
                     end
                 end
             end
+            
+            if prevTool and prevTool.Parent ~= char then
+                pcall(function() hum:EquipTool(prevTool) end)
+            end
         end
     end
 end
@@ -918,7 +1007,158 @@ spawn(function()
     end
 end)
 
+local autoCookThread = nil
+local function autoCookLoop()
+    while State.AutoCook do
+        wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            for _, prompt in ipairs(workspace:GetDescendants()) do
+                if prompt:IsA("ProximityPrompt") then
+                    local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
+                    if string.find(txt, "cook") or string.find(txt, "grill") or string.find(txt, "roast") then
+                        local part = prompt.Parent
+                        if part and part:IsA("BasePart") then
+                            if (part.Position - root.Position).Magnitude <= State.CookRadius then
+                                pcall(function()
+                                    if fireproximityprompt then
+                                        fireproximityprompt(prompt)
+                                    else
+                                        prompt:InputHoldBegin()
+                                        task.wait(prompt.HoldDuration + 0.1)
+                                        prompt:InputHoldEnd()
+                                    end
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+spawn(function()
+    while true do
+        wait(1)
+        if State.AutoCook then
+            if not autoCookThread or coroutine.status(autoCookThread) == "dead" then
+                autoCookThread = coroutine.create(autoCookLoop)
+                coroutine.resume(autoCookThread)
+            end
+        end
+    end
+end)
+
 local scanRemoteBtn = Instance.new("TextButton")
+
+local auraHarvestThread = nil
+local function auraHarvestLoop()
+    while State.AuraHarvest do
+        wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("Model") or obj:IsA("BasePart") then
+                    local primary = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")) or obj
+                    if primary and (primary.Position - root.Position).Magnitude <= State.AuraRadius then
+                        local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
+                        if prompt then
+                            local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
+                            if string.find(txt, "take") or string.find(txt, "pick") or string.find(txt, "harvest") or string.find(txt, "gather") or string.find(txt, "grab") then
+                                pcall(function()
+                                    if fireproximityprompt then
+                                        fireproximityprompt(prompt)
+                                    else
+                                        prompt:InputHoldBegin()
+                                        task.wait(prompt.HoldDuration + 0.1)
+                                        prompt:InputHoldEnd()
+                                    end
+                                end)
+                            end
+                        else
+                            pcall(function()
+                                local pickupEvent = ReplicatedStorage:FindFirstChild("Pickup", true) or ReplicatedStorage:FindFirstChild("TakeItem", true)
+                                if pickupEvent and pickupEvent:IsA("RemoteEvent") then
+                                    pickupEvent:FireServer(obj)
+                                end
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+spawn(function()
+    while true do
+        wait(1)
+        if State.AuraHarvest then
+            if not auraHarvestThread or coroutine.status(auraHarvestThread) == "dead" then
+                auraHarvestThread = coroutine.create(auraHarvestLoop)
+                coroutine.resume(auraHarvestThread)
+            end
+        end
+    end
+end)
+
+local auraKillThread = nil
+local function auraKillLoop()
+    while State.AuraKill do
+        wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            local weapon = char:FindFirstChildOfClass("Tool")
+            if not weapon then
+                local bp = LocalPlayer:FindFirstChild("Backpack")
+                if bp then
+                    weapon = bp:FindFirstChildOfClass("Tool")
+                    if weapon then
+                        pcall(function() char.Humanoid:EquipTool(weapon) end)
+                    end
+                end
+            end
+            
+            if weapon then
+                local attackEvent = weapon:FindFirstChild("AttackEvent") or weapon:FindFirstChild("ClientControl")
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                        local eRoot = p.Character.HumanoidRootPart
+                        if (eRoot.Position - root.Position).Magnitude <= State.AuraRadius then
+                            pcall(function()
+                                if attackEvent then
+                                    if attackEvent:IsA("RemoteEvent") then
+                                        attackEvent:FireServer()
+                                    elseif attackEvent:IsA("RemoteFunction") then
+                                        attackEvent:InvokeServer()
+                                    end
+                                end
+                                weapon:Activate()
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+spawn(function()
+    while true do
+        wait(1)
+        if State.AuraKill then
+            if not auraKillThread or coroutine.status(auraKillThread) == "dead" then
+                auraKillThread = coroutine.create(auraKillLoop)
+                coroutine.resume(auraKillThread)
+            end
+        end
+    end
+end)
+
 scanRemoteBtn.Size = UDim2.new(0.9, 0, 0, 30)
 scanRemoteBtn.Position = UDim2.new(0.05, 0, 0, 0) -- Akan dikendalikan oleh UIListLayout
 scanRemoteBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
@@ -1760,7 +2000,7 @@ pasteBaseBtn.MouseButton1Click:Connect(function()
             end
             
             count = count + 1
-            wait(0.3) -- Jeda kecepatan naruh barang agar tidak terdeteksi rate limit server
+            wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1) -- Jeda kecepatan naruh barang ngikutin setingan AttackCooldown
         end
         
         logAction("BUILDER", "Successfully built Skybase with " .. count .. " buildings (Limit By-passed)!")
