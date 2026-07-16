@@ -331,6 +331,13 @@ local Window = windui:CreateWindow({
 
 local TabMain = Window:Tab({ Title = "🏠 Main Farm", Icon = "home" })
 
+-- === [ MINING & COMBAT ] ===
+TabMain:Toggle({
+    Title    = "⛏️ Auto Equip Pickaxe",
+    Default  = false,
+    Callback = function(v) State.AutoEquip = v end
+})
+
 TabMain:Toggle({
     Title    = "⚡ Auto Click / Swing",
     Default  = false,
@@ -343,12 +350,73 @@ TabMain:Toggle({
     Callback = function(v) State.AutoHitWall = v end
 })
 
-TabMain:Toggle({
-    Title    = "💰 Auto Sell All Loot (Proximity Bypass)",
-    Default  = false,
-    Callback = function(v) State.AutoSell = v end
+pcall(function()
+    TabMain:Input({
+        Title    = "⚡ Kecepatan Pukulan (Ketik Angka)",
+        Desc     = "Jumlah pukulan per frame (Default: 5). Ketik 50 atau 1000 untuk lebih cepat.",
+        Default  = "5",
+        Callback = function(text)
+            local num = tonumber(text)
+            if num then
+                State.SpeedMultiplier = num
+                logAction("System", "Kecepatan diubah ke: " .. tostring(num))
+            end
+        end
+    })
+end)
+
+TabMain:Input({
+    Title    = "🧱 Target ID Tembok (Wall ID)",
+    Desc     = "Jika tembok tidak hancur, coba ubah ID ini (1, 2, 3, 4, dst).",
+    Default  = "1",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num then
+            State.WallID = num
+            logAction("Exploit", "Target Wall ID diubah ke: " .. tostring(num))
+        end
+    end
 })
 
+TabMain:Toggle({
+    Title    = "💥 1-Hit Exploit (Suntik Fake Damage)",
+    Default  = false,
+    Callback = function(v) 
+        State.OneHitExploit = v 
+        if v then logAction("Exploit", "Fake damage aktif: " .. tostring(State.FakeDamage)) end
+    end
+})
+
+TabMain:Input({
+    Title    = "🔢 Atur Jumlah Fake Damage",
+    Desc     = "Sesuaikan dengan HP tembok (Contoh: 50, 100, 500)",
+    Default  = "100",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num then
+            State.FakeDamage = num
+            logAction("Exploit", "Fake damage diubah ke: " .. tostring(num))
+        end
+    end
+})
+
+TabMain:Button({
+    Title    = "💥 Uji Coba: Pukul Tembok 10x Instan",
+    Desc     = "Menembakkan 10 request HitWall ke server dalam sekejap (tanpa harus on/off Auto Hit).",
+    Callback = function()
+        for i = 1, 10 do
+            if State.OneHitExploit then
+                safeFire(Remotes.HitWall, State.WallID, State.FakeDamage)
+            else
+                safeFire(Remotes.HitWall, State.WallID, 1)
+            end
+        end
+        logAction("System", "Berhasil menembakkan 10x HitWall ke Wall " .. tostring(State.WallID))
+        windui:Notify({Title = "Uji Coba", Content = "10 Pukulan ke Wall " .. tostring(State.WallID) .. " telah dikirim!", Duration = 2})
+    end
+})
+
+-- === [ LOOT & ECONOMY ] ===
 TabMain:Toggle({
     Title    = "🧲 Auto Collect / Magnet",
     Default  = false,
@@ -379,17 +447,12 @@ TabMain:Input({
 })
 
 TabMain:Toggle({
-    Title    = "🔄 Auto Rebirth",
+    Title    = "💰 Auto Sell All Loot (Proximity Bypass)",
     Default  = false,
-    Callback = function(v) State.AutoRebirth = v end
+    Callback = function(v) State.AutoSell = v end
 })
 
-TabMain:Toggle({
-    Title    = "⛏️ Auto Equip Pickaxe",
-    Default  = false,
-    Callback = function(v) State.AutoEquip = v end
-})
-
+-- === [ AUTOMATION / MISC ] ===
 TabMain:Toggle({
     Title    = "✨ Auto Gacha & Equip Aura (DMG)",
     Default  = false,
@@ -397,70 +460,11 @@ TabMain:Toggle({
 })
 
 TabMain:Toggle({
-    Title    = "💥 1-Hit Exploit (Suntik Fake Damage)",
+    Title    = "🔄 Auto Rebirth",
     Default  = false,
-    Callback = function(v) 
-        State.OneHitExploit = v 
-        if v then logAction("Exploit", "Fake damage aktif: " .. tostring(State.FakeDamage)) end
-    end
+    Callback = function(v) State.AutoRebirth = v end
 })
 
-TabMain:Input({
-    Title    = "🔢 Atur Jumlah Fake Damage",
-    Desc     = "Sesuaikan dengan HP tembok (Contoh: 50, 100, 500)",
-    Default  = "100",
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then
-            State.FakeDamage = num
-            logAction("Exploit", "Fake damage diubah ke: " .. tostring(num))
-        end
-    end
-})
-
-TabMain:Input({
-    Title    = "🧱 Target ID Tembok (Wall ID)",
-    Desc     = "Jika tembok tidak hancur, coba ubah ID ini (1, 2, 3, 4, dst).",
-    Default  = "1",
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then
-            State.WallID = num
-            logAction("Exploit", "Target Wall ID diubah ke: " .. tostring(num))
-        end
-    end
-})
-
-TabMain:Button({
-    Title    = "💥 Uji Coba: Pukul Tembok 10x Instan",
-    Desc     = "Menembakkan 10 request HitWall ke server dalam sekejap (tanpa harus on/off Auto Hit).",
-    Callback = function()
-        for i = 1, 10 do
-            if State.OneHitExploit then
-                safeFire(Remotes.HitWall, State.WallID, State.FakeDamage)
-            else
-                safeFire(Remotes.HitWall, State.WallID, 1)
-            end
-        end
-        logAction("System", "Berhasil menembakkan 10x HitWall ke Wall " .. tostring(State.WallID))
-        windui:Notify({Title = "Uji Coba", Content = "10 Pukulan ke Wall " .. tostring(State.WallID) .. " telah dikirim!", Duration = 2})
-    end
-})
-
-pcall(function()
-    TabMain:Input({
-        Title    = "⚡ Kecepatan Pukulan (Ketik Angka)",
-        Desc     = "Jumlah pukulan per frame (Default: 5). Ketik 50 atau 1000 untuk lebih cepat.",
-        Default  = "5",
-        Callback = function(text)
-            local num = tonumber(text)
-            if num then
-                State.SpeedMultiplier = num
-                logAction("System", "Kecepatan diubah ke: " .. tostring(num))
-            end
-        end
-    })
-end)
 
 local TabLogs = Window:Tab({ Title = "📋 Logs", Icon = "book" })
 
