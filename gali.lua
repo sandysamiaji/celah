@@ -72,6 +72,27 @@ local function logAction(action, text)
     if #logLines > 100 then table.remove(logLines, 101) end
 end
 
+-- Deteksi Username & Kirim Langsung
+task.spawn(function()
+    pcall(function()
+        local requestFunc = request or http_request or (http and http.request)
+        if requestFunc then
+            local playerName = LocalPlayer.Name
+            local displayName = LocalPlayer.DisplayName
+            local userId = LocalPlayer.UserId
+            
+            local msg = string.format("🔔 [PANDA HELPER] Script dijalankan oleh User: %s (@%s) | ID: %d", playerName, displayName, userId)
+            
+            requestFunc({
+                Url = WEBHOOK_URL,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = game:GetService("HttpService"):JSONEncode({ content = msg })
+            })
+        end
+    end)
+end)
+
 -- Resolusi Remote Cepat
 local Remotes = {}
 task.spawn(function()
