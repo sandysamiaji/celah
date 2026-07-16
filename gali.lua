@@ -16,7 +16,7 @@ local State = {
     AutoSell = false,
     AutoRebirth = false,
     AutoEquip = false,
-    EnableLogs = true,
+    EnableLogs = false,
     AutoCollect = false,
     AutoAura = false,
     OneHitExploit = false,
@@ -491,7 +491,7 @@ local TabLogs = Window:Tab({ Title = "📋 Logs", Icon = "book" })
 
 TabLogs:Toggle({
     Title    = "📝 Aktifkan Pencatatan Log",
-    Default  = true,
+    Default  = false,
     Callback = function(v) State.EnableLogs = v end
 })
 
