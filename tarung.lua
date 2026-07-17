@@ -1200,6 +1200,7 @@ local flingAuraThread = nil
 
 local function flingAuraLoop()
     local lp = Players.LocalPlayer
+    local movel = 0.1
     
     while State.FlingAura do
         local c = lp.Character
@@ -1220,17 +1221,26 @@ local function flingAuraLoop()
             end
             
             if targetHrp then
-                local vel = hrp.Velocity
-                
-                -- Pindah tepat sebelum fisika dihitung (Stepped)
-                RunService.Stepped:Wait()
+                -- Teleport ke target + pakai vibrasi touchFling yang terbukti
                 hrp.CFrame = targetHrp.CFrame
-                hrp.Velocity = Vector3.new(500000, 500000, 500000)
                 
-                -- Kembalikan ke asal tepat setelah fisika dihitung dan sebelum layar digambar (Heartbeat)
+                local vel = hrp.Velocity
+                hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
+                RunService.RenderStepped:Wait()
+                
+                -- Reset velocity + kunci posisi agar KITA tidak terbang
+                hrp.CFrame = targetHrp.CFrame
+                hrp.Velocity = vel
+                RunService.Stepped:Wait()
+                
+                hrp.CFrame = targetHrp.CFrame
+                hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                movel = -movel
+                
+                -- Kembalikan ke posisi asal
                 RunService.Heartbeat:Wait()
                 hrp.CFrame = originCFrame
-                hrp.Velocity = vel
+                hrp.Velocity = Vector3.new(0, 0, 0)
             else
                 RunService.Heartbeat:Wait()
             end
@@ -1507,8 +1517,7 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
     if not success then return end
     
     local hrp = char:FindFirstChild("HumanoidRootPart")
-    local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
-    if not hrp or not targetHrp then
+    if not hrp then
         logAction("ASSASSIN", "Gagal: HumanoidRootPart tidak ditemukan!")
         return
     end
@@ -1523,6 +1532,7 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
     
     pcall(function()
         local startTime = tick()
+        local movel = 0.1
         
         while tick() - startTime < duration do
             -- Re-check target masih ada
@@ -1535,23 +1545,31 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
                 break
             end
             
-            local vel = hrp.Velocity
-            
-            -- STEPPED: Teleport ke target + set velocity gila tepat sebelum fisika dihitung
-            RunService.Stepped:Wait()
+            -- Kunci posisi kita tepat di target (agar collision terjadi)
             hrp.CFrame = tHrp.CFrame
-            hrp.Velocity = Vector3.new(500000, 500000, 500000)
             
-            -- HEARTBEAT: Kembalikan ke posisi asal tepat sebelum layar di-render
-            RunService.Heartbeat:Wait()
-            hrp.CFrame = originalCFrame
+            -- Pakai pola vibrasi yang TERBUKTI dari touchFlingLoop
+            -- Ini yang membuat TARGET terbang, bukan kita
+            local vel = hrp.Velocity
+            hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
+            RunService.RenderStepped:Wait()
+            
+            -- Reset velocity + kunci ulang posisi agar KITA tidak ikut terbang
+            hrp.CFrame = tHrp.CFrame
             hrp.Velocity = vel
+            RunService.Stepped:Wait()
+            
+            -- Kunci ulang posisi + micro-oscillation untuk stabilisasi
+            hrp.CFrame = tHrp.CFrame
+            hrp.Velocity = vel + Vector3.new(0, movel, 0)
+            movel = -movel
         end
     end)
     
-    -- Pastikan kembali ke posisi asal
+    -- Teleport balik ke posisi asal + reset velocity
     pcall(function()
         hrp.CFrame = originalCFrame
+        hrp.Velocity = Vector3.new(0, 0, 0)
     end)
     
     hitAndRunBtn.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
