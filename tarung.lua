@@ -116,6 +116,7 @@ local State = {
     AuraRadius = 40,
     AttackCooldown = 0.1,
     MultiHitCount = 5,
+    AntiFling = false,
     FEInvisible = false,
     UndergroundMode = false,
     SelectedPlayer = nil
@@ -705,6 +706,7 @@ local autoCookBtn = createToggle("AutoCookToggle", "Auto Cook in Area", "AutoCoo
 -- CHEATS TAB
 createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab)
 local noclipBtn = createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
+createToggle("AntiFlingToggle", "Anti Fling", "AntiFling", 2.5, cheatsTab)
 createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
 createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
 local flyBtn = createToggle("FlyToggle", "Fly", "Fly", 5, cheatsTab)
