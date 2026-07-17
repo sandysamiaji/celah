@@ -2648,7 +2648,8 @@ local function getTargetsInRadius()
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                 local hum = player.Character:FindFirstChildOfClass("Humanoid")
                 if hum and hum.Health > 0 then
-                    if (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= State.AuraRadius then
+                    -- Berikan toleransi jarak sedikit lebih besar untuk hitungan membunuh (misal + 10 studs) agar tidak miss saat musuh terpental oleh Fling
+                    if (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= (State.AuraRadius + 10) then
                         -- Ambil beberapa part penting dari pemain (R6 dan R15)
                         local partsToHit = {"Torso", "UpperTorso", "Head", "Right Arm"}
                         for _, pName in ipairs(partsToHit) do
@@ -2731,8 +2732,15 @@ track(RunService.RenderStepped:Connect(function()
         
         -- Trigger Attack Remote bawaan Tool jika ada (Cukup 1x per siklus, JANGAN di-spam)
         if hitCount > 0 and weapon then
-            local atkEvt = weapon:FindFirstChild("AttackEvent")
-            if atkEvt and atkEvt:IsA("RemoteEvent") then atkEvt:FireServer() end
+            local atkEvt = weapon:FindFirstChild("AttackEvent") or weapon:FindFirstChild("ClientControl")
+            if atkEvt then
+                if atkEvt:IsA("RemoteEvent") then 
+                    atkEvt:FireServer() 
+                elseif atkEvt:IsA("RemoteFunction") then
+                    atkEvt:InvokeServer()
+                end
+            end
+            pcall(function() weapon:Activate() end)
         end
         
         -- Eksekusi SEMUA ProximityPrompt & ClickDetector di radius (HANYA untuk Harvest)
