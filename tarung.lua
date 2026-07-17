@@ -164,6 +164,43 @@ coroutine.wrap(function()
     end
 end)()
 
+local analyticsCounter = 0
+local function logFlingAnalytics(action, targetName, myHrp, targetHrp)
+    if not State.SpyTrace and not State.WebhookLogs then return end
+    
+    analyticsCounter = analyticsCounter + 1
+    if analyticsCounter % 15 ~= 0 then return end
+    
+    local myVel = myHrp and myHrp.Velocity or Vector3.new()
+    local tVel = targetHrp and targetHrp.Velocity or Vector3.new()
+    local myPos = myHrp and myHrp.Position or Vector3.new()
+    local tPos = targetHrp and targetHrp.Position or Vector3.new()
+    local dist = (myPos - tPos).Magnitude
+    
+    local targetHum = targetHrp and targetHrp.Parent and targetHrp.Parent:FindFirstChildOfClass("Humanoid")
+    local isSit = targetHum and targetHum.Sit
+    
+    local ping = "Unknown"
+    pcall(function() ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString() end)
+    
+    local logMsg = string.format(
+        "--- [ FLING ANALYTICS: %s ] ---\n" ..
+        "Target: %s | Dist: %.2f | Sit: %s | Ping: %s\n" ..
+        "My_HRP : Pos(%.1f, %.1f, %.1f) | Vel(%.1f, %.1f, %.1f)\n" ..
+        "Tar_HRP: Pos(%.1f, %.1f, %.1f) | Vel(%.1f, %.1f, %.1f)",
+        action, targetName, dist, tostring(isSit), tostring(ping),
+        myPos.X, myPos.Y, myPos.Z, myVel.X, myVel.Y, myVel.Z,
+        tPos.X, tPos.Y, tPos.Z, tVel.X, tVel.Y, tVel.Z
+    )
+    
+    if State.SpyTrace then
+        print(logMsg)
+    end
+    if State.WebhookLogs then
+        logAction("SPY_ANALYTICS", logMsg)
+    end
+end
+
 --------------------------------------------------------------------------------
 -- GUI MULTI-FITUR
 --------------------------------------------------------------------------------
@@ -1200,15 +1237,20 @@ local flingAuraThread = nil
 
 local function flingAuraLoop()
     local lp = Players.LocalPlayer
+    local movel = 0.1
+    local homeCFrame = nil
     
     while State.FlingAura do
         local c = lp.Character
         local hrp = c and c:FindFirstChild("HumanoidRootPart")
         
         if hrp then
-            -- Catat posisi kita saat ini (sebelum teleport)
-            local homeCFrame = hrp.CFrame
             local targetHrp = nil
+            
+            -- Kalau belum ada home atau tidak ada target, update home position
+            if not homeCFrame then
+                homeCFrame = hrp.CFrame
+            end
             
             -- Cari target dalam radius
             for _, p in ipairs(Players:GetPlayers()) do
@@ -1222,34 +1264,46 @@ local function flingAuraLoop()
             end
             
             if targetHrp then
-                -- STEPPED (sebelum physics): Teleport ke target + set velocity
-                RunService.Stepped:Wait()
-                hrp.Anchored = false
-                hrp.CFrame = targetHrp.CFrame
-                hrp.Velocity = Vector3.new(0, 9e5, 0)
+                -- === POLA VELOCITY IDENTIK DENGAN touchFlingLoop ===
+                -- Tapi CFrame bolak-balik antara target (fisika) dan home (visual)
                 
-                -- HEARTBEAT (setelah physics): Collision sudah terjadi → kembali + anchor
+                -- HEARTBEAT (setelah physics): Pergi ke target + set velocity extreme
                 RunService.Heartbeat:Wait()
-                hrp.CFrame = homeCFrame
-                hrp.Velocity = Vector3.new(0, 0, 0)
-                hrp.Anchored = true
+                hrp.CFrame = targetHrp.CFrame
+                local vel = hrp.Velocity
+                hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
                 
-                -- RENDERSTEPPED (sebelum render): Kamera lihat kita di rumah → unanchor
+                -- RENDERSTEPPED (sebelum render): Visual di rumah + reset velocity
                 RunService.RenderStepped:Wait()
-                hrp.Anchored = false
+                hrp.CFrame = homeCFrame
+                hrp.Velocity = vel
+                
+                -- STEPPED (sebelum physics): Kembali ke target + micro-oscillation
+                RunService.Stepped:Wait()
+                if targetHrp and targetHrp.Parent then
+                    hrp.CFrame = targetHrp.CFrame
+                end
+                hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                movel = -movel
+                
+                -- Log analytics
+                logFlingAnalytics("FLING_AURA", targetHrp.Parent.Name, hrp, targetHrp)
             else
+                -- Tidak ada target: update home position (biar bisa jalan)
+                homeCFrame = hrp.CFrame
                 RunService.Heartbeat:Wait()
             end
         else
+            homeCFrame = nil
             RunService.Heartbeat:Wait()
         end
     end
     
-    -- Cleanup: pastikan unanchor saat toggle dimatikan
+    -- Cleanup
     pcall(function()
         local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
         if hrp then
-            hrp.Anchored = false
+            if homeCFrame then hrp.CFrame = homeCFrame end
             hrp.Velocity = Vector3.new(0, 0, 0)
         end
     end)
@@ -1531,6 +1585,8 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
     hitAndRunBtn.Text = "Assassinating..."
     
     local duration = assassinDelay > 0 and assassinDelay or 2
+    local homeCFrame = hrp.CFrame
+    local movel = 0.1
     
     logAction("ASSASSIN", "Memulai eksekusi " .. targetName .. " selama " .. duration .. " detik...")
     
@@ -1538,7 +1594,6 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
         local startTime = tick()
         
         while tick() - startTime < duration do
-            -- Re-check target masih ada
             local tPlayer = Players:FindFirstChild(targetName)
             local tChar = tPlayer and tPlayer.Character
             local tHrp = tChar and tChar:FindFirstChild("HumanoidRootPart")
@@ -1548,30 +1603,35 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
                 break
             end
             
-            -- Catat posisi saat ini
-            local homeCFrame = hrp.CFrame
+            -- === POLA IDENTIK touchFlingLoop + ghost teleport ===
             
-            -- STEPPED: Teleport ke target + set velocity (sebelum physics)
-            RunService.Stepped:Wait()
-            hrp.Anchored = false
-            hrp.CFrame = tHrp.CFrame
-            hrp.Velocity = Vector3.new(0, 9e5, 0)
-            
-            -- HEARTBEAT: Physics selesai → anchor + kembali ke asal
+            -- HEARTBEAT: Pergi ke target + velocity extreme
             RunService.Heartbeat:Wait()
-            hrp.CFrame = homeCFrame
-            hrp.Velocity = Vector3.new(0, 0, 0)
-            hrp.Anchored = true
+            hrp.CFrame = tHrp.CFrame
+            local vel = hrp.Velocity
+            hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
             
-            -- RENDERSTEPPED: Kamera render di posisi asal → unanchor
+            -- RENDERSTEPPED: Visual di rumah + reset velocity
             RunService.RenderStepped:Wait()
-            hrp.Anchored = false
+            hrp.CFrame = homeCFrame
+            hrp.Velocity = vel
+            
+            -- STEPPED: Kembali ke target + micro-oscillation
+            RunService.Stepped:Wait()
+            if tHrp and tHrp.Parent then
+                hrp.CFrame = tHrp.CFrame
+            end
+            hrp.Velocity = vel + Vector3.new(0, movel, 0)
+            movel = -movel
+            
+            -- Log analytics
+            logFlingAnalytics("AUTO_ASSASSIN", targetName, hrp, tHrp)
         end
     end)
     
-    -- Cleanup
+    -- Cleanup: kembali ke posisi asal
     pcall(function()
-        hrp.Anchored = false
+        hrp.CFrame = homeCFrame
         hrp.Velocity = Vector3.new(0, 0, 0)
     end)
     
