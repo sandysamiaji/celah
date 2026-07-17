@@ -92,6 +92,7 @@ local State = {
     AutoClaimReward = false,
     AutoRespawn = false,
     AutoHeal = false,
+    HealCooldown = 0.02,
     AutoEat = false,
     EatCooldown = 5,
     AutoCook = false,
@@ -116,7 +117,7 @@ local State = {
     DeleteRadius = 200,
     AuraRadius = 40,
     AttackCooldown = 0.1,
-    MultiHitCount = 5,
+    MultiHitCount = 10,
     AntiFling = false,
     FEInvisible = false,
     UndergroundMode = false,
@@ -664,6 +665,43 @@ createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 6, farmTab)
 createToggle("AutoHealToggle", "Auto Bandage (x3)", "AutoHeal", 6.5, farmTab)
 createToggle("AutoEatToggle", "Auto Eat & Drink", "AutoEat", 7, farmTab)
 
+local multiHitContainer = Instance.new("Frame")
+multiHitContainer.Size = UDim2.new(0.9, 0, 0, 35)
+multiHitContainer.BackgroundTransparency = 1
+multiHitContainer.LayoutOrder = 7.5
+multiHitContainer.Parent = farmTab
+
+local multiHitLabel = Instance.new("TextLabel")
+multiHitLabel.Size = UDim2.new(0.55, 0, 1, 0)
+multiHitLabel.BackgroundTransparency = 1
+multiHitLabel.Text = "Multi Hit Count:"
+multiHitLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+multiHitLabel.Font = Enum.Font.GothamBold
+multiHitLabel.TextSize = 13
+multiHitLabel.TextXAlignment = Enum.TextXAlignment.Left
+multiHitLabel.Parent = multiHitContainer
+
+local multiHitInput = Instance.new("TextBox")
+multiHitInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+multiHitInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+multiHitInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+multiHitInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+multiHitInput.Font = Enum.Font.Gotham
+multiHitInput.TextSize = 13
+multiHitInput.Text = tostring(State.MultiHitCount)
+multiHitInput.PlaceholderText = "Count"
+multiHitInput.Parent = multiHitContainer
+
+multiHitInput.FocusLost:Connect(function()
+    local val = tonumber(multiHitInput.Text)
+    if val then
+        State.MultiHitCount = val
+        logAction("SETTINGS", "Multi Hit Count changed to " .. val)
+    else
+        multiHitInput.Text = tostring(State.MultiHitCount)
+    end
+end)
+
 local eatCooldownContainer = Instance.new("Frame")
 eatCooldownContainer.Size = UDim2.new(0.9, 0, 0, 35)
 eatCooldownContainer.BackgroundTransparency = 1
@@ -1048,14 +1086,13 @@ local function autoHealLoop()
     end
 
     while State.AutoHeal do
-        wait(1)
+        task.wait(State.HealCooldown) -- Cek secepat kecepatan input dari UI
         if not State.AutoHeal then break end
         
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health > 0 and hum.Health < hum.MaxHealth then
             local prevTool = char:FindFirstChildOfClass("Tool")
-            local consumed = false
             
             if useEvent then
                 local consumeList = {"Bandage", "Perban", "Medkit", "Heal"}
@@ -1067,7 +1104,6 @@ local function autoHealLoop()
                         end
                     end)
                 end
-                consumed = true
             else
                 local bp = LocalPlayer:FindFirstChild("Backpack")
                 if bp then
@@ -1086,7 +1122,6 @@ local function autoHealLoop()
                                     wait(0.1)
                                     hum:UnequipTools()
                                 end)
-                                consumed = true
                                 break 
                             end
                         end
