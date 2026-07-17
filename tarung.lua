@@ -110,6 +110,7 @@ local State = {
     FlySpeed = 16,
     WebhookLogs = false, -- Default mati
     FlingAura = false,
+    FlingVelocity = 10000,
     CopyRadius = 200,
     DeleteRadius = 200,
     AuraRadius = 40,
@@ -1267,22 +1268,27 @@ local function flingAuraLoop()
                 -- === POLA VELOCITY IDENTIK DENGAN touchFlingLoop ===
                 -- Tapi CFrame bolak-balik antara target (fisika) dan home (visual)
                 
-                -- HEARTBEAT (setelah physics): Pergi ke target + set velocity extreme
+                -- HEARTBEAT (setelah physics): Set Spin Extreme + Velocity Vibrate
                 RunService.Heartbeat:Wait()
-                hrp.CFrame = targetHrp.CFrame
+                
                 local vel = hrp.Velocity
-                hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
-                
-                -- RENDERSTEPPED (sebelum render): Visual di rumah + reset velocity
-                RunService.RenderStepped:Wait()
-                hrp.CFrame = homeCFrame
-                hrp.Velocity = vel
-                
-                -- STEPPED (sebelum physics): Kembali ke target + micro-oscillation
-                RunService.Stepped:Wait()
-                if targetHrp and targetHrp.Parent then
-                    hrp.CFrame = targetHrp.CFrame
+                if vel.Magnitude > 100 or vel.Magnitude ~= vel.Magnitude then
+                    vel = Vector3.new(0, 0, 0)
                 end
+                
+                -- Salto brutal di tempat (RotVelocity) + Fling Velocity
+                hrp.RotVelocity = Vector3.new(State.FlingVelocity, State.FlingVelocity, State.FlingVelocity)
+                hrp.Velocity = vel * State.FlingVelocity + Vector3.new(0, State.FlingVelocity, 0)
+                
+                -- RENDERSTEPPED (sebelum render): Visual normal (reset rotasi & velocity)
+                RunService.RenderStepped:Wait()
+                hrp.RotVelocity = Vector3.new(0, 0, 0)
+                hrp.Velocity = vel
+                -- Jaga posisi tetap di home
+                hrp.CFrame = CFrame.new(homeCFrame.Position)
+                
+                -- STEPPED (sebelum physics): Micro-oscillation
+                RunService.Stepped:Wait()
                 hrp.Velocity = vel + Vector3.new(0, movel, 0)
                 movel = -movel
                 
@@ -1311,6 +1317,44 @@ end
 
 createToggle("TouchFling", "Touch Fling (Vibrate)", "TouchFling", 2, teleportTab)
 createToggle("FlingAura", "Fling Aura (Area Fling)", "FlingAura", 3, teleportTab)
+
+local flingVelContainer = Instance.new("Frame")
+flingVelContainer.Size = UDim2.new(0.9, 0, 0, 35)
+flingVelContainer.BackgroundTransparency = 1
+flingVelContainer.LayoutOrder = 4
+flingVelContainer.Parent = teleportTab
+
+local flingVelLabel = Instance.new("TextLabel")
+flingVelLabel.Size = UDim2.new(0.5, 0, 0.8, 0)
+flingVelLabel.Position = UDim2.new(0.05, 0, 0.1, 0)
+flingVelLabel.BackgroundTransparency = 1
+flingVelLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+flingVelLabel.Font = Enum.Font.GothamBold
+flingVelLabel.TextSize = 13
+flingVelLabel.TextXAlignment = Enum.TextXAlignment.Left
+flingVelLabel.Text = "Fling Velocity:"
+flingVelLabel.Parent = flingVelContainer
+
+local flingVelInput = Instance.new("TextBox")
+flingVelInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+flingVelInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+flingVelInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+flingVelInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+flingVelInput.Font = Enum.Font.Gotham
+flingVelInput.TextSize = 13
+flingVelInput.Text = tostring(State.FlingVelocity)
+flingVelInput.PlaceholderText = "Velocity"
+flingVelInput.Parent = flingVelContainer
+
+flingVelInput.FocusLost:Connect(function()
+    local num = tonumber(flingVelInput.Text)
+    if num then
+        State.FlingVelocity = num
+        flingVelInput.Text = tostring(num)
+    else
+        flingVelInput.Text = tostring(State.FlingVelocity)
+    end
+end)
 
 spawn(function()
     while true do
@@ -1586,7 +1630,11 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
     
     local duration = assassinDelay > 0 and assassinDelay or 2
     local homeCFrame = hrp.CFrame
+    local originalHomeCFrame = hrp.CFrame -- Simpan posisi asli untuk cleanup
     local movel = 0.1
+    
+    local wasAuraKillActive = State.AuraKill
+    State.AuraKill = true
     
     logAction("ASSASSIN", "Memulai eksekusi " .. targetName .. " selama " .. duration .. " detik...")
     
@@ -1605,22 +1653,34 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
             
             -- === POLA IDENTIK touchFlingLoop + ghost teleport ===
             
-            -- HEARTBEAT: Pergi ke target + velocity extreme
-            RunService.Heartbeat:Wait()
-            hrp.CFrame = tHrp.CFrame
-            local vel = hrp.Velocity
-            hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
-            
-            -- RENDERSTEPPED: Visual di rumah + reset velocity
-            RunService.RenderStepped:Wait()
-            hrp.CFrame = homeCFrame
-            hrp.Velocity = vel
-            
-            -- STEPPED: Kembali ke target + micro-oscillation
-            RunService.Stepped:Wait()
-            if tHrp and tHrp.Parent then
-                hrp.CFrame = tHrp.CFrame
+            -- FOLLOW TARGET JIKA TERBANG / TERPENTAL
+            if tHrp.Position.Y > -400 then -- Jangan ikuti kalau masuk void (biar kita tidak mati)
+                -- Terbang ke atas atau ke bawah sama saja ikuti
+                if tHrp.Velocity.Magnitude > 50 or math.abs(tHrp.Position.Y - homeCFrame.Position.Y) > 15 then
+                    -- Ikuti tepat 3 stud di belakang target yang melayang
+                    homeCFrame = tHrp.CFrame * CFrame.new(0, 0, 3)
+                end
             end
+            
+            -- HEARTBEAT: Salto Brutal + Velocity Extreme
+            RunService.Heartbeat:Wait()
+            
+            local vel = hrp.Velocity
+            if vel.Magnitude > 100 or vel.Magnitude ~= vel.Magnitude then
+                vel = Vector3.new(0, 0, 0)
+            end
+            
+            hrp.RotVelocity = Vector3.new(State.FlingVelocity, State.FlingVelocity, State.FlingVelocity)
+            hrp.Velocity = vel * State.FlingVelocity + Vector3.new(0, State.FlingVelocity, 0)
+            
+            -- RENDERSTEPPED: Visual normal
+            RunService.RenderStepped:Wait()
+            hrp.RotVelocity = Vector3.new(0, 0, 0)
+            hrp.Velocity = vel
+            hrp.CFrame = CFrame.new(homeCFrame.Position)
+            
+            -- STEPPED: Micro-oscillation
+            RunService.Stepped:Wait()
             hrp.Velocity = vel + Vector3.new(0, movel, 0)
             movel = -movel
             
@@ -1629,9 +1689,10 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
         end
     end)
     
-    -- Cleanup: kembali ke posisi asal
+    -- Cleanup: kembali ke posisi awal yang sebenarnya
     pcall(function()
-        hrp.CFrame = homeCFrame
+        State.AuraKill = wasAuraKillActive
+        hrp.CFrame = originalHomeCFrame
         hrp.Velocity = Vector3.new(0, 0, 0)
     end)
     
