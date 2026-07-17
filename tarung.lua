@@ -527,7 +527,7 @@ createInfoBox("Infinite Drop", "Bypasses item dropping limits or restrictions in
 createInfoBox("Spy Trace", "A diagnostic tool to help find bugs or glitches within the application. If you experience any issues, enable this feature so Panda can check the automatically generated bug reports.", 7)
 createInfoBox("Night Mode", "Client-side visual change that forces the game time to night. Helps reduce eye strain while AFK farming. Only visible to you.", 8)
 createInfoBox("Fly & Fly Speed", "Enables true flight for your character. You can adjust your flying speed dynamically using the 'Fly Speed' input box right below the toggle.", 9)
-createInfoBox("Teleport Options", "Instantly teleport to any player using 'TP To Player', or sneak up right behind them using 'TP Behind Player' for a surprise attack.", 10)
+createInfoBox("Teleport Options", "Continuously pull any player to you using 'Player To Me', or sneak up right behind them using 'TP Behind Player' for a surprise attack.", 10)
 createInfoBox("Fling Player", "Select a target from the list, equip any Tool/Weapon in your hand, and click this to violently launch them into the sky using physics manipulation!", 11)
 createInfoBox("Touch Fling", "Turns your character into a walking hazard. Anyone who physically touches your character will instantly be flung away. Excellent for passive defense.", 12)
 createInfoBox("Scan RemoteEvents", "An advanced debugging feature that logs all RemoteEvents in the server. Helpful for developers analyzing the game's network structure.", 13)
@@ -1317,7 +1317,7 @@ tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
 tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 tpBtn.Font = Enum.Font.GothamBold
 tpBtn.TextSize = 12
-tpBtn.Text = "TP To Player"
+tpBtn.Text = "Player To Me"
 tpBtn.Parent = tpContainer
 
 local bringBtn = Instance.new("TextButton")
@@ -1544,7 +1544,12 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
         char:PivotTo(savedPosition)
         task.wait(assassinDelay)
         
-        targetChar:PivotTo(savedPosition * CFrame.new(0, 0, -3) * CFrame.Angles(0, math.pi, 0))
+        -- Kunci musuh di depan kita secara visual setiap frame agar tidak nge-blink/hilang
+        local holdTargetConn = RunService.Heartbeat:Connect(function()
+            pcall(function()
+                targetChar:PivotTo(char:GetPivot() * CFrame.new(0, 0, -3) * CFrame.Angles(0, math.pi, 0))
+            end)
+        end)
         
         State.AuraKill = true
         logAction("ASSASSIN", "Mengeksekusi " .. targetName .. " di Zona PvP secepat kilat!")
@@ -1553,6 +1558,8 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
         task.wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
         
         State.AuraKill = false
+        
+        if holdTargetConn then holdTargetConn:Disconnect() end
         
         char:PivotTo(originalPos)
         logAction("ASSASSIN", "Selesai eksekusi, kembali ke posisi aman.")
@@ -1565,43 +1572,34 @@ local loopTPConnection = nil
 tpBtn.MouseButton1Click:Connect(function()
     if isLoopTPActive then
         isLoopTPActive = false
-        tpBtn.Text = "TP To Player"
+        tpBtn.Text = "Player To Me"
         tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
         if loopTPConnection then
             loopTPConnection:Disconnect()
             loopTPConnection = nil
         end
-        logAction("TELEPORT", "Stopped TP Loop")
+        logAction("TELEPORT", "Stopped Pull Loop")
     else
         local success, char, targetChar, targetName = checkTeleportRequirements()
         if success then
             isLoopTPActive = true
-            tpBtn.Text = "Stop TP Loop"
+            tpBtn.Text = "Stop Pulling"
             tpBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
             
-            local hum = char:FindFirstChildOfClass("Humanoid")
+            local hum = targetChar:FindFirstChildOfClass("Humanoid")
             if hum then hum.Sit = false end
             
-            -- TP pertama kali sekaligus fix kamera
-            local targetCFrame = targetChar:GetPivot()
-            char:PivotTo(targetCFrame * CFrame.new(0, 2, -3) * CFrame.Angles(0, math.pi, 0))
-            
-            local root = char.PrimaryPart or char:FindFirstChild("HumanoidRootPart")
-            if root then
-                local cam = workspace.CurrentCamera
-                if cam then
-                    cam.CFrame = CFrame.lookAt(root.Position + (root.CFrame.LookVector * -12) + Vector3.new(0, 5, 0), root.Position)
-                end
-            end
+            -- Tarik musuh ke depan kita
+            targetChar:PivotTo(char:GetPivot() * CFrame.new(0, 0, -3) * CFrame.Angles(0, math.pi, 0))
             
             if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end
             
-            -- Mulai loop supaya musuh selalu di depan kita (ga ilang)
+            -- Mulai loop supaya musuh terus ditarik ke depan kita
             loopTPConnection = RunService.Heartbeat:Connect(function()
                 local s, c, tc, tn = checkTeleportRequirements()
                 if not s then
                     isLoopTPActive = false
-                    tpBtn.Text = "TP To Player"
+                    tpBtn.Text = "Player To Me"
                     tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
                     if loopTPConnection then
                         loopTPConnection:Disconnect()
@@ -1611,14 +1609,14 @@ tpBtn.MouseButton1Click:Connect(function()
                 end
                 
                 pcall(function()
-                    local h = c:FindFirstChildOfClass("Humanoid")
+                    local h = tc:FindFirstChildOfClass("Humanoid")
                     if h then h.Sit = false end
-                    -- Terus teleport ke depan musuh
-                    c:PivotTo(tc:GetPivot() * CFrame.new(0, 2, -3) * CFrame.Angles(0, math.pi, 0))
+                    -- Terus tarik musuh ke depan kita
+                    tc:PivotTo(c:GetPivot() * CFrame.new(0, 0, -3) * CFrame.Angles(0, math.pi, 0))
                 end)
             end)
             
-            logAction("TELEPORT", "Started Loop TP to " .. targetName)
+            logAction("TELEPORT", "Started pulling " .. targetName .. " to me")
         end
     end
 end)
