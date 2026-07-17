@@ -1547,17 +1547,23 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
         -- Kunci musuh di depan kita secara visual setiap frame agar tidak nge-blink/hilang
         local holdTargetConn = RunService.Heartbeat:Connect(function()
             pcall(function()
-                targetChar:PivotTo(char:GetPivot() * CFrame.new(0, 0, -3) * CFrame.Angles(0, math.pi, 0))
+                targetChar:PivotTo(char:GetPivot() * CFrame.new(0, 0, -2) * CFrame.Angles(0, math.pi, 0))
             end)
         end)
         
         State.AuraKill = true
-        logAction("ASSASSIN", "Mengeksekusi " .. targetName .. " di Zona PvP secepat kilat!")
+        State.TouchFling = true
+        if not touchFlingThread or coroutine.status(touchFlingThread) == "dead" then
+            touchFlingThread = coroutine.create(touchFlingLoop)
+            coroutine.resume(touchFlingThread)
+        end
+        logAction("ASSASSIN", "Mengeksekusi " .. targetName .. " di Zona PvP (Fling Active)!")
         
         -- Waktu eksekusi sinkron dengan kecepatan yang diset di UI
         task.wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
         
         State.AuraKill = false
+        State.TouchFling = false
         
         if holdTargetConn then holdTargetConn:Disconnect() end
         
@@ -1572,6 +1578,7 @@ local loopTPConnection = nil
 tpBtn.MouseButton1Click:Connect(function()
     if isLoopTPActive then
         isLoopTPActive = false
+        State.TouchFling = false
         tpBtn.Text = "Player To Me"
         tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
         if loopTPConnection then
@@ -1590,7 +1597,13 @@ tpBtn.MouseButton1Click:Connect(function()
             if hum then hum.Sit = false end
             
             -- Tarik musuh ke depan kita
-            targetChar:PivotTo(char:GetPivot() * CFrame.new(0, 0, -3) * CFrame.Angles(0, math.pi, 0))
+            targetChar:PivotTo(char:GetPivot() * CFrame.new(0, 0, -2) * CFrame.Angles(0, math.pi, 0))
+            
+            State.TouchFling = true
+            if not touchFlingThread or coroutine.status(touchFlingThread) == "dead" then
+                touchFlingThread = coroutine.create(touchFlingLoop)
+                coroutine.resume(touchFlingThread)
+            end
             
             if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end
             
@@ -1599,6 +1612,7 @@ tpBtn.MouseButton1Click:Connect(function()
                 local s, c, tc, tn = checkTeleportRequirements()
                 if not s then
                     isLoopTPActive = false
+                    State.TouchFling = false
                     tpBtn.Text = "Player To Me"
                     tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
                     if loopTPConnection then
@@ -1612,7 +1626,7 @@ tpBtn.MouseButton1Click:Connect(function()
                     local h = tc:FindFirstChildOfClass("Humanoid")
                     if h then h.Sit = false end
                     -- Terus tarik musuh ke depan kita
-                    tc:PivotTo(c:GetPivot() * CFrame.new(0, 0, -3) * CFrame.Angles(0, math.pi, 0))
+                    tc:PivotTo(c:GetPivot() * CFrame.new(0, 0, -2) * CFrame.Angles(0, math.pi, 0))
                 end)
             end)
             
