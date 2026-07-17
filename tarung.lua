@@ -663,7 +663,7 @@ end)
 
 createToggle("RewardToggle", "Claim Reward", "AutoClaimReward", 5, farmTab)
 createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 6, farmTab)
-createToggle("AutoHealToggle", "Auto Bandage (x3)", "AutoHeal", 6.5, farmTab)
+createToggle("AutoHealToggle", "Auto Bandage (x3)", "AutoHeal", 100, farmTab)
 createToggle("AutoEatToggle", "Auto Eat & Drink", "AutoEat", 7, farmTab)
 
 local multiHitContainer = Instance.new("Frame")
@@ -745,7 +745,7 @@ end)
 local healCooldownContainer = Instance.new("Frame")
 healCooldownContainer.Size = UDim2.new(0.9, 0, 0, 35)
 healCooldownContainer.BackgroundTransparency = 1
-healCooldownContainer.LayoutOrder = 8.5
+healCooldownContainer.LayoutOrder = 101
 healCooldownContainer.Parent = farmTab
 
 local healCooldownLabel = Instance.new("TextLabel")
@@ -782,7 +782,7 @@ end)
 local healAmountContainer = Instance.new("Frame")
 healAmountContainer.Size = UDim2.new(0.9, 0, 0, 35)
 healAmountContainer.BackgroundTransparency = 1
-healAmountContainer.LayoutOrder = 8.6
+healAmountContainer.LayoutOrder = 102
 healAmountContainer.Parent = farmTab
 
 local healAmountLabel = Instance.new("TextLabel")
@@ -816,7 +816,7 @@ healAmountInput.FocusLost:Connect(function()
     end
 end)
 
-local autoCookBtn = createToggle("AutoCookToggle", "Auto Cook in Area", "AutoCook", 9, farmTab)
+local autoCookBtn = createToggle("AutoCookToggle", "Auto Cook in Area", "AutoCook", 103, farmTab)
 
 -- CHEATS TAB
 createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab)
