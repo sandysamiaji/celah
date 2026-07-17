@@ -91,6 +91,7 @@ local State = {
     AuraKill = false,
     AutoClaimReward = false,
     AutoRespawn = false,
+    AutoHeal = false,
     AutoEat = false,
     EatCooldown = 5,
     AutoCook = false,
@@ -660,6 +661,7 @@ end)
 
 createToggle("RewardToggle", "Claim Reward", "AutoClaimReward", 5, farmTab)
 createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 6, farmTab)
+createToggle("AutoHealToggle", "Auto Bandage (x3)", "AutoHeal", 6.5, farmTab)
 createToggle("AutoEatToggle", "Auto Eat & Drink", "AutoEat", 7, farmTab)
 
 local eatCooldownContainer = Instance.new("Frame")
@@ -1035,6 +1037,70 @@ local function autoEatLoop()
     end
 end
 
+local autoHealThread = nil
+local function autoHealLoop()
+    local useEvent
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+        if desc:IsA("RemoteEvent") and (desc.Name == "UseConsumable" or desc.Name == "UseBagItem" or desc.Name == "UseItem" or desc.Name == "Consume" or desc.Name == "EatItem") then
+            useEvent = desc
+            break
+        end
+    end
+
+    while State.AutoHeal do
+        wait(1)
+        if not State.AutoHeal then break end
+        
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health > 0 and hum.Health < hum.MaxHealth then
+            local prevTool = char:FindFirstChildOfClass("Tool")
+            local consumed = false
+            
+            if useEvent then
+                local consumeList = {"Bandage", "Perban", "Medkit", "Heal"}
+                for _, item in ipairs(consumeList) do
+                    if not State.AutoHeal then break end
+                    pcall(function()
+                        for i = 1, 3 do -- Langsung pakai 3
+                            useEvent:FireServer(item)
+                        end
+                    end)
+                end
+                consumed = true
+            else
+                local bp = LocalPlayer:FindFirstChild("Backpack")
+                if bp then
+                    for _, tool in ipairs(bp:GetChildren()) do
+                        if not State.AutoHeal then break end
+                        if tool:IsA("Tool") then
+                            local n = tool.Name:lower()
+                            if string.find(n, "bandage") or string.find(n, "perban") or string.find(n, "medkit") or string.find(n, "heal") then
+                                pcall(function()
+                                    hum:EquipTool(tool)
+                                    wait(0.1)
+                                    for i = 1, 3 do -- Langsung tembak 3 kali
+                                        tool:Activate()
+                                        wait(0.05)
+                                    end
+                                    wait(0.1)
+                                    hum:UnequipTools()
+                                end)
+                                consumed = true
+                                break 
+                            end
+                        end
+                    end
+                end
+            end
+            
+            if prevTool and prevTool.Parent ~= char then
+                pcall(function() hum:EquipTool(prevTool) end)
+            end
+        end
+    end
+end
+
 spawn(function()
     while true do
         wait(1)
@@ -1042,6 +1108,12 @@ spawn(function()
             if not autoEatThread or coroutine.status(autoEatThread) == "dead" then
                 autoEatThread = coroutine.create(autoEatLoop)
                 coroutine.resume(autoEatThread)
+            end
+        end
+        if State.AutoHeal then
+            if not autoHealThread or coroutine.status(autoHealThread) == "dead" then
+                autoHealThread = coroutine.create(autoHealLoop)
+                coroutine.resume(autoHealThread)
             end
         end
     end
@@ -2822,8 +2894,20 @@ track(RunService.Stepped:Connect(function()
             if hrp then
                 -- Jika ada orang lain yang mencoba Fling kita (Velocity sangat tinggi)
                 if hrp.Velocity.Magnitude > 150 or hrp.RotVelocity.Magnitude > 150 then
+                    -- LANGSUNG KUNCI POSISI (ANCHOR) agar physics force terputus sepenuhnya
                     hrp.Velocity = Vector3.new(0, 0, 0)
                     hrp.RotVelocity = Vector3.new(0, 0, 0)
+                    
+                    if not hrp.Anchored then
+                        hrp.Anchored = true
+                        
+                        -- Lepas kuncian setelah 0.2 detik, saat musuh sudah terpental / physics stabil
+                        task.delay(0.2, function()
+                            if hrp and State.AntiFling then
+                                hrp.Anchored = false
+                            end
+                        end)
+                    end
                 end
             end
         end
