@@ -1200,19 +1200,20 @@ local flingAuraThread = nil
 
 local function flingAuraLoop()
     local lp = Players.LocalPlayer
-    local movel = 0.1
     
     while State.FlingAura do
         local c = lp.Character
         local hrp = c and c:FindFirstChild("HumanoidRootPart")
         
         if hrp then
-            local originCFrame = hrp.CFrame
+            -- Catat posisi kita saat ini (sebelum teleport)
+            local homeCFrame = hrp.CFrame
             local targetHrp = nil
             
+            -- Cari target dalam radius
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= lp and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                    local dist = (originCFrame.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                    local dist = (homeCFrame.Position - p.Character.HumanoidRootPart.Position).Magnitude
                     if dist <= State.AuraRadius then
                         targetHrp = p.Character.HumanoidRootPart
                         break
@@ -1221,26 +1222,21 @@ local function flingAuraLoop()
             end
             
             if targetHrp then
-                -- Teleport ke target + pakai vibrasi touchFling yang terbukti
-                hrp.CFrame = targetHrp.CFrame
-                
-                local vel = hrp.Velocity
-                hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
-                RunService.RenderStepped:Wait()
-                
-                -- Reset velocity + kunci posisi agar KITA tidak terbang
-                hrp.CFrame = targetHrp.CFrame
-                hrp.Velocity = vel
+                -- STEPPED (sebelum physics): Teleport ke target + set velocity
                 RunService.Stepped:Wait()
-                
+                hrp.Anchored = false
                 hrp.CFrame = targetHrp.CFrame
-                hrp.Velocity = vel + Vector3.new(0, movel, 0)
-                movel = -movel
+                hrp.Velocity = Vector3.new(0, 9e5, 0)
                 
-                -- Kembalikan ke posisi asal
+                -- HEARTBEAT (setelah physics): Collision sudah terjadi → kembali + anchor
                 RunService.Heartbeat:Wait()
-                hrp.CFrame = originCFrame
+                hrp.CFrame = homeCFrame
                 hrp.Velocity = Vector3.new(0, 0, 0)
+                hrp.Anchored = true
+                
+                -- RENDERSTEPPED (sebelum render): Kamera lihat kita di rumah → unanchor
+                RunService.RenderStepped:Wait()
+                hrp.Anchored = false
             else
                 RunService.Heartbeat:Wait()
             end
@@ -1248,6 +1244,15 @@ local function flingAuraLoop()
             RunService.Heartbeat:Wait()
         end
     end
+    
+    -- Cleanup: pastikan unanchor saat toggle dimatikan
+    pcall(function()
+        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Anchored = false
+            hrp.Velocity = Vector3.new(0, 0, 0)
+        end
+    end)
 end
 
 createToggle("TouchFling", "Touch Fling (Vibrate)", "TouchFling", 2, teleportTab)
@@ -1525,19 +1530,17 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
     hitAndRunBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
     hitAndRunBtn.Text = "Assassinating..."
     
-    local originalCFrame = hrp.CFrame
     local duration = assassinDelay > 0 and assassinDelay or 2
     
     logAction("ASSASSIN", "Memulai eksekusi " .. targetName .. " selama " .. duration .. " detik...")
     
     pcall(function()
         local startTime = tick()
-        local movel = 0.1
         
         while tick() - startTime < duration do
             -- Re-check target masih ada
-            local tChar = Players:FindFirstChild(targetName)
-            tChar = tChar and tChar.Character
+            local tPlayer = Players:FindFirstChild(targetName)
+            local tChar = tPlayer and tPlayer.Character
             local tHrp = tChar and tChar:FindFirstChild("HumanoidRootPart")
             
             if not tHrp then
@@ -1545,36 +1548,36 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
                 break
             end
             
-            -- Kunci posisi kita tepat di target (agar collision terjadi)
-            hrp.CFrame = tHrp.CFrame
+            -- Catat posisi saat ini
+            local homeCFrame = hrp.CFrame
             
-            -- Pakai pola vibrasi yang TERBUKTI dari touchFlingLoop
-            -- Ini yang membuat TARGET terbang, bukan kita
-            local vel = hrp.Velocity
-            hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
-            RunService.RenderStepped:Wait()
-            
-            -- Reset velocity + kunci ulang posisi agar KITA tidak ikut terbang
-            hrp.CFrame = tHrp.CFrame
-            hrp.Velocity = vel
+            -- STEPPED: Teleport ke target + set velocity (sebelum physics)
             RunService.Stepped:Wait()
-            
-            -- Kunci ulang posisi + micro-oscillation untuk stabilisasi
+            hrp.Anchored = false
             hrp.CFrame = tHrp.CFrame
-            hrp.Velocity = vel + Vector3.new(0, movel, 0)
-            movel = -movel
+            hrp.Velocity = Vector3.new(0, 9e5, 0)
+            
+            -- HEARTBEAT: Physics selesai → anchor + kembali ke asal
+            RunService.Heartbeat:Wait()
+            hrp.CFrame = homeCFrame
+            hrp.Velocity = Vector3.new(0, 0, 0)
+            hrp.Anchored = true
+            
+            -- RENDERSTEPPED: Kamera render di posisi asal → unanchor
+            RunService.RenderStepped:Wait()
+            hrp.Anchored = false
         end
     end)
     
-    -- Teleport balik ke posisi asal + reset velocity
+    -- Cleanup
     pcall(function()
-        hrp.CFrame = originalCFrame
+        hrp.Anchored = false
         hrp.Velocity = Vector3.new(0, 0, 0)
     end)
     
     hitAndRunBtn.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
     hitAndRunBtn.Text = "Auto Assassin"
-    logAction("ASSASSIN", "Selesai eksekusi " .. targetName .. ", kembali ke posisi asal.")
+    logAction("ASSASSIN", "Selesai eksekusi " .. targetName .. ".")
 end)
 
 local isLoopTPActive = false
