@@ -115,6 +115,7 @@ local State = {
     DeleteRadius = 200,
     AuraRadius = 40,
     AttackCooldown = 0.1,
+    MultiHitCount = 5,
     FEInvisible = false,
     UndergroundMode = false,
     SelectedPlayer = nil
@@ -1651,18 +1652,7 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
                 break
             end
             
-            -- === POLA IDENTIK touchFlingLoop + ghost teleport ===
-            
-            -- FOLLOW TARGET JIKA TERBANG / TERPENTAL
-            if tHrp.Position.Y > -400 then -- Jangan ikuti kalau masuk void (biar kita tidak mati)
-                -- Terbang ke atas atau ke bawah sama saja ikuti
-                if tHrp.Velocity.Magnitude > 50 or math.abs(tHrp.Position.Y - homeCFrame.Position.Y) > 15 then
-                    -- Ikuti tepat 3 stud di belakang target yang melayang
-                    homeCFrame = tHrp.CFrame * CFrame.new(0, 0, 3)
-                end
-            end
-            
-            -- HEARTBEAT: Salto Brutal + Velocity Extreme
+            -- VISUAL DAN FISIK BERSATU (Direct Fling)
             RunService.Heartbeat:Wait()
             
             local vel = hrp.Velocity
@@ -1670,19 +1660,12 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
                 vel = Vector3.new(0, 0, 0)
             end
             
+            -- Posisi fisik dan visual TEPAT di badan musuh
+            hrp.CFrame = tHrp.CFrame
+            
+            -- Salto Brutal Kelihatan
             hrp.RotVelocity = Vector3.new(State.FlingVelocity, State.FlingVelocity, State.FlingVelocity)
             hrp.Velocity = vel * State.FlingVelocity + Vector3.new(0, State.FlingVelocity, 0)
-            
-            -- RENDERSTEPPED: Visual normal
-            RunService.RenderStepped:Wait()
-            hrp.RotVelocity = Vector3.new(0, 0, 0)
-            hrp.Velocity = vel
-            hrp.CFrame = CFrame.new(homeCFrame.Position)
-            
-            -- STEPPED: Micro-oscillation
-            RunService.Stepped:Wait()
-            hrp.Velocity = vel + Vector3.new(0, movel, 0)
-            movel = -movel
             
             -- Log analytics
             logFlingAnalytics("AUTO_ASSASSIN", targetName, hrp, tHrp)
@@ -2827,6 +2810,24 @@ end
 --------------------------------------------------------------------------------
 logAction("SYSTEM", "All-In-One Hub successfully launched!")
 
+-- Hook Anti Fling Standalone
+track(RunService.Stepped:Connect(function()
+    if State.AntiFling then
+        -- Jangan aktifkan anti-fling saat sedang menjadi hantu (FlingAura/AutoAssassin)
+        -- karena kita butuh velocity ekstrem untuk melempar musuh
+        if not State.FlingAura and hitAndRunBtn.Text == "Auto Assassin" then
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                -- Jika ada orang lain yang mencoba Fling kita (Velocity sangat tinggi)
+                if hrp.Velocity.Magnitude > 150 or hrp.RotVelocity.Magnitude > 150 then
+                    hrp.Velocity = Vector3.new(0, 0, 0)
+                    hrp.RotVelocity = Vector3.new(0, 0, 0)
+                end
+            end
+        end
+    end
+end))
+
 track(RunService.RenderStepped:Connect(function()
     processLogQueue()
     local currentTime = tick()
@@ -2844,29 +2845,34 @@ track(RunService.RenderStepped:Connect(function()
             local tPart = t.part
             local tType = t.type
             
-            -- Sentuh dengan senjata (Damage)
-            if weaponHandle and firetouchinterest then
-                firetouchinterest(tPart, weaponHandle, 0)
-                firetouchinterest(tPart, weaponHandle, 1)
-            end
-            
-            -- Sentuh dengan badan (Collect drop items) HANYA untuk Harvest
-            if tType == "Harvest" and rootPart and firetouchinterest then
-                firetouchinterest(tPart, rootPart, 0)
-                firetouchinterest(tPart, rootPart, 1)
+            -- Lakukan hit berkali-kali dalam 1 frame untuk melipatgandakan damage
+            for i = 1, State.MultiHitCount do
+                -- Sentuh dengan senjata (Damage)
+                if weaponHandle and firetouchinterest then
+                    firetouchinterest(tPart, weaponHandle, 0)
+                    firetouchinterest(tPart, weaponHandle, 1)
+                end
+                
+                -- Sentuh dengan badan (Collect drop items) HANYA untuk Harvest
+                if tType == "Harvest" and rootPart and firetouchinterest then
+                    firetouchinterest(tPart, rootPart, 0)
+                    firetouchinterest(tPart, rootPart, 1)
+                end
             end
             
             hitCount = hitCount + 1
         end
         
-        -- Trigger Attack Remote bawaan Tool jika ada (Cukup 1x per siklus, JANGAN di-spam)
+        -- Trigger Attack Remote bawaan Tool jika ada
         if hitCount > 0 and weapon then
             local atkEvt = weapon:FindFirstChild("AttackEvent") or weapon:FindFirstChild("ClientControl")
             if atkEvt then
-                if atkEvt:IsA("RemoteEvent") then 
-                    atkEvt:FireServer() 
-                elseif atkEvt:IsA("RemoteFunction") then
-                    atkEvt:InvokeServer()
+                for i = 1, State.MultiHitCount do
+                    if atkEvt:IsA("RemoteEvent") then 
+                        atkEvt:FireServer() 
+                    elseif atkEvt:IsA("RemoteFunction") then
+                        atkEvt:InvokeServer()
+                    end
                 end
             end
             pcall(function() weapon:Activate() end)
