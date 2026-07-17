@@ -93,6 +93,7 @@ local State = {
     AutoRespawn = false,
     AutoHeal = false,
     HealCooldown = 0.02,
+    HealAmount = 3,
     AutoEat = false,
     EatCooldown = 5,
     AutoCook = false,
@@ -741,6 +742,80 @@ eatCooldownInput.FocusLost:Connect(function()
     end
 end)
 
+local healCooldownContainer = Instance.new("Frame")
+healCooldownContainer.Size = UDim2.new(0.9, 0, 0, 35)
+healCooldownContainer.BackgroundTransparency = 1
+healCooldownContainer.LayoutOrder = 8.5
+healCooldownContainer.Parent = farmTab
+
+local healCooldownLabel = Instance.new("TextLabel")
+healCooldownLabel.Size = UDim2.new(0.55, 0, 1, 0)
+healCooldownLabel.BackgroundTransparency = 1
+healCooldownLabel.Text = "Bandage Delay:"
+healCooldownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+healCooldownLabel.Font = Enum.Font.GothamBold
+healCooldownLabel.TextSize = 13
+healCooldownLabel.TextXAlignment = Enum.TextXAlignment.Left
+healCooldownLabel.Parent = healCooldownContainer
+
+local healCooldownInput = Instance.new("TextBox")
+healCooldownInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+healCooldownInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+healCooldownInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+healCooldownInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+healCooldownInput.Font = Enum.Font.Gotham
+healCooldownInput.TextSize = 13
+healCooldownInput.Text = tostring(State.HealCooldown)
+healCooldownInput.PlaceholderText = "Seconds"
+healCooldownInput.Parent = healCooldownContainer
+
+healCooldownInput.FocusLost:Connect(function()
+    local val = tonumber(healCooldownInput.Text)
+    if val then
+        State.HealCooldown = val
+        logAction("SETTINGS", "Bandage Delay changed to " .. val)
+    else
+        healCooldownInput.Text = tostring(State.HealCooldown)
+    end
+end)
+
+local healAmountContainer = Instance.new("Frame")
+healAmountContainer.Size = UDim2.new(0.9, 0, 0, 35)
+healAmountContainer.BackgroundTransparency = 1
+healAmountContainer.LayoutOrder = 8.6
+healAmountContainer.Parent = farmTab
+
+local healAmountLabel = Instance.new("TextLabel")
+healAmountLabel.Size = UDim2.new(0.55, 0, 1, 0)
+healAmountLabel.BackgroundTransparency = 1
+healAmountLabel.Text = "Bandage Amount:"
+healAmountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+healAmountLabel.Font = Enum.Font.GothamBold
+healAmountLabel.TextSize = 13
+healAmountLabel.TextXAlignment = Enum.TextXAlignment.Left
+healAmountLabel.Parent = healAmountContainer
+
+local healAmountInput = Instance.new("TextBox")
+healAmountInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+healAmountInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+healAmountInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+healAmountInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+healAmountInput.Font = Enum.Font.Gotham
+healAmountInput.TextSize = 13
+healAmountInput.Text = tostring(State.HealAmount)
+healAmountInput.PlaceholderText = "Amount"
+healAmountInput.Parent = healAmountContainer
+
+healAmountInput.FocusLost:Connect(function()
+    local val = tonumber(healAmountInput.Text)
+    if val then
+        State.HealAmount = val
+        logAction("SETTINGS", "Bandage Amount changed to " .. val)
+    else
+        healAmountInput.Text = tostring(State.HealAmount)
+    end
+end)
+
 local autoCookBtn = createToggle("AutoCookToggle", "Auto Cook in Area", "AutoCook", 9, farmTab)
 
 -- CHEATS TAB
@@ -1099,7 +1174,7 @@ local function autoHealLoop()
                 for _, item in ipairs(consumeList) do
                     if not State.AutoHeal then break end
                     pcall(function()
-                        for i = 1, 3 do -- Langsung pakai 3
+                        for i = 1, State.HealAmount do -- Langsung pakai sesuai jumlah
                             useEvent:FireServer(item)
                         end
                     end)
@@ -1115,7 +1190,7 @@ local function autoHealLoop()
                                 pcall(function()
                                     hum:EquipTool(tool)
                                     wait(0.1)
-                                    for i = 1, 3 do -- Langsung tembak 3 kali
+                                    for i = 1, State.HealAmount do -- Langsung tembak sesuai jumlah
                                         tool:Activate()
                                         wait(0.05)
                                     end
