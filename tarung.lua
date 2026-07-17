@@ -530,6 +530,7 @@ createInfoBox("Fly & Fly Speed", "Enables true flight for your character. You ca
 createInfoBox("Teleport Options", "Continuously pull any player to you using 'Player To Me', or sneak up right behind them using 'TP Behind Player' for a surprise attack.", 10)
 createInfoBox("Fling Player", "Select a target from the list, equip any Tool/Weapon in your hand, and click this to violently launch them into the sky using physics manipulation!", 11)
 createInfoBox("Touch Fling", "Turns your character into a walking hazard. Anyone who physically touches your character will instantly be flung away. Excellent for passive defense.", 12)
+createInfoBox("Fling Aura", "Fling that expands its area. Automatically teleport to and fling any player within your Aura Radius. Highly aggressive.", 13)
 createInfoBox("Scan RemoteEvents", "An advanced debugging feature that logs all RemoteEvents in the server. Helpful for developers analyzing the game's network structure.", 13)
 createInfoBox("Builder System", "A comprehensive saving system for your structures. Use 'Copy Base' to save buildings within a radius to your local file, and 'Load Base' to rebuild them instantly anywhere.", 14)
 createInfoBox("Auto Eat & Drink", "Automatically consumes food and water from your inventory in the background so you never starve or dehydrate while AFK farming.", 15)
@@ -1195,7 +1196,52 @@ local function touchFlingLoop()
     end
 end
 
+local flingAuraThread = nil
+
+local function flingAuraLoop()
+    local lp = Players.LocalPlayer
+    
+    while State.FlingAura do
+        local c = lp.Character
+        local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        
+        if hrp then
+            local originCFrame = hrp.CFrame
+            local targetHrp = nil
+            
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= lp and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (originCFrame.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                    if dist <= State.AuraRadius then
+                        targetHrp = p.Character.HumanoidRootPart
+                        break
+                    end
+                end
+            end
+            
+            if targetHrp then
+                local vel = hrp.Velocity
+                
+                -- Pindah tepat sebelum fisika dihitung (Stepped)
+                RunService.Stepped:Wait()
+                hrp.CFrame = targetHrp.CFrame
+                hrp.Velocity = Vector3.new(500000, 500000, 500000)
+                
+                -- Kembalikan ke asal tepat setelah fisika dihitung dan sebelum layar digambar (Heartbeat)
+                RunService.Heartbeat:Wait()
+                hrp.CFrame = originCFrame
+                hrp.Velocity = vel
+            else
+                RunService.Heartbeat:Wait()
+            end
+        else
+            RunService.Heartbeat:Wait()
+        end
+    end
+end
+
 createToggle("TouchFling", "Touch Fling (Vibrate)", "TouchFling", 2, teleportTab)
+createToggle("FlingAura", "Fling Aura (Area Fling)", "FlingAura", 3, teleportTab)
 
 spawn(function()
     while true do
@@ -1204,6 +1250,12 @@ spawn(function()
             if not touchFlingThread or coroutine.status(touchFlingThread) == "dead" then
                 touchFlingThread = coroutine.create(touchFlingLoop)
                 coroutine.resume(touchFlingThread)
+            end
+        end
+        if State.FlingAura then
+            if not flingAuraThread or coroutine.status(flingAuraThread) == "dead" then
+                flingAuraThread = coroutine.create(flingAuraLoop)
+                coroutine.resume(flingAuraThread)
             end
         end
     end
@@ -1451,49 +1503,60 @@ local function checkTeleportRequirements()
 end
 
 hitAndRunBtn.MouseButton1Click:Connect(function()
-    if not savedPosition then
-        logAction("ASSASSIN", "Gagal: Tandai posisi (PvP Zone) terlebih dahulu!")
-        return
-    end
-    
     local success, char, targetChar, targetName = checkTeleportRequirements()
     if not success then return end
     
-    local originalPos = char:GetPivot()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
+    if not hrp or not targetHrp then
+        logAction("ASSASSIN", "Gagal: HumanoidRootPart tidak ditemukan!")
+        return
+    end
+    
+    hitAndRunBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+    hitAndRunBtn.Text = "Assassinating..."
+    
+    local originalCFrame = hrp.CFrame
+    local duration = assassinDelay > 0 and assassinDelay or 2
+    
+    logAction("ASSASSIN", "Memulai eksekusi " .. targetName .. " selama " .. duration .. " detik...")
     
     pcall(function()
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.Sit = false end
+        local startTime = tick()
         
-        char:PivotTo(savedPosition)
-        task.wait(assassinDelay)
-        
-        -- Kunci musuh di depan kita secara visual setiap frame agar tidak nge-blink/hilang
-        local holdTargetConn = RunService.Heartbeat:Connect(function()
-            pcall(function()
-                targetChar:PivotTo(char:GetPivot() * CFrame.new(0, 0, -2) * CFrame.Angles(0, math.pi, 0))
-            end)
-        end)
-        
-        State.AuraKill = true
-        State.TouchFling = true
-        if not touchFlingThread or coroutine.status(touchFlingThread) == "dead" then
-            touchFlingThread = coroutine.create(touchFlingLoop)
-            coroutine.resume(touchFlingThread)
+        while tick() - startTime < duration do
+            -- Re-check target masih ada
+            local tChar = Players:FindFirstChild(targetName)
+            tChar = tChar and tChar.Character
+            local tHrp = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            
+            if not tHrp then
+                logAction("ASSASSIN", targetName .. " sudah mati atau disconnect!")
+                break
+            end
+            
+            local vel = hrp.Velocity
+            
+            -- STEPPED: Teleport ke target + set velocity gila tepat sebelum fisika dihitung
+            RunService.Stepped:Wait()
+            hrp.CFrame = tHrp.CFrame
+            hrp.Velocity = Vector3.new(500000, 500000, 500000)
+            
+            -- HEARTBEAT: Kembalikan ke posisi asal tepat sebelum layar di-render
+            RunService.Heartbeat:Wait()
+            hrp.CFrame = originalCFrame
+            hrp.Velocity = vel
         end
-        logAction("ASSASSIN", "Mengeksekusi " .. targetName .. " di Zona PvP (Fling Active)!")
-        
-        -- Waktu eksekusi sinkron dengan kecepatan yang diset di UI
-        task.wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
-        
-        State.AuraKill = false
-        State.TouchFling = false
-        
-        if holdTargetConn then holdTargetConn:Disconnect() end
-        
-        char:PivotTo(originalPos)
-        logAction("ASSASSIN", "Selesai eksekusi, kembali ke posisi aman.")
     end)
+    
+    -- Pastikan kembali ke posisi asal
+    pcall(function()
+        hrp.CFrame = originalCFrame
+    end)
+    
+    hitAndRunBtn.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
+    hitAndRunBtn.Text = "Auto Assassin"
+    logAction("ASSASSIN", "Selesai eksekusi " .. targetName .. ", kembali ke posisi asal.")
 end)
 
 local isLoopTPActive = false
