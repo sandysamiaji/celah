@@ -1183,38 +1183,10 @@ local function auraKillLoop()
             end
             
             if shouldAttack then
-                local bp = LocalPlayer:FindFirstChild("Backpack")
-                local allTools = {}
-                for _, t in ipairs(char:GetChildren()) do if t:IsA("Tool") then table.insert(allTools, t) end end
-                if bp then for _, t in ipairs(bp:GetChildren()) do if t:IsA("Tool") then table.insert(allTools, t) end end end
-                
-                local bestTool = nil
-                if targetType == "Rock" then
-                    for _, t in ipairs(allTools) do
-                        if string.find(t.Name:lower(), "pickaxe") or string.find(t.Name:lower(), "pick") or string.find(t.Name:lower(), "hammer") or string.find(t.Name:lower(), "magnet") then
-                            bestTool = t
-                            break
-                        end
-                    end
-                elseif targetType == "Tree" then
-                    for _, t in ipairs(allTools) do
-                        if string.find(t.Name:lower(), "axe") and not string.find(t.Name:lower(), "pickaxe") then
-                            bestTool = t
-                            break
-                        end
-                    end
-                end
-                
-                -- Default kalau gak nemu senjata spesifik
-                if not bestTool then
-                    bestTool = char:FindFirstChildOfClass("Tool") or allTools[1]
-                end
+                -- Biarkan user yang memegang senjata sendiri (manual) agar tidak menyebabkan lag saat mencari di tas
+                local bestTool = char:FindFirstChildOfClass("Tool")
                 
                 if bestTool then
-                    if bestTool.Parent ~= char then
-                        pcall(function() char.Humanoid:EquipTool(bestTool) end)
-                        wait(0.1) -- Jeda kecil biar senjatanya terpegang dulu di server
-                    end
                     
                     local attackEvent = bestTool:FindFirstChild("AttackEvent") or bestTool:FindFirstChild("ClientControl")
                     pcall(function()
@@ -1323,7 +1295,7 @@ end)
 
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
-tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
+tpContainer.Size = UDim2.new(0.9, 0, 0, 175)
 tpContainer.BackgroundTransparency = 1
 tpContainer.LayoutOrder = 1
 tpContainer.Parent = teleportTab
@@ -1368,9 +1340,29 @@ flingPlayerBtn.TextSize = 12
 flingPlayerBtn.Text = "Fling Player"
 flingPlayerBtn.Parent = tpContainer
 
+local markPosBtn = Instance.new("TextButton")
+markPosBtn.Size = UDim2.new(0.48, 0, 0, 30)
+markPosBtn.Position = UDim2.new(0, 0, 0, 70)
+markPosBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+markPosBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+markPosBtn.Font = Enum.Font.GothamBold
+markPosBtn.TextSize = 12
+markPosBtn.Text = "Tandai Tempat"
+markPosBtn.Parent = tpContainer
+
+local tpToMarkBtn = Instance.new("TextButton")
+tpToMarkBtn.Size = UDim2.new(0.48, 0, 0, 30)
+tpToMarkBtn.Position = UDim2.new(0.52, 0, 0, 70)
+tpToMarkBtn.BackgroundColor3 = Color3.fromRGB(26, 188, 156)
+tpToMarkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpToMarkBtn.Font = Enum.Font.GothamBold
+tpToMarkBtn.TextSize = 12
+tpToMarkBtn.Text = "TP ke Tanda"
+tpToMarkBtn.Parent = tpContainer
+
 local playerDropdown = Instance.new("TextButton")
 playerDropdown.Size = UDim2.new(1, 0, 0, 30)
-playerDropdown.Position = UDim2.new(0, 0, 0, 70)
+playerDropdown.Position = UDim2.new(0, 0, 0, 140)
 playerDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 playerDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
 playerDropdown.Font = Enum.Font.Gotham
@@ -1378,9 +1370,41 @@ playerDropdown.TextSize = 12
 playerDropdown.Text = "Select Player..."
 playerDropdown.Parent = tpContainer
 
+local assassinDelay = 0.5
+
+local hitAndRunBtn = Instance.new("TextButton")
+hitAndRunBtn.Size = UDim2.new(0.68, 0, 0, 30)
+hitAndRunBtn.Position = UDim2.new(0, 0, 0, 105)
+hitAndRunBtn.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
+hitAndRunBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+hitAndRunBtn.Font = Enum.Font.GothamBold
+hitAndRunBtn.TextSize = 12
+hitAndRunBtn.Text = "Auto Assassin"
+hitAndRunBtn.Parent = tpContainer
+
+local delayInput = Instance.new("TextBox")
+delayInput.Size = UDim2.new(0.3, 0, 0, 30)
+delayInput.Position = UDim2.new(0.7, 0, 0, 105)
+delayInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+delayInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+delayInput.Font = Enum.Font.Gotham
+delayInput.TextSize = 11
+delayInput.Text = tostring(assassinDelay)
+delayInput.PlaceholderText = "Delay"
+delayInput.Parent = tpContainer
+
+delayInput.FocusLost:Connect(function()
+    local num = tonumber(delayInput.Text)
+    if num then
+        assassinDelay = num
+    else
+        delayInput.Text = tostring(assassinDelay)
+    end
+end)
+
 local playerList = Instance.new("ScrollingFrame")
 playerList.Size = UDim2.new(1, 0, 0, 200)
-playerList.Position = UDim2.new(0, 0, 0, 68)
+playerList.Position = UDim2.new(0, 0, 0, 138)
 playerList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 playerList.ScrollBarThickness = 4
 playerList.Visible = false
@@ -1419,7 +1443,7 @@ local function updatePlayerList()
                 State.SelectedPlayer = player.Name
                 playerDropdown.Text = player.Name
                 playerList.Visible = false
-                tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
+                tpContainer.Size = UDim2.new(0.9, 0, 0, 175)
             end)
             ySize = ySize + 25
         end
@@ -1432,7 +1456,7 @@ refreshBtn.MouseButton1Click:Connect(function()
     playerDropdown.Text = "Pilih Pemain..."
     selectedPlayer = nil
     if playerList.Visible then
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 305)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 375)
     end
 end)
 
@@ -1440,9 +1464,36 @@ playerDropdown.MouseButton1Click:Connect(function()
     playerList.Visible = not playerList.Visible
     if playerList.Visible then
         updatePlayerList()
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 305)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 375)
     else
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 105)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 175)
+    end
+end)
+
+local savedPosition = nil
+
+markPosBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if char and char:GetPivot() then
+        savedPosition = char:GetPivot()
+        markPosBtn.Text = "Tandai (Tersimpan)"
+        logAction("TELEPORT", "Posisi ditandai sukses.")
+    else
+        logAction("TELEPORT", "Gagal tandai posisi: Karakter tidak ditemukan.")
+    end
+end)
+
+tpToMarkBtn.MouseButton1Click:Connect(function()
+    if savedPosition then
+        local char = LocalPlayer.Character
+        if char and char:GetPivot() then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Sit = false end
+            char:PivotTo(savedPosition)
+            logAction("TELEPORT", "Berhasil teleport ke posisi yang ditandai.")
+        end
+    else
+        logAction("TELEPORT", "Belum ada posisi yang ditandai!")
     end
 end)
 
@@ -1475,28 +1526,100 @@ local function checkTeleportRequirements()
     return true, myChar, targetChar, targetName
 end
 
-tpBtn.MouseButton1Click:Connect(function()
+hitAndRunBtn.MouseButton1Click:Connect(function()
+    if not savedPosition then
+        logAction("ASSASSIN", "Gagal: Tandai posisi (PvP Zone) terlebih dahulu!")
+        return
+    end
+    
     local success, char, targetChar, targetName = checkTeleportRequirements()
-    if success then
+    if not success then return end
+    
+    local originalPos = char:GetPivot()
+    
+    pcall(function()
         local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.Sit = false end -- Lepaskan dari kursi jika sedang duduk
+        if hum then hum.Sit = false end
         
-        -- Gunakan PivotTo agar seluruh model karakter ikut berpindah tanpa terputus
-        local targetCFrame = targetChar:GetPivot()
-        char:PivotTo(targetCFrame * CFrame.new(0, 2, -3) * CFrame.Angles(0, math.pi, 0))
+        char:PivotTo(savedPosition)
+        task.wait(assassinDelay)
         
-        local root = char.PrimaryPart or char:FindFirstChild("HumanoidRootPart")
-        if root then
-            -- Fix Kamera "Lemot/Lag"
-            local cam = workspace.CurrentCamera
-            if cam then
-                cam.CFrame = CFrame.lookAt(root.Position + (root.CFrame.LookVector * -12) + Vector3.new(0, 5, 0), root.Position)
-            end
+        targetChar:PivotTo(savedPosition * CFrame.new(0, 0, -3) * CFrame.Angles(0, math.pi, 0))
+        
+        State.AuraKill = true
+        logAction("ASSASSIN", "Mengeksekusi " .. targetName .. " di Zona PvP secepat kilat!")
+        
+        -- Waktu eksekusi sinkron dengan kecepatan yang diset di UI
+        task.wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
+        
+        State.AuraKill = false
+        
+        char:PivotTo(originalPos)
+        logAction("ASSASSIN", "Selesai eksekusi, kembali ke posisi aman.")
+    end)
+end)
+
+local isLoopTPActive = false
+local loopTPConnection = nil
+
+tpBtn.MouseButton1Click:Connect(function()
+    if isLoopTPActive then
+        isLoopTPActive = false
+        tpBtn.Text = "TP To Player"
+        tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+        if loopTPConnection then
+            loopTPConnection:Disconnect()
+            loopTPConnection = nil
         end
-        
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end -- Force physics update
-        
-        logAction("TELEPORT", "Successfully INSTANT teleported to " .. targetName)
+        logAction("TELEPORT", "Stopped TP Loop")
+    else
+        local success, char, targetChar, targetName = checkTeleportRequirements()
+        if success then
+            isLoopTPActive = true
+            tpBtn.Text = "Stop TP Loop"
+            tpBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+            
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Sit = false end
+            
+            -- TP pertama kali sekaligus fix kamera
+            local targetCFrame = targetChar:GetPivot()
+            char:PivotTo(targetCFrame * CFrame.new(0, 2, -3) * CFrame.Angles(0, math.pi, 0))
+            
+            local root = char.PrimaryPart or char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local cam = workspace.CurrentCamera
+                if cam then
+                    cam.CFrame = CFrame.lookAt(root.Position + (root.CFrame.LookVector * -12) + Vector3.new(0, 5, 0), root.Position)
+                end
+            end
+            
+            if hum then hum:ChangeState(Enum.HumanoidStateType.Freefall) end
+            
+            -- Mulai loop supaya musuh selalu di depan kita (ga ilang)
+            loopTPConnection = RunService.Heartbeat:Connect(function()
+                local s, c, tc, tn = checkTeleportRequirements()
+                if not s then
+                    isLoopTPActive = false
+                    tpBtn.Text = "TP To Player"
+                    tpBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+                    if loopTPConnection then
+                        loopTPConnection:Disconnect()
+                        loopTPConnection = nil
+                    end
+                    return
+                end
+                
+                pcall(function()
+                    local h = c:FindFirstChildOfClass("Humanoid")
+                    if h then h.Sit = false end
+                    -- Terus teleport ke depan musuh
+                    c:PivotTo(tc:GetPivot() * CFrame.new(0, 2, -3) * CFrame.Angles(0, math.pi, 0))
+                end)
+            end)
+            
+            logAction("TELEPORT", "Started Loop TP to " .. targetName)
+        end
     end
 end)
 
