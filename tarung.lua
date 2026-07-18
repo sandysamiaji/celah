@@ -1154,6 +1154,14 @@ end
 
 local autoHealThread = nil
 local function autoHealLoop()
+    local useEvent
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+        if desc:IsA("RemoteEvent") and (desc.Name == "UseConsumable" or desc.Name == "UseBagItem" or desc.Name == "UseItem" or desc.Name == "Consume" or desc.Name == "EatItem") then
+            useEvent = desc
+            break
+        end
+    end
+
     while State.AutoHeal do
         task.wait(State.HealCooldown)
         if not State.AutoHeal then break end
@@ -1162,40 +1170,56 @@ local function autoHealLoop()
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health > 0 then
             local prevTool = char:FindFirstChildOfClass("Tool")
-            local bp = LocalPlayer:FindFirstChild("Backpack")
             
-            -- Kumpulkan semua tool dari Backpack dan Character
-            local allTools = {}
-            if bp then
-                for _, t in ipairs(bp:GetChildren()) do table.insert(allTools, t) end
-            end
-            if prevTool then table.insert(allTools, prevTool) end
-            
-            for _, tool in ipairs(allTools) do
-                if not State.AutoHeal then break end
-                if tool:IsA("Tool") then
-                    local n = tool.Name:lower()
-                    if string.find(n, "bandage") or string.find(n, "perban") or string.find(n, "medkit") or string.find(n, "heal") or string.find(n, "blood") then
-                        pcall(function()
-                            if tool.Parent ~= char then
-                                hum:EquipTool(tool)
-                                wait(0.1)
+            if useEvent then
+                -- Tambahkan "Bandages" dengan huruf 's' sesuai dengan log
+                local consumeList = {"Bandages", "Bandage", "Perban", "Medkit", "Heal"}
+                for _, item in ipairs(consumeList) do
+                    if not State.AutoHeal then break end
+                    pcall(function()
+                        for i = 1, State.HealAmount do
+                            useEvent:FireServer(item)
+                        end
+                    end)
+                end
+            else
+                local bp = LocalPlayer:FindFirstChild("Backpack")
+                if bp then
+                    local allTools = {}
+                    for _, t in ipairs(bp:GetChildren()) do table.insert(allTools, t) end
+                    if prevTool then table.insert(allTools, prevTool) end
+                    
+                    for _, tool in ipairs(allTools) do
+                        if not State.AutoHeal then break end
+                        if tool:IsA("Tool") then
+                            local n = tool.Name:lower()
+                            if string.find(n, "bandage") or string.find(n, "perban") or string.find(n, "medkit") or string.find(n, "heal") or string.find(n, "blood") then
+                                pcall(function()
+                                    if tool.Parent ~= char then
+                                        hum:EquipTool(tool)
+                                        wait(0.1)
+                                    end
+                                    for i = 1, State.HealAmount do
+                                        tool:Activate()
+                                        wait(0.05)
+                                    end
+                                    if prevTool and prevTool ~= tool and prevTool.Parent ~= char then
+                                        wait(0.1)
+                                        hum:EquipTool(prevTool)
+                                    elseif not prevTool then
+                                        wait(0.1)
+                                        hum:UnequipTools()
+                                    end
+                                end)
+                                break 
                             end
-                            for i = 1, State.HealAmount do
-                                tool:Activate()
-                                wait(0.05)
-                            end
-                            if prevTool and prevTool ~= tool and prevTool.Parent ~= char then
-                                wait(0.1)
-                                hum:EquipTool(prevTool)
-                            elseif not prevTool then
-                                wait(0.1)
-                                hum:UnequipTools()
-                            end
-                        end)
-                        break 
+                        end
                     end
                 end
+            end
+            
+            if prevTool and prevTool.Parent ~= char then
+                pcall(function() hum:EquipTool(prevTool) end)
             end
         end
     end
