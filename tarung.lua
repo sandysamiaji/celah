@@ -92,10 +92,10 @@ local State = {
     AutoClaimReward = false,
     AutoRespawn = false,
     AutoHeal = false,
-    HealCooldown = 0.02,
-    HealAmount = 3,
+    HealCooldown = 0.2,
+    HealAmount = 5,
     AutoEat = false,
-    EatCooldown = 5,
+    EatCooldown = 30,
     AutoCook = false,
     PasteHeight = 20,
     AntiFallDamage = false,
@@ -1166,7 +1166,7 @@ local function autoHealLoop()
         
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum and hum.Health > 0 and hum.Health < hum.MaxHealth then
+        if hum and hum.Health > 0 then
             local prevTool = char:FindFirstChildOfClass("Tool")
             
             if useEvent then
@@ -2741,20 +2741,19 @@ local function autoGiftLoop()
             if myRoot then
                 local originalCFrame = myRoot.CFrame
                 
-                for targetName, isSelected in pairs(State.GiftTargets) do
+                for _, targetPlayer in ipairs(Players:GetPlayers()) do
                     if not State.AutoGift then break end
                     
-                    if isSelected then
-                        local targetPlayer = Players:FindFirstChild(targetName)
-                        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    if targetPlayer ~= LocalPlayer and State.GiftTargets[targetPlayer.Name] then
+                        if targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
                             local targetRoot = targetPlayer.Character.HumanoidRootPart
                             local targetPos = targetRoot.Position + Vector3.new(0, -5, 0) -- Di bawah kaki
                             
-                            -- 1. Teleport ke atas kepala pemain target
-                            myRoot.CFrame = targetRoot.CFrame + Vector3.new(0, 10, 0)
+                            -- 1. Teleport ke depan pemain target (jarak 2 stud, saling berhadapan)
+                            myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, -2) * CFrame.Angles(0, math.pi, 0)
                             
                             -- 2. Jeda agar server mendaftarkan posisi baru kita
-                            wait(0.5)
+                            wait(1)
                             
                             if not State.AutoGift then break end
                             
