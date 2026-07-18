@@ -109,6 +109,8 @@ local State = {
     GiftTargets = {},
     GiftRemote = nil,
     GiftArgs = nil,
+    GiftTeleportDelay = 2,
+    GiftDropDelay = 0.1,
     Fly = false,
     FlySpeed = 16,
     WebhookLogs = false, -- Default mati
@@ -1152,60 +1154,48 @@ end
 
 local autoHealThread = nil
 local function autoHealLoop()
-    local useEvent
-    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
-        if desc:IsA("RemoteEvent") and (desc.Name == "UseConsumable" or desc.Name == "UseBagItem" or desc.Name == "UseItem" or desc.Name == "Consume" or desc.Name == "EatItem") then
-            useEvent = desc
-            break
-        end
-    end
-
     while State.AutoHeal do
-        task.wait(State.HealCooldown) -- Cek secepat kecepatan input dari UI
+        task.wait(State.HealCooldown)
         if not State.AutoHeal then break end
         
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health > 0 then
             local prevTool = char:FindFirstChildOfClass("Tool")
+            local bp = LocalPlayer:FindFirstChild("Backpack")
             
-            if useEvent then
-                local consumeList = {"Bandage", "Perban", "Medkit", "Heal"}
-                for _, item in ipairs(consumeList) do
-                    if not State.AutoHeal then break end
-                    pcall(function()
-                        for i = 1, State.HealAmount do -- Langsung pakai sesuai jumlah
-                            useEvent:FireServer(item)
-                        end
-                    end)
-                end
-            else
-                local bp = LocalPlayer:FindFirstChild("Backpack")
-                if bp then
-                    for _, tool in ipairs(bp:GetChildren()) do
-                        if not State.AutoHeal then break end
-                        if tool:IsA("Tool") then
-                            local n = tool.Name:lower()
-                            if string.find(n, "bandage") or string.find(n, "perban") or string.find(n, "medkit") or string.find(n, "heal") then
-                                pcall(function()
-                                    hum:EquipTool(tool)
-                                    wait(0.1)
-                                    for i = 1, State.HealAmount do -- Langsung tembak sesuai jumlah
-                                        tool:Activate()
-                                        wait(0.05)
-                                    end
-                                    wait(0.1)
-                                    hum:UnequipTools()
-                                end)
-                                break 
+            -- Kumpulkan semua tool dari Backpack dan Character
+            local allTools = {}
+            if bp then
+                for _, t in ipairs(bp:GetChildren()) do table.insert(allTools, t) end
+            end
+            if prevTool then table.insert(allTools, prevTool) end
+            
+            for _, tool in ipairs(allTools) do
+                if not State.AutoHeal then break end
+                if tool:IsA("Tool") then
+                    local n = tool.Name:lower()
+                    if string.find(n, "bandage") or string.find(n, "perban") or string.find(n, "medkit") or string.find(n, "heal") or string.find(n, "blood") then
+                        pcall(function()
+                            if tool.Parent ~= char then
+                                hum:EquipTool(tool)
+                                wait(0.1)
                             end
-                        end
+                            for i = 1, State.HealAmount do
+                                tool:Activate()
+                                wait(0.05)
+                            end
+                            if prevTool and prevTool ~= tool and prevTool.Parent ~= char then
+                                wait(0.1)
+                                hum:EquipTool(prevTool)
+                            elseif not prevTool then
+                                wait(0.1)
+                                hum:UnequipTools()
+                            end
+                        end)
+                        break 
                     end
                 end
-            end
-            
-            if prevTool and prevTool.Parent ~= char then
-                pcall(function() hum:EquipTool(prevTool) end)
             end
         end
     end
@@ -2632,6 +2622,78 @@ autoGiftBtn.Text = "Auto Gift: OFF"
 autoGiftBtn.LayoutOrder = 2
 autoGiftBtn.Parent = giftTab
 
+local giftTpDelayContainer = Instance.new("Frame")
+giftTpDelayContainer.Size = UDim2.new(0.9, 0, 0, 35)
+giftTpDelayContainer.BackgroundTransparency = 1
+giftTpDelayContainer.LayoutOrder = 2.1
+giftTpDelayContainer.Parent = giftTab
+
+local giftTpDelayLabel = Instance.new("TextLabel")
+giftTpDelayLabel.Size = UDim2.new(0.55, 0, 1, 0)
+giftTpDelayLabel.BackgroundTransparency = 1
+giftTpDelayLabel.Text = "Teleport Delay:"
+giftTpDelayLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+giftTpDelayLabel.Font = Enum.Font.GothamBold
+giftTpDelayLabel.TextSize = 13
+giftTpDelayLabel.TextXAlignment = Enum.TextXAlignment.Left
+giftTpDelayLabel.Parent = giftTpDelayContainer
+
+local giftTpDelayInput = Instance.new("TextBox")
+giftTpDelayInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+giftTpDelayInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+giftTpDelayInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+giftTpDelayInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+giftTpDelayInput.Font = Enum.Font.Gotham
+giftTpDelayInput.TextSize = 13
+giftTpDelayInput.Text = tostring(State.GiftTeleportDelay)
+giftTpDelayInput.PlaceholderText = "Seconds"
+giftTpDelayInput.Parent = giftTpDelayContainer
+
+giftTpDelayInput.FocusLost:Connect(function()
+    local val = tonumber(giftTpDelayInput.Text)
+    if val then
+        State.GiftTeleportDelay = val
+    else
+        giftTpDelayInput.Text = tostring(State.GiftTeleportDelay)
+    end
+end)
+
+local giftDropDelayContainer = Instance.new("Frame")
+giftDropDelayContainer.Size = UDim2.new(0.9, 0, 0, 35)
+giftDropDelayContainer.BackgroundTransparency = 1
+giftDropDelayContainer.LayoutOrder = 2.2
+giftDropDelayContainer.Parent = giftTab
+
+local giftDropDelayLabel = Instance.new("TextLabel")
+giftDropDelayLabel.Size = UDim2.new(0.55, 0, 1, 0)
+giftDropDelayLabel.BackgroundTransparency = 1
+giftDropDelayLabel.Text = "Drop Speed:"
+giftDropDelayLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+giftDropDelayLabel.Font = Enum.Font.GothamBold
+giftDropDelayLabel.TextSize = 13
+giftDropDelayLabel.TextXAlignment = Enum.TextXAlignment.Left
+giftDropDelayLabel.Parent = giftDropDelayContainer
+
+local giftDropDelayInput = Instance.new("TextBox")
+giftDropDelayInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+giftDropDelayInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+giftDropDelayInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+giftDropDelayInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+giftDropDelayInput.Font = Enum.Font.Gotham
+giftDropDelayInput.TextSize = 13
+giftDropDelayInput.Text = tostring(State.GiftDropDelay)
+giftDropDelayInput.PlaceholderText = "Seconds"
+giftDropDelayInput.Parent = giftDropDelayContainer
+
+giftDropDelayInput.FocusLost:Connect(function()
+    local val = tonumber(giftDropDelayInput.Text)
+    if val then
+        State.GiftDropDelay = val
+    else
+        giftDropDelayInput.Text = tostring(State.GiftDropDelay)
+    end
+end)
+
 local giftStatus = Instance.new("TextLabel")
 giftStatus.Name = "GiftStatusLabel"
 giftStatus.Size = UDim2.new(0.9, 0, 0, 30)
@@ -2753,7 +2815,7 @@ local function autoGiftLoop()
                             myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, -2) * CFrame.Angles(0, math.pi, 0)
                             
                             -- 2. Jeda agar server mendaftarkan posisi baru kita
-                            wait(1)
+                            wait(State.GiftTeleportDelay)
                             
                             if not State.AutoGift then break end
                             
@@ -2783,11 +2845,11 @@ local function autoGiftLoop()
                                     State.GiftRemote:FireServer(unpack(newArgs))
                                     State.IsLoopDropping = false
                                 end)
-                                wait(0.1) -- Jeda tipis antar drop biar tidak dianggap spam/kick
+                                wait(State.GiftDropDelay) -- Jeda tipis antar drop biar tidak dianggap spam/kick
                             end
                             
                             -- 5. Jeda sebelum pindah ke pemain berikutnya
-                            wait(0.5)
+                            wait(State.GiftTeleportDelay)
                         end
                     end
                 end
