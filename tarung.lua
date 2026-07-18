@@ -1873,8 +1873,19 @@ hitAndRunBtn.MouseButton1Click:Connect(function()
     -- Cleanup: kembali ke posisi awal yang sebenarnya
     pcall(function()
         State.AuraKill = wasAuraKillActive
-        hrp.CFrame = originalHomeCFrame
+        
+        -- Reset momentum gila dari Fling agar tidak terlempar
         hrp.Velocity = Vector3.new(0, 0, 0)
+        hrp.RotVelocity = Vector3.new(0, 0, 0)
+        
+        -- Gunakan PivotTo untuk memindahkan keseluruhan karakter dengan aman
+        char:PivotTo(originalHomeCFrame)
+        
+        -- Pastikan setelah 1 frame tetap diam di tempat
+        RunService.Heartbeat:Wait()
+        hrp.Velocity = Vector3.new(0, 0, 0)
+        hrp.RotVelocity = Vector3.new(0, 0, 0)
+        char:PivotTo(originalHomeCFrame)
     end)
     
     hitAndRunBtn.BackgroundColor3 = Color3.fromRGB(192, 57, 43)
