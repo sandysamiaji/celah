@@ -1424,6 +1424,7 @@ local function touchFlingLoop()
         
         if hrp then
             local vel = hrp.Velocity
+            local oldCFrame = hrp.CFrame
             
             -- Bypass Anti-Fling musuh: Buat karakter kita 140x lebih berat (Density maksimal)
             -- Ini mencegah kita terlempar balik dan memastikan hukum fisika memihak kita
@@ -1434,8 +1435,9 @@ local function touchFlingLoop()
             hrp.Velocity = vel * State.FlingVelocity + Vector3.new(0, State.FlingVelocity, 0)
             
             RunService.RenderStepped:Wait()
-            -- Jangan reset RotVelocity agar getaran terlihat oleh diri sendiri dan pemain lain
+            -- Pertahankan posisi dan rotasi visual agar kamera tidak pusing akibat RotVelocity
             hrp.Velocity = vel
+            hrp.CFrame = CFrame.new(hrp.Position) * (oldCFrame - oldCFrame.Position)
             
             RunService.Stepped:Wait()
             -- Micro-oscillation agar selalu terhitung bergerak untuk collision
@@ -1505,11 +1507,11 @@ local function flingAuraLoop()
                 hrp.RotVelocity = Vector3.new(State.FlingVelocity, State.FlingVelocity, State.FlingVelocity)
                 hrp.Velocity = vel * State.FlingVelocity + Vector3.new(0, State.FlingVelocity, 0)
                 
-                -- RENDERSTEPPED (sebelum render): Jaga posisi tetap di home tapi biarkan getaran rotasi terlihat
+                -- RENDERSTEPPED (sebelum render): Jaga posisi tetap di home dan jaga rotasi tetap normal
                 RunService.RenderStepped:Wait()
                 hrp.Velocity = vel
-                -- Jaga posisi tetap di home, tapi pertahankan rotasi saat ini agar getaran (salto) terlihat!
-                hrp.CFrame = CFrame.new(homeCFrame.Position) * (hrp.CFrame - hrp.CFrame.Position)
+                -- Jaga posisi dan rotasi sesuai dengan homeCFrame agar kamera tidak pusing
+                hrp.CFrame = CFrame.new(homeCFrame.Position) * (homeCFrame - homeCFrame.Position)
                 
                 -- STEPPED (sebelum physics): Micro-oscillation
                 RunService.Stepped:Wait()
@@ -1562,6 +1564,15 @@ local function lockFlingLoop()
                     homeCFrame = hrp.CFrame
                 end
                 
+                -- Pindahkan fokus kamera ke target agar layar kita tidak ikut berputar pusing
+                pcall(function()
+                    local cam = workspace.CurrentCamera
+                    local targetHum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
+                    if cam and targetHum and cam.CameraSubject ~= targetHum then
+                        cam.CameraSubject = targetHum
+                    end
+                end)
+                
                 RunService.Heartbeat:Wait()
                 
                 hrp.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5, 1, 1)
@@ -1573,17 +1584,15 @@ local function lockFlingLoop()
                 RunService.RenderStepped:Wait()
                 hrp.Velocity = vel
                 
-                -- Lock posisi HRP kita ke musuh agar dia terus tertabrak (Lock Fling)
+                -- Lock posisi HRP kita ke musuh, dan biarkan rotasi berputar (tumbling) agar kelihatan menabrak target dengan hebat
                 hrp.CFrame = CFrame.new(targetHrp.Position) * (hrp.CFrame - hrp.CFrame.Position)
                 
                 RunService.Stepped:Wait()
                 hrp.Velocity = vel + Vector3.new(0, movel, 0)
                 movel = -movel
             else
-                -- Matikan otomatis kalau target hilang atau mati
-                if not State.SelectedPlayer or not targetPlayer then
-                    State.LockFling = false
-                end
+                -- Matikan otomatis kalau target hilang atau mati agar langsung kembali ke posisi semula (homeCFrame)
+                State.LockFling = false
                 RunService.Heartbeat:Wait()
             end
         else
@@ -1599,6 +1608,13 @@ local function lockFlingLoop()
             if homeCFrame then hrp.CFrame = homeCFrame end
             hrp.Velocity = Vector3.new(0, 0, 0)
             hrp.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1)
+        end
+        
+        -- Kembalikan kamera ke karakter kita
+        local cam = workspace.CurrentCamera
+        local myHum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+        if cam and myHum then
+            cam.CameraSubject = myHum
         end
     end)
 end
