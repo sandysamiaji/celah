@@ -1866,7 +1866,7 @@ flyToTargetBtn.MouseButton1Click:Connect(function()
         
         local bv = Instance.new("BodyVelocity")
         bv.Name = "FlyToTargetBV"
-        bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        bv.MaxForce = Vector3.new(100000, 100000, 100000)
         bv.Velocity = Vector3.new(0, 0, 0)
         if hrp then bv.Parent = hrp end
         
@@ -1883,6 +1883,10 @@ flyToTargetBtn.MouseButton1Click:Connect(function()
             if tHrp and hrp and hum then
                 hum.PlatformStand = true
                 if not hrp:FindFirstChild("FlyToTargetBV") then
+                    bv = Instance.new("BodyVelocity")
+                    bv.Name = "FlyToTargetBV"
+                    bv.MaxForce = Vector3.new(100000, 100000, 100000)
+                    bv.Velocity = Vector3.new(0, 0, 0)
                     bv.Parent = hrp
                 end
                 
