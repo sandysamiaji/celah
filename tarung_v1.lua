@@ -1416,42 +1416,20 @@ local touchFlingThread = nil
 local function touchFlingLoop()
     local lp = Players.LocalPlayer
     local movel = 0.1
-    local currentYaw = 0
-    
-    pcall(function()
-        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            currentYaw = math.atan2(-hrp.CFrame.LookVector.X, -hrp.CFrame.LookVector.Z)
-        end
-    end)
     
     while State.TouchFling do
         RunService.Heartbeat:Wait()
         local c = lp.Character
         local hrp = c and c:FindFirstChild("HumanoidRootPart")
-        local hum = c and c:FindFirstChildOfClass("Humanoid")
         
-        if hrp and hum then
+        if hrp then
             local vel = hrp.Velocity
-            
-            -- Menghitung arah berjalan untuk mengatur rotasi visual (agar terlihat jalan normal)
-            local moveDir = hum.MoveDirection
-            if moveDir.Magnitude > 0 then
-                currentYaw = math.atan2(-moveDir.X, -moveDir.Z)
-            end
-            
-            -- Set fisika berputar gila-gilaan untuk mementalkan musuh
-            hrp.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5, 1, 1)
-            hrp.RotVelocity = Vector3.new(State.FlingVelocity, State.FlingVelocity, State.FlingVelocity)
-            hrp.Velocity = vel * State.FlingVelocity + Vector3.new(0, State.FlingVelocity, 0)
+            hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
             
             RunService.RenderStepped:Wait()
             hrp.Velocity = vel
-            -- Timpa rotasi gila tadi dengan rotasi visual normal agar "seolah olah baik baik saja"
-            hrp.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(0, currentYaw, 0)
             
             RunService.Stepped:Wait()
-            -- Micro-oscillation (getaran naik-turun sangat kecil) untuk memicu tabrakan
             hrp.Velocity = vel + Vector3.new(0, movel, 0)
             movel = -movel
         end
@@ -1598,10 +1576,10 @@ local function lockFlingLoop()
                 hrp.Velocity = vel * State.FlingVelocity + Vector3.new(0, State.FlingVelocity, 0)
                 
                 RunService.RenderStepped:Wait()
+                hrp.RotVelocity = Vector3.new(0, 0, 0)
                 hrp.Velocity = vel
-                -- Lock posisi fisik ke musuh, tapi secara visual tetap berdiri tegak layaknya invisible fling (seolah-olah karakter baik-baik saja)
-                local targetYaw = math.atan2(-targetHrp.CFrame.LookVector.X, -targetHrp.CFrame.LookVector.Z)
-                hrp.CFrame = CFrame.new(targetHrp.Position) * CFrame.Angles(0, targetYaw, 0)
+                -- Jaga posisi tetap di target (mengikuti cara tarung.lua: CFrame murni tanpa dirotasi agar visual tenang)
+                hrp.CFrame = CFrame.new(targetHrp.Position)
                 
                 RunService.Stepped:Wait()
                 hrp.Velocity = vel + Vector3.new(0, movel, 0)
