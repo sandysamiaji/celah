@@ -1470,6 +1470,9 @@ local function flingAuraLoop()
             -- Kalau belum ada home atau tidak ada target, update home position
             if not homeCFrame then
                 homeCFrame = hrp.CFrame
+            elseif (hrp.Position - homeCFrame.Position).Magnitude > 10 then
+                -- Deteksi jika player teleport manual (jarak mendadak > 20 studs), update anchor
+                homeCFrame = hrp.CFrame
             end
             
             -- Cari target dalam radius
@@ -1555,7 +1558,9 @@ local function lockFlingLoop()
             local targetHrp = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
             
             if targetHrp then
-                if not homeCFrame then homeCFrame = hrp.CFrame end
+                if not homeCFrame or (hrp.Position - homeCFrame.Position).Magnitude > 20 then
+                    homeCFrame = hrp.CFrame
+                end
                 
                 RunService.Heartbeat:Wait()
                 
