@@ -1679,7 +1679,7 @@ end)
 
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
-tpContainer.Size = UDim2.new(0.9, 0, 0, 210)
+tpContainer.Size = UDim2.new(0.9, 0, 0, 245)
 tpContainer.BackgroundTransparency = 1
 tpContainer.LayoutOrder = 1
 tpContainer.Parent = teleportTab
@@ -1821,6 +1821,107 @@ trackPlayerBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+local flyToTargetSpeed = 20
+local isFlyingToTarget = false
+local flyConnection = nil
+
+local flyToTargetBtn = Instance.new("TextButton")
+flyToTargetBtn.Size = UDim2.new(0.68, 0, 0, 30)
+flyToTargetBtn.Position = UDim2.new(0, 0, 0, 210)
+flyToTargetBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+flyToTargetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyToTargetBtn.Font = Enum.Font.GothamBold
+flyToTargetBtn.TextSize = 12
+flyToTargetBtn.Text = "Terbang ke Target (Off)"
+flyToTargetBtn.Parent = tpContainer
+
+local flySpeedInput = Instance.new("TextBox")
+flySpeedInput.Size = UDim2.new(0.3, 0, 0, 30)
+flySpeedInput.Position = UDim2.new(0.7, 0, 0, 210)
+flySpeedInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+flySpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedInput.Font = Enum.Font.Gotham
+flySpeedInput.TextSize = 11
+flySpeedInput.Text = tostring(flyToTargetSpeed)
+flySpeedInput.PlaceholderText = "Speed"
+flySpeedInput.Parent = tpContainer
+
+flySpeedInput.FocusLost:Connect(function()
+    local num = tonumber(flySpeedInput.Text)
+    if num then
+        flyToTargetSpeed = num
+    else
+        flySpeedInput.Text = tostring(flyToTargetSpeed)
+    end
+end)
+
+flyToTargetBtn.MouseButton1Click:Connect(function()
+    isFlyingToTarget = not isFlyingToTarget
+    if isFlyingToTarget then
+        flyToTargetBtn.Text = "Terbang ke Target (On)"
+        flyToTargetBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        
+        local c = LocalPlayer.Character
+        local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        
+        local bv = Instance.new("BodyVelocity")
+        bv.Name = "FlyToTargetBV"
+        bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        bv.Velocity = Vector3.new(0, 0, 0)
+        if hrp then bv.Parent = hrp end
+        
+        flyConnection = RunService.Heartbeat:Connect(function(dt)
+            if not State.SelectedPlayer then return end
+            local tPlayer = Players:FindFirstChild(State.SelectedPlayer)
+            local tChar = tPlayer and tPlayer.Character
+            local tHrp = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            
+            local c = LocalPlayer.Character
+            local hrp = c and c:FindFirstChild("HumanoidRootPart")
+            local hum = c and c:FindFirstChildOfClass("Humanoid")
+            
+            if tHrp and hrp and hum then
+                hum.PlatformStand = true
+                if not hrp:FindFirstChild("FlyToTargetBV") then
+                    bv.Parent = hrp
+                end
+                
+                -- Anti-collision (Noclip)
+                for _, part in ipairs(c:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+                
+                local dist = (tHrp.Position - hrp.Position).Magnitude
+                if dist > 3 then
+                    local dir = (tHrp.Position - hrp.Position).Unit
+                    hrp.CFrame = CFrame.lookAt(hrp.Position + (dir * flyToTargetSpeed * dt), tHrp.Position)
+                else
+                    hrp.CFrame = CFrame.lookAt(hrp.Position, tHrp.Position)
+                end
+            end
+        end)
+    else
+        flyToTargetBtn.Text = "Terbang ke Target (Off)"
+        flyToTargetBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+        if flyConnection then
+            flyConnection:Disconnect()
+            flyConnection = nil
+        end
+        local c = LocalPlayer.Character
+        local hum = c and c:FindFirstChildOfClass("Humanoid")
+        local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        if hum then hum.PlatformStand = false end
+        if hrp then 
+            local bv = hrp:FindFirstChild("FlyToTargetBV")
+            if bv then bv:Destroy() end
+            hrp.Velocity = Vector3.new(0, 0, 0)
+            hrp.RotVelocity = Vector3.new(0, 0, 0)
+        end
+    end
+end)
+
 local assassinDelay = 0.5
 
 local hitAndRunBtn = Instance.new("TextButton")
@@ -1894,7 +1995,7 @@ local function updatePlayerList()
                 State.SelectedPlayer = player.Name
                 playerDropdown.Text = player.Name
                 playerList.Visible = false
-                tpContainer.Size = UDim2.new(0.9, 0, 0, 210)
+                tpContainer.Size = UDim2.new(0.9, 0, 0, 245)
             end)
             ySize = ySize + 25
         end
@@ -1907,7 +2008,7 @@ refreshBtn.MouseButton1Click:Connect(function()
     playerDropdown.Text = "Pilih Pemain..."
     selectedPlayer = nil
     if playerList.Visible then
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 410)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 445)
     end
 end)
 
@@ -1915,9 +2016,9 @@ playerDropdown.MouseButton1Click:Connect(function()
     playerList.Visible = not playerList.Visible
     if playerList.Visible then
         updatePlayerList()
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 410)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 445)
     else
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 210)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 245)
     end
 end)
 
