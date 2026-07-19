@@ -1679,7 +1679,7 @@ end)
 
 -- TELEPORT TAB
 local tpContainer = Instance.new("Frame")
-tpContainer.Size = UDim2.new(0.9, 0, 0, 175)
+tpContainer.Size = UDim2.new(0.9, 0, 0, 210)
 tpContainer.BackgroundTransparency = 1
 tpContainer.LayoutOrder = 1
 tpContainer.Parent = teleportTab
@@ -1754,6 +1754,73 @@ playerDropdown.TextSize = 12
 playerDropdown.Text = "Select Player..."
 playerDropdown.Parent = tpContainer
 
+local isTracking = false
+local trackConnection = nil
+local trackGui = nil
+
+local trackPlayerBtn = Instance.new("TextButton")
+trackPlayerBtn.Size = UDim2.new(1, 0, 0, 30)
+trackPlayerBtn.Position = UDim2.new(0, 0, 0, 175)
+trackPlayerBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+trackPlayerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+trackPlayerBtn.Font = Enum.Font.GothamBold
+trackPlayerBtn.TextSize = 12
+trackPlayerBtn.Text = "Lacak Pemain (Off)"
+trackPlayerBtn.Parent = tpContainer
+
+local function clearTrack()
+    if trackGui then
+        trackGui:Destroy()
+        trackGui = nil
+    end
+end
+
+trackPlayerBtn.MouseButton1Click:Connect(function()
+    isTracking = not isTracking
+    if isTracking then
+        trackPlayerBtn.Text = "Lacak Pemain (On)"
+        trackPlayerBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        trackConnection = RunService.RenderStepped:Connect(function()
+            if not State.SelectedPlayer then clearTrack() return end
+            local tPlayer = Players:FindFirstChild(State.SelectedPlayer)
+            local tChar = tPlayer and tPlayer.Character
+            local tHead = tChar and tChar:FindFirstChild("Head")
+            if tHead then
+                if not trackGui or trackGui.Parent ~= tHead then
+                    clearTrack()
+                    trackGui = Instance.new("BillboardGui")
+                    trackGui.Name = "TargetTracker"
+                    trackGui.Adornee = tHead
+                    trackGui.Size = UDim2.new(0, 50, 0, 50)
+                    trackGui.StudsOffset = Vector3.new(0, 3, 0)
+                    trackGui.AlwaysOnTop = true
+                    local arrow = Instance.new("TextLabel")
+                    arrow.Size = UDim2.new(1, 0, 1, 0)
+                    arrow.BackgroundTransparency = 1
+                    arrow.Text = "▼"
+                    arrow.TextColor3 = Color3.fromRGB(255, 0, 0)
+                    arrow.TextScaled = true
+                    arrow.Font = Enum.Font.GothamBlack
+                    arrow.TextStrokeTransparency = 0
+                    arrow.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
+                    arrow.Parent = trackGui
+                    trackGui.Parent = tHead
+                end
+            else
+                clearTrack()
+            end
+        end)
+    else
+        trackPlayerBtn.Text = "Lacak Pemain (Off)"
+        trackPlayerBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+        if trackConnection then
+            trackConnection:Disconnect()
+            trackConnection = nil
+        end
+        clearTrack()
+    end
+end)
+
 local assassinDelay = 0.5
 
 local hitAndRunBtn = Instance.new("TextButton")
@@ -1827,7 +1894,7 @@ local function updatePlayerList()
                 State.SelectedPlayer = player.Name
                 playerDropdown.Text = player.Name
                 playerList.Visible = false
-                tpContainer.Size = UDim2.new(0.9, 0, 0, 175)
+                tpContainer.Size = UDim2.new(0.9, 0, 0, 210)
             end)
             ySize = ySize + 25
         end
@@ -1840,7 +1907,7 @@ refreshBtn.MouseButton1Click:Connect(function()
     playerDropdown.Text = "Pilih Pemain..."
     selectedPlayer = nil
     if playerList.Visible then
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 375)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 410)
     end
 end)
 
@@ -1848,9 +1915,9 @@ playerDropdown.MouseButton1Click:Connect(function()
     playerList.Visible = not playerList.Visible
     if playerList.Visible then
         updatePlayerList()
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 375)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 410)
     else
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 175)
+        tpContainer.Size = UDim2.new(0.9, 0, 0, 210)
     end
 end)
 
