@@ -1416,37 +1416,48 @@ local touchFlingThread = nil
 local function touchFlingLoop()
     local lp = Players.LocalPlayer
     local movel = 0.1
+    local currentYaw = 0
+    
+    pcall(function()
+        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            currentYaw = math.atan2(-hrp.CFrame.LookVector.X, -hrp.CFrame.LookVector.Z)
+        end
+    end)
     
     while State.TouchFling do
         RunService.Heartbeat:Wait()
         local c = lp.Character
         local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        local hum = c and c:FindFirstChildOfClass("Humanoid")
         
-        if hrp then
+        if hrp and hum then
             local vel = hrp.Velocity
-            local oldCFrame = hrp.CFrame
             
-            -- Bypass Anti-Fling musuh: Buat karakter kita 140x lebih berat (Density maksimal)
-            -- Ini mencegah kita terlempar balik dan memastikan hukum fisika memihak kita
+            -- Menghitung arah berjalan untuk mengatur rotasi visual (agar terlihat jalan normal)
+            local moveDir = hum.MoveDirection
+            if moveDir.Magnitude > 0 then
+                currentYaw = math.atan2(-moveDir.X, -moveDir.Z)
+            end
+            
+            -- Set fisika berputar gila-gilaan untuk mementalkan musuh
             hrp.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5, 1, 1)
-            
-            -- Set rotasi ekstrim (getaran) dan kecepatan ekstrim (lemparan) berdasarkan setting
             hrp.RotVelocity = Vector3.new(State.FlingVelocity, State.FlingVelocity, State.FlingVelocity)
             hrp.Velocity = vel * State.FlingVelocity + Vector3.new(0, State.FlingVelocity, 0)
             
             RunService.RenderStepped:Wait()
-            -- Pertahankan posisi dan rotasi visual agar kamera tidak pusing akibat RotVelocity
             hrp.Velocity = vel
-            hrp.CFrame = CFrame.new(hrp.Position) * (oldCFrame - oldCFrame.Position)
+            -- Timpa rotasi gila tadi dengan rotasi visual normal agar "seolah olah baik baik saja"
+            hrp.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(0, currentYaw, 0)
             
             RunService.Stepped:Wait()
-            -- Micro-oscillation agar selalu terhitung bergerak untuk collision
+            -- Micro-oscillation (getaran naik-turun sangat kecil) untuk memicu tabrakan
             hrp.Velocity = vel + Vector3.new(0, movel, 0)
             movel = -movel
         end
     end
     
-    -- Kembalikan berat normal saat fitur dimatikan
+    -- Cleanup
     pcall(function()
         local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
         if hrp then
@@ -1549,32 +1560,37 @@ local function lockFlingLoop()
     local movel = 0.1
     local homeCFrame = nil
     
+    pcall(function()
+        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then homeCFrame = hrp.CFrame end
+    end)
+    
     while State.LockFling do
+        local targetName = State.SelectedPlayer
+        local targetPlayer = targetName and Players:FindFirstChild(targetName)
+        
+        if not targetPlayer then
+            State.LockFling = false
+            break
+        end
+
         local c = lp.Character
         local hrp = c and c:FindFirstChild("HumanoidRootPart")
         
         if hrp then
-            local targetName = State.SelectedPlayer
-            local targetPlayer = targetName and Players:FindFirstChild(targetName)
-            local targetChar = targetPlayer and targetPlayer.Character
+            local targetChar = targetPlayer.Character
             local targetHrp = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+            local targetHum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
             
-            if targetHrp then
-                if not homeCFrame or (hrp.Position - homeCFrame.Position).Magnitude > 20 then
-                    homeCFrame = hrp.CFrame
-                end
-                
-                -- Pindahkan fokus kamera ke target agar layar kita tidak ikut berputar pusing
+            if targetHrp and targetHum and targetHum.Health > 0 then
                 pcall(function()
                     local cam = workspace.CurrentCamera
-                    local targetHum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
-                    if cam and targetHum and cam.CameraSubject ~= targetHum then
+                    if cam and cam.CameraSubject ~= targetHum then
                         cam.CameraSubject = targetHum
                     end
                 end)
                 
                 RunService.Heartbeat:Wait()
-                
                 hrp.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5, 1, 1)
                 local vel = hrp.Velocity
                 
@@ -1583,20 +1599,35 @@ local function lockFlingLoop()
                 
                 RunService.RenderStepped:Wait()
                 hrp.Velocity = vel
-                
-                -- Lock posisi HRP kita ke musuh, dan biarkan rotasi berputar (tumbling) agar kelihatan menabrak target dengan hebat
-                hrp.CFrame = CFrame.new(targetHrp.Position) * (hrp.CFrame - hrp.CFrame.Position)
+                -- Lock posisi fisik ke musuh, tapi secara visual tetap berdiri tegak layaknya invisible fling (seolah-olah karakter baik-baik saja)
+                local targetYaw = math.atan2(-targetHrp.CFrame.LookVector.X, -targetHrp.CFrame.LookVector.Z)
+                hrp.CFrame = CFrame.new(targetHrp.Position) * CFrame.Angles(0, targetYaw, 0)
                 
                 RunService.Stepped:Wait()
                 hrp.Velocity = vel + Vector3.new(0, movel, 0)
                 movel = -movel
             else
-                -- Matikan otomatis kalau target hilang atau mati agar langsung kembali ke posisi semula (homeCFrame)
-                State.LockFling = false
+                -- Target sedang mati/hilang, kembali ke homeCFrame dan tunggu respawn
+                if homeCFrame then
+                    pcall(function()
+                        hrp.CFrame = homeCFrame
+                        hrp.Velocity = Vector3.new(0, 0, 0)
+                        hrp.RotVelocity = Vector3.new(0, 0, 0)
+                    end)
+                end
+                
+                -- Kembalikan kamera ke karakter kita sementara menunggu
+                pcall(function()
+                    local cam = workspace.CurrentCamera
+                    local myHum = c:FindFirstChildOfClass("Humanoid")
+                    if cam and myHum and cam.CameraSubject ~= myHum then
+                        cam.CameraSubject = myHum
+                    end
+                end)
+                
                 RunService.Heartbeat:Wait()
             end
         else
-            homeCFrame = nil
             RunService.Heartbeat:Wait()
         end
     end
@@ -1609,12 +1640,9 @@ local function lockFlingLoop()
             hrp.Velocity = Vector3.new(0, 0, 0)
             hrp.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1)
         end
-        
-        -- Kembalikan kamera ke karakter kita
-        local cam = workspace.CurrentCamera
         local myHum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
-        if cam and myHum then
-            cam.CameraSubject = myHum
+        if myHum then
+            workspace.CurrentCamera.CameraSubject = myHum
         end
     end)
 end
@@ -3321,13 +3349,15 @@ local function getTargetsInRadius()
     local rootPart = char.HumanoidRootPart
 
     -- Cek Pemain & NPC
-    if State.AuraKill then
+    if State.AuraKill or State.LockFling then
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                 local hum = player.Character:FindFirstChildOfClass("Humanoid")
                 if hum and hum.Health > 0 then
                     -- Berikan toleransi jarak sedikit lebih besar untuk hitungan membunuh (misal + 10 studs) agar tidak miss saat musuh terpental oleh Fling
-                    if (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= (State.AuraRadius + 10) then
+                    -- Jika LockFling aktif, target utama selalu diserang walau terlempar jauh
+                    local isLockTarget = State.LockFling and State.SelectedPlayer == player.Name
+                    if isLockTarget or (State.AuraKill and (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= (State.AuraRadius + 10)) then
                         -- Ambil beberapa part penting dari pemain (R6 dan R15)
                         local partsToHit = {"Torso", "UpperTorso", "Head", "Right Arm"}
                         for _, pName in ipairs(partsToHit) do
@@ -3411,7 +3441,7 @@ track(RunService.RenderStepped:Connect(function()
     local currentTime = tick()
     
     -- 1. AURA & COLLECT
-    if (State.AuraHarvest or State.AuraKill) and (currentTime - lastAttackTime >= State.AttackCooldown) then
+    if (State.AuraHarvest or State.AuraKill or State.LockFling) and (currentTime - lastAttackTime >= State.AttackCooldown) then
         local weapon = getEquippedWeapon()
         local rootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         local weaponHandle = weapon and weapon:FindFirstChild("Handle")
