@@ -1568,22 +1568,42 @@ local function lockFlingLoop()
                     end
                 end)
                 
-                RunService.Heartbeat:Wait()
-                hrp.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5, 1, 1)
-                local vel = hrp.Velocity
+                -- Gunakan pcall agar jika target tiba-tiba hancur/leave di tengah frame, thread tidak mati!
+                local success, err = pcall(function()
+                    RunService.Heartbeat:Wait()
+                    -- Cek ulang eksistensi target setelah Wait
+                    if not targetHrp or not targetHrp.Parent then return end
+                    
+                    hrp.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5, 1, 1)
+                    local vel = hrp.Velocity
+                    
+                    -- Posisi fisik (Mesin penabrak): Mundur 3 stud ke arah acak, lalu tembak ke arah musuh!
+                    local randomDir = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
+                    hrp.CFrame = CFrame.new(targetHrp.Position + (randomDir * 3))
+                    
+                    hrp.RotVelocity = Vector3.new(State.FlingVelocity, State.FlingVelocity, State.FlingVelocity)
+                    -- Arahkan velocity tepat menembus musuh dari arah acak tersebut
+                    hrp.Velocity = (-randomDir) * State.FlingVelocity
+                    
+                    RunService.RenderStepped:Wait()
+                    if not targetHrp or not targetHrp.Parent then return end
+                    
+                    -- Jangan set RotVelocity ke 0! Biarkan karakter asli berputar dan menabrak secara nyata di layar.
+                    hrp.Velocity = vel
+                    
+                    -- Kembalikan posisi persis ke musuh, tapi pertahankan rotasi brutalnya agar server dan layar sinkron
+                    hrp.CFrame = CFrame.new(targetHrp.Position) * (hrp.CFrame - hrp.CFrame.Position)
+                    
+                    RunService.Stepped:Wait()
+                    if not targetHrp or not targetHrp.Parent then return end
+                    hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                    movel = -movel
+                end)
                 
-                hrp.RotVelocity = Vector3.new(State.FlingVelocity, State.FlingVelocity, State.FlingVelocity)
-                hrp.Velocity = vel * State.FlingVelocity + Vector3.new(0, State.FlingVelocity, 0)
-                
-                RunService.RenderStepped:Wait()
-                hrp.RotVelocity = Vector3.new(0, 0, 0)
-                hrp.Velocity = vel
-                -- Jaga posisi tetap di target (mengikuti cara tarung.lua: CFrame murni tanpa dirotasi agar visual tenang)
-                hrp.CFrame = CFrame.new(targetHrp.Position)
-                
-                RunService.Stepped:Wait()
-                hrp.Velocity = vel + Vector3.new(0, movel, 0)
-                movel = -movel
+                if not success then
+                    -- Jika error (misal target hilang mendadak), tunggu sejenak lalu lanjut
+                    RunService.Heartbeat:Wait()
+                end
             else
                 -- Target sedang mati/hilang, kembali ke homeCFrame dan tunggu respawn
                 if homeCFrame then
@@ -1610,12 +1630,13 @@ local function lockFlingLoop()
         end
     end
     
-    -- Cleanup
+    -- Cleanup (pasti tereksekusi ketika State.LockFling dimatikan, karena thread terlindungi pcall)
     pcall(function()
         local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
         if hrp then
             if homeCFrame then hrp.CFrame = homeCFrame end
             hrp.Velocity = Vector3.new(0, 0, 0)
+            hrp.RotVelocity = Vector3.new(0, 0, 0)
             hrp.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1)
         end
         local myHum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
