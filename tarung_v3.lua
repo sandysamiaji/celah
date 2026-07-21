@@ -3041,8 +3041,15 @@ dropAmountInput.PlaceholderText = "Jumlah Item (misal: 10)"
 dropAmountInput.Text = "10"
 dropAmountInput.LayoutOrder = 6
 dropAmountInput.Parent = giftTab
-UI_Corner(dropAmountInput, 6)
-UI_Stroke(dropAmountInput, Color3.fromRGB(100, 100, 100))
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = dropAmountInput
+    local s = Instance.new("UIStroke")
+    s.Color = Color3.fromRGB(100, 100, 100)
+    s.Thickness = 1
+    s.Parent = dropAmountInput
+end
 
 local autoDropBagBtn = Instance.new("TextButton")
 autoDropBagBtn.Name = "AutoDropBagBtn"
