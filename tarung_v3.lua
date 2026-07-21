@@ -124,7 +124,7 @@ local State = {
     AntiFling = false,
     FEInvisible = false,
     UndergroundMode = false,
-    SelectedPlayer = nil
+    SelectedPlayer = nil,
     LockFling = false,
     AutoLockKiller = false,
 }
