@@ -3392,6 +3392,14 @@ local function autoGiftLoop()
     while State.AutoGift do
         if not State.AutoGift then break end
         
+        if State.GiftCaptured then
+            State.GiftCaptured = false
+            pcall(function()
+                giftStatus.Text = "Status: Captured [" .. tostring(State.GiftArgs and State.GiftArgs[1] or "item") .. "]!"
+                giftStatus.TextColor3 = Color3.fromRGB(46, 204, 113)
+            end)
+        end
+        
         if State.GiftRemote and State.GiftArgs then
             local myChar = LocalPlayer.Character
             local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -3919,53 +3927,30 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     
     -- Blokir Fall Damage jika aktif
     if State.AntiFallDamage and method == "FireServer" and self == fallDamageEvent then
-        return
+        return nil
     end
     
-    -- Infinite Drop / Duplication Exploit (Spoofing Drop Amount)
+    -- Auto Respawn block
+    if State.AutoRespawn and method == "FireServer" and self.Name == "OnDied" then
+        return nil
+    end
+    
+    -- Infinite Drop Hack
     if State.InfiniteDrop and method == "FireServer" and (self.Name == "Drop" or self.Name == "DropItem" or self.Name == "DropItems") then
         for i, v in ipairs(args) do
             if type(v) == "number" then
-                args[i] = -999999 -- Underflow hack: Coba tipu server bahwa kita nge-drop minus
+                args[i] = -999999
             end
         end
-        -- DELTA FIX: Unroll unpack untuk mencegah bug variadic di Delta executor
-        if #args == 1 then
-            return oldNamecall(self, args[1])
-        elseif #args == 2 then
-            return oldNamecall(self, args[1], args[2])
-        elseif #args == 3 then
-            return oldNamecall(self, args[1], args[2], args[3])
-        elseif #args == 4 then
-            return oldNamecall(self, args[1], args[2], args[3], args[4])
-        else
-            return oldNamecall(self, unpack(args))
-        end
+        return oldNamecall(self, unpack(args))
     end
     
-    -- Auto Gift Interception
+    -- Auto Gift Intercept
     if State.AutoGift and not State.IsLoopDropping and method == "FireServer" and (self.Name == "Drop" or self.Name == "DropItem" or self.Name == "DropItems") then
         State.GiftRemote = self
         State.GiftArgs = args
-        pcall(function()
-            giftStatus.Text = "Status: Captured [" .. tostring(args[1] or "item") .. "]!"
-            giftStatus.TextColor3 = Color3.fromRGB(46, 204, 113)
-        end)
-        return
-    end
-    
-    -- Sistem Trace & Logging
-    if State.SpyTrace and (method == "FireServer" or method == "InvokeServer") then
-        if self.Name ~= "Sync" and self.Name ~= "RequestSync" and self.Name ~= "Update" and self.Name ~= "Mouse" and self.Name ~= "Ping" then
-            local argsStr = ""
-            for i, v in ipairs(args) do
-                -- Tangkap tipe data asli (berguna untuk melihat CFrame/Vector3/String)
-                local vStr = type(v) == "userdata" and typeof(v) .. "(" .. tostring(v) .. ")" or tostring(v)
-                argsStr = argsStr .. vStr .. (i < #args and ", " or "")
-            end
-            if string.len(argsStr) > 500 then argsStr = string.sub(argsStr, 1, 500) .. "..." end
-            logAction("SPY-REMOTE", string.format("%s | Args: [%s]", self.Name, argsStr))
-        end
+        State.GiftCaptured = true -- signal to UI updater outside hook
+        return nil
     end
     
     return oldNamecall(self, ...)
