@@ -116,6 +116,7 @@ local State = {
     WebhookLogs = false, -- Default mati
     FlingAura = false,
     LockFling = false,
+    AutoLockKiller = false,
     FlingVelocity = 10000,
     CopyRadius = 200,
     DeleteRadius = 200,
@@ -1649,6 +1650,7 @@ end
 createToggle("TouchFling", "Touch Fling (Vibrate)", "TouchFling", 2, teleportTab)
 createToggle("FlingAura", "Fling Aura (Area Fling)", "FlingAura", 3, teleportTab)
 createToggle("LockFlingToggle", "Lock Fling (Target)", "LockFling", 3.5, teleportTab)
+createToggle("AutoLockKillerToggle", "Auto Lock Killer (Revenge)", "AutoLockKiller", 3.6, teleportTab)
 
 local flingVelContainer = Instance.new("Frame")
 flingVelContainer.Size = UDim2.new(0.9, 0, 0, 35)
@@ -1834,11 +1836,14 @@ trackPlayerBtn.MouseButton1Click:Connect(function()
                     trackGui = Instance.new("BillboardGui")
                     trackGui.Name = "TargetTracker"
                     trackGui.Adornee = tHead
-                    trackGui.Size = UDim2.new(0, 50, 0, 50)
+                    trackGui.Size = UDim2.new(0, 80, 0, 70)
                     trackGui.StudsOffset = Vector3.new(0, 3, 0)
                     trackGui.AlwaysOnTop = true
+                    
                     local arrow = Instance.new("TextLabel")
-                    arrow.Size = UDim2.new(1, 0, 1, 0)
+                    arrow.Name = "Arrow"
+                    arrow.Size = UDim2.new(1, 0, 0.6, 0)
+                    arrow.Position = UDim2.new(0, 0, 0, 0)
                     arrow.BackgroundTransparency = 1
                     arrow.Text = "▼"
                     arrow.TextColor3 = Color3.fromRGB(255, 0, 0)
@@ -1847,7 +1852,30 @@ trackPlayerBtn.MouseButton1Click:Connect(function()
                     arrow.TextStrokeTransparency = 0
                     arrow.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
                     arrow.Parent = trackGui
+                    
+                    local distLabel = Instance.new("TextLabel")
+                    distLabel.Name = "Distance"
+                    distLabel.Size = UDim2.new(1, 0, 0.4, 0)
+                    distLabel.Position = UDim2.new(0, 0, 0.6, 0)
+                    distLabel.BackgroundTransparency = 1
+                    distLabel.Text = "0m"
+                    distLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    distLabel.TextScaled = true
+                    distLabel.Font = Enum.Font.GothamBold
+                    distLabel.TextStrokeTransparency = 0
+                    distLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                    distLabel.Parent = trackGui
+                    
                     trackGui.Parent = tHead
+                end
+                
+                -- Update jarak secara real-time
+                local myChar = LocalPlayer.Character
+                local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                local targetRoot = tChar:FindFirstChild("HumanoidRootPart")
+                if myRoot and targetRoot and trackGui:FindFirstChild("Distance") then
+                    local dist = math.floor((myRoot.Position - targetRoot.Position).Magnitude)
+                    trackGui.Distance.Text = tostring(dist) .. "m"
                 end
             else
                 clearTrack()
@@ -3053,6 +3081,226 @@ giftStatus.TextSize = 12
 giftStatus.LayoutOrder = 3
 giftStatus.Parent = giftTab
 
+local dropAmountContainer = Instance.new("Frame")
+dropAmountContainer.Size = UDim2.new(0.9, 0, 0, 30)
+dropAmountContainer.BackgroundTransparency = 1
+dropAmountContainer.LayoutOrder = 4
+dropAmountContainer.Parent = giftTab
+
+local dropAmountLabel = Instance.new("TextLabel")
+dropAmountLabel.Size = UDim2.new(0.6, 0, 1, 0)
+dropAmountLabel.BackgroundTransparency = 1
+dropAmountLabel.Text = "Set Drop Amount:"
+dropAmountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+dropAmountLabel.Font = Enum.Font.GothamBold
+dropAmountLabel.TextSize = 12
+dropAmountLabel.TextXAlignment = Enum.TextXAlignment.Left
+dropAmountLabel.Parent = dropAmountContainer
+
+local dropAmountInput = Instance.new("TextBox")
+dropAmountInput.Size = UDim2.new(0.35, 0, 1, 0)
+dropAmountInput.Position = UDim2.new(0.65, 0, 0, 0)
+dropAmountInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+dropAmountInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+dropAmountInput.Font = Enum.Font.Gotham
+dropAmountInput.TextSize = 12
+dropAmountInput.Text = "-10"
+dropAmountInput.Parent = dropAmountContainer
+
+local dropItemFilterContainer = Instance.new("Frame")
+dropItemFilterContainer.Size = UDim2.new(0.9, 0, 0, 30)
+dropItemFilterContainer.BackgroundTransparency = 1
+dropItemFilterContainer.LayoutOrder = 5
+dropItemFilterContainer.Parent = giftTab
+
+local dropItemFilterLabel = Instance.new("TextLabel")
+dropItemFilterLabel.Size = UDim2.new(0.35, 0, 1, 0)
+dropItemFilterLabel.BackgroundTransparency = 1
+dropItemFilterLabel.Text = "Pilih Item Drop:"
+dropItemFilterLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+dropItemFilterLabel.Font = Enum.Font.GothamBold
+dropItemFilterLabel.TextSize = 12
+dropItemFilterLabel.TextXAlignment = Enum.TextXAlignment.Left
+dropItemFilterLabel.Parent = dropItemFilterContainer
+
+local dropItemDropdownBtn = Instance.new("TextButton")
+dropItemDropdownBtn.Size = UDim2.new(0.65, 0, 1, 0)
+dropItemDropdownBtn.Position = UDim2.new(0.35, 0, 0, 0)
+dropItemDropdownBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+dropItemDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+dropItemDropdownBtn.Font = Enum.Font.Gotham
+dropItemDropdownBtn.TextSize = 12
+dropItemDropdownBtn.Text = "Semua Item"
+dropItemDropdownBtn.Parent = dropItemFilterContainer
+
+local dropItemList = Instance.new("ScrollingFrame")
+dropItemList.Size = UDim2.new(1, 0, 0, 120)
+dropItemList.Position = UDim2.new(0, 0, 1, 0)
+dropItemList.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+dropItemList.BorderSizePixel = 0
+dropItemList.ScrollBarThickness = 4
+dropItemList.ZIndex = 5
+dropItemList.Visible = false
+dropItemList.Parent = dropItemDropdownBtn
+
+local dropItemListLayout = Instance.new("UIListLayout")
+dropItemListLayout.Parent = dropItemList
+dropItemListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+dropItemDropdownBtn.MouseButton1Click:Connect(function()
+    dropItemList.Visible = not dropItemList.Visible
+    if dropItemList.Visible then
+        for _, child in ipairs(dropItemList:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+        
+        local function createOption(name, order)
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 0, 25)
+            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 11
+            btn.Text = name
+            btn.LayoutOrder = order
+            btn.ZIndex = 6
+            btn.Parent = dropItemList
+            
+            btn.MouseButton1Click:Connect(function()
+                dropItemDropdownBtn.Text = name
+                dropItemList.Visible = false
+            end)
+        end
+        
+        createOption("Semua Item", 1)
+        
+        local backpack = LocalPlayer:FindFirstChild("Backpack")
+        if backpack then
+            local found = {}
+            local order = 2
+            for _, tool in ipairs(backpack:GetChildren()) do
+                if tool:IsA("Tool") and not found[tool.Name] then
+                    found[tool.Name] = true
+                    createOption(tool.Name, order)
+                    order = order + 1
+                end
+            end
+            dropItemList.CanvasSize = UDim2.new(0, 0, 0, (order - 1) * 25)
+        end
+    end
+end)
+
+local autoDropBagBtn = Instance.new("TextButton")
+autoDropBagBtn.Size = UDim2.new(0.9, 0, 0, 30)
+autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+autoDropBagBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoDropBagBtn.Font = Enum.Font.GothamBold
+autoDropBagBtn.TextSize = 12
+autoDropBagBtn.Text = "Drop Isi Tas (Sesuai Pilihan)"
+autoDropBagBtn.LayoutOrder = 6
+autoDropBagBtn.Parent = giftTab
+
+autoDropBagBtn.MouseButton1Click:Connect(function()
+    local dropRemote = State.GiftRemote
+    local argsTemplate = State.GiftArgs
+
+    if not dropRemote then
+        -- Coba cari remote otomatis jika belum ada yang direkam
+        local names = {"Drop", "DropItem", "DropItems"}
+        for _, name in ipairs(names) do
+            pcall(function()
+                if ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild(name) then
+                    dropRemote = ReplicatedStorage.Events[name]
+                elseif ReplicatedStorage:FindFirstChild(name) then
+                    dropRemote = ReplicatedStorage[name]
+                end
+            end)
+            if dropRemote then break end
+        end
+    end
+
+    if not dropRemote then
+        giftStatus.Text = "Status: Gagal auto-detect! Jatuhkan 1 barang manual dulu."
+        giftStatus.TextColor3 = Color3.fromRGB(231, 76, 60)
+        return
+    end
+
+    local dropAmount = tonumber(dropAmountInput.Text) or -10
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not backpack then return end
+    
+    local filterText = dropItemDropdownBtn.Text
+
+    autoDropBagBtn.Text = "Proses Dropping..."
+    autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(241, 196, 15)
+
+    spawn(function()
+        local count = 0
+        
+        if filterText ~= "Semua Item" and filterText ~= "" then
+            -- Bypass backpack check, paksa drop item spesifik (untuk item gaib/invisible)
+            local newArgs = {}
+            if argsTemplate then
+                for i, v in ipairs(argsTemplate) do
+                    if i == 1 then
+                        newArgs[i] = filterText
+                    elseif type(v) == "number" then
+                        newArgs[i] = dropAmount
+                    else
+                        newArgs[i] = v
+                    end
+                end
+            else
+                newArgs = {filterText, dropAmount}
+            end
+            
+            task.spawn(function()
+                pcall(function()
+                    State.IsLoopDropping = true
+                    dropRemote:FireServer(unpack(newArgs))
+                    State.IsLoopDropping = false
+                end)
+            end)
+            count = 1
+        else
+            -- Drop semua isi tas yang benar-benar ada
+            for _, tool in ipairs(backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    local newArgs = {}
+                    if argsTemplate then
+                        for i, v in ipairs(argsTemplate) do
+                            if i == 1 then
+                                newArgs[i] = tool.Name
+                            elseif type(v) == "number" then
+                                newArgs[i] = dropAmount
+                            else
+                                newArgs[i] = v
+                            end
+                        end
+                    else
+                        newArgs = {tool.Name, dropAmount}
+                    end
+                    
+                    task.spawn(function()
+                        pcall(function()
+                            State.IsLoopDropping = true
+                            dropRemote:FireServer(unpack(newArgs))
+                            State.IsLoopDropping = false
+                        end)
+                    end)
+                    count = count + 1
+                end
+            end
+        end
+        
+        autoDropBagBtn.Text = "Selesai (" .. tostring(count) .. " Item)!"
+        autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        wait(2)
+        autoDropBagBtn.Text = "Drop Isi Tas (Sesuai Pilihan)"
+        autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+    end)
+end)
+
 local refreshGiftBtn = Instance.new("TextButton")
 refreshGiftBtn.Size = UDim2.new(0.9, 0, 0, 30)
 refreshGiftBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
@@ -3060,13 +3308,13 @@ refreshGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 refreshGiftBtn.Font = Enum.Font.GothamBold
 refreshGiftBtn.TextSize = 12
 refreshGiftBtn.Text = "Refresh Player List"
-refreshGiftBtn.LayoutOrder = 4
+refreshGiftBtn.LayoutOrder = 7
 refreshGiftBtn.Parent = giftTab
 
 local giftBtnContainer = Instance.new("Frame")
 giftBtnContainer.Size = UDim2.new(0.9, 0, 0, 30)
 giftBtnContainer.BackgroundTransparency = 1
-giftBtnContainer.LayoutOrder = 5
+giftBtnContainer.LayoutOrder = 8
 giftBtnContainer.Parent = giftTab
 
 local selectAllGiftBtn = Instance.new("TextButton")
@@ -3093,7 +3341,7 @@ giftPlayerList.Size = UDim2.new(0.9, 0, 0, 200)
 giftPlayerList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 giftPlayerList.BorderSizePixel = 0
 giftPlayerList.ScrollBarThickness = 4
-giftPlayerList.LayoutOrder = 6
+giftPlayerList.LayoutOrder = 9
 giftPlayerList.Parent = giftTab
 
 local giftPlayerLayout = Instance.new("UIListLayout")
@@ -3600,7 +3848,8 @@ track(RunService.RenderStepped:Connect(function()
         local hum = char:FindFirstChild("Humanoid")
         
         if State.Fly and root and hum then
-            if not fakeFloor then
+            if not fakeFloor or not fakeFloor.Parent then
+                if fakeFloor then fakeFloor:Destroy() end
                 fakeFloor = Instance.new("Part")
                 fakeFloor.Size = Vector3.new(5, 1, 5)
                 fakeFloor.Anchored = true
@@ -3609,13 +3858,15 @@ track(RunService.RenderStepped:Connect(function()
                 fakeFloor.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
                 fakeFloor.Parent = workspace
             end
-            if not bbg then
+            if not bbg or bbg.Parent ~= root then
+                if bbg then bbg:Destroy() end
                 bbg = Instance.new("BodyGyro")
                 bbg.P = 9e4
                 bbg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
                 bbg.Parent = root
             end
-            if not bve then
+            if not bve or bve.Parent ~= root then
+                if bve then bve:Destroy() end
                 bve = Instance.new("BodyVelocity")
                 bve.maxForce = Vector3.new(9e9, 9e9, 9e9)
                 bve.Parent = root
@@ -3623,8 +3874,10 @@ track(RunService.RenderStepped:Connect(function()
             
             hum.PlatformStand = false
             
-            -- Pasang lantai di bawah kaki agar animasi jalan/idle tetap berjalan
-            fakeFloor.CFrame = root.CFrame - Vector3.new(0, 3.2, 0)
+            -- Pasang lantai di bawah kaki agar animasi jalan/idle tetap berjalan secara dinamis (sesuai HipHeight/Avatar)
+            local hipHeight = hum.HipHeight > 0 and hum.HipHeight or 2
+            local dropOffset = hipHeight + (root.Size.Y / 2) + 0.2
+            fakeFloor.CFrame = root.CFrame - Vector3.new(0, dropOffset, 0)
             
             -- Arahkan badan karakter mengikuti kamera secara horizontal (agar tidak nungging)
             local look = camera.CFrame.LookVector
@@ -3634,6 +3887,10 @@ track(RunService.RenderStepped:Connect(function()
             local dir = camera.CFrame.LookVector * -moveVec.Z + camera.CFrame.RightVector * moveVec.X
             if dir.Magnitude > 0 then
                 dir = dir.Unit
+            else
+                -- Mencegah bug karakter melayang pelan ke atas setelah fitur Lock/Assassin dimatikan
+                root.Velocity = Vector3.new(0, 0, 0)
+                root.RotVelocity = Vector3.new(0, 0, 0)
             end
             
             bve.velocity = dir * State.FlySpeed
@@ -3713,6 +3970,35 @@ end)
 
 -- 6. EQUIP TOOL TRACKER
 local function setupCharacterTracker(char)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if hum then
+        hum.Died:Connect(function()
+            if State.AutoLockKiller then
+                -- Cari tag "creator" yang biasa disematkan Roblox saat player dibunuh pemain lain
+                local creator = hum:FindFirstChild("creator")
+                if creator and creator.Value and creator.Value:IsA("Player") then
+                    local killerName = creator.Value.Name
+                    if killerName ~= LocalPlayer.Name then
+                        -- Aktifkan mode balas dendam (Extreme Mode / Lock Fling)
+                        State.SelectedPlayer = killerName
+                        State.LockFling = true
+                        
+                        -- Coba nyalakan ulang thread lock fling jika mati
+                        if lockFlingThread and coroutine.status(lockFlingThread) ~= "dead" then
+                            -- biarkan jalan
+                        else
+                            -- Kalau kita mau pastikan, biar RunService yang me-resume-nya nanti
+                        end
+                        
+                        pcall(function()
+                            logAction("REVENGE", "Killed by " .. killerName .. "! Auto-Lock Fling (Extreme) ACTIVATED!")
+                        end)
+                    end
+                end
+            end
+        end)
+    end
+
     char.ChildAdded:Connect(function(child)
         if State.SpyTrace and child:IsA("Tool") then
             local durStr = "N/A"
