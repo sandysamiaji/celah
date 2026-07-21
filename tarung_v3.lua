@@ -131,7 +131,12 @@ local State = {
 
 -- Logging System
 local function logAction(action, text)
-    local t = os.date("%H:%M:%S")
+    local t = "Time"
+    if os and type(os.date) == "function" then
+        pcall(function() t = os.date("%H:%M:%S") end)
+    else
+        t = tostring(math.floor(tick() % 86400))
+    end
     local msg = string.format("[%s] %s | %s", t, action, text)
     table.insert(logQueue, msg)
 end
