@@ -2952,13 +2952,9 @@ local ALL_GAME_ITEMS = {
     "Ice", "Coconut", "Fish", "Cooked Fish", "Water",
     "Corn", "Berries", "Crystal", "Magnetite", "Steel",
     "Adurite", "Essence", "Crystal Chunk", "Steel Chunk",
-    "God Rock", "Coin", "Token",
-    "Plant Seed", "Plant Seeds", 
-    "Berry Seed", "Berry Seeds", 
-    "Corn Seed", "Corn Seeds",
-    "Sun Fruit Seed", "Sun Fruit Seeds", 
-    "Blood Fruit Seed", "Blood Fruit Seeds", 
-    "Blue Fruit Seed", "Blue Fruit Seeds"
+    "God Rock", "Coin", "Coins", "Token", "Tokens", "Survivor Token", "Survivor Tokens",
+    "Fiber Seeds", "Berry Seeds", "Corn Seeds",
+    "Sun Fruit Seeds", "Blood Fruit Seeds", "Blue Fruit Seeds"
 }
 
 dropItemDropdownBtn = Instance.new("TextButton")
@@ -3061,13 +3057,22 @@ autoDropBagBtn.MouseButton1Click:Connect(function()
         if filterText == "Semua Item" then
             for i = 2, #ALL_GAME_ITEMS do
                 pcall(function()
-                    dropRemote:FireServer(ALL_GAME_ITEMS[i], dropAmount, targetCFrame)
+                    local itemName = ALL_GAME_ITEMS[i]
+                    if string.find(itemName, "Seeds") then
+                        dropRemote:FireServer(itemName, dropAmount)
+                    else
+                        dropRemote:FireServer(itemName, dropAmount, targetCFrame)
+                    end
                 end)
                 wait(0.05)
             end
         else
             pcall(function()
-                dropRemote:FireServer(filterText, dropAmount, targetCFrame)
+                if string.find(filterText, "Seeds") then
+                    dropRemote:FireServer(filterText, dropAmount)
+                else
+                    dropRemote:FireServer(filterText, dropAmount, targetCFrame)
+                end
             end)
         end
         autoDropBagBtn.Text = "Drop Selesai!"
