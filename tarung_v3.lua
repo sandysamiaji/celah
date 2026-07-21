@@ -2955,27 +2955,27 @@ giftBtnContainer.LayoutOrder = 5
 giftBtnContainer.Parent = giftTab
 
 local ALL_GAME_ITEMS = {
-    'Semua Item',
-    'Wood', 'Stone', 'Rock', 'Iron Ore', 'Gold Ore',
-    'Fiber', 'Leaves', 'Plant', 'Raw Meat', 'Cooked Meat',
-    'Sun Fruit', 'Blood Fruit', 'Blue Fruit', 'Jelly',
-    'Ice', 'Coconut', 'Fish', 'Cooked Fish', 'Water',
-    'Corn', 'Berries', 'Crystal', 'Magnetite', 'Steel',
-    'Adurite', 'Essence', 'Crystal Chunk', 'Steel Chunk',
-    'God Rock', 'Coin'
+    "Semua Item",
+    "Wood", "Stone", "Rock", "Iron Ore", "Gold Ore",
+    "Fiber", "Leaves", "Plant", "Raw Meat", "Cooked Meat",
+    "Sun Fruit", "Blood Fruit", "Blue Fruit", "Jelly",
+    "Ice", "Coconut", "Fish", "Cooked Fish", "Water",
+    "Corn", "Berries", "Crystal", "Magnetite", "Steel",
+    "Adurite", "Essence", "Crystal Chunk", "Steel Chunk",
+    "God Rock", "Coin"
 }
 
-local dropItemDropdownBtn = Instance.new('TextButton')
+local dropItemDropdownBtn = Instance.new("TextButton")
 dropItemDropdownBtn.Size = UDim2.new(0.9, 0, 0, 30)
 dropItemDropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 dropItemDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 dropItemDropdownBtn.Font = Enum.Font.Gotham
 dropItemDropdownBtn.TextSize = 12
-dropItemDropdownBtn.Text = 'Semua Item'
+dropItemDropdownBtn.Text = "Semua Item"
 dropItemDropdownBtn.LayoutOrder = 6
 dropItemDropdownBtn.Parent = giftTab
 
-local dropItemList = Instance.new('ScrollingFrame')
+local dropItemList = Instance.new("ScrollingFrame")
 dropItemList.Size = UDim2.new(0.9, 0, 0, 100)
 dropItemList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 dropItemList.BorderSizePixel = 0
@@ -2984,13 +2984,13 @@ dropItemList.Visible = false
 dropItemList.LayoutOrder = 7
 dropItemList.Parent = giftTab
 
-local dropItemLayout = Instance.new('UIListLayout')
+local dropItemLayout = Instance.new("UIListLayout")
 dropItemLayout.SortOrder = Enum.SortOrder.LayoutOrder
 dropItemLayout.Parent = dropItemList
 
 for i = 1, #ALL_GAME_ITEMS do
     local itemName = ALL_GAME_ITEMS[i]
-    local itemBtn = Instance.new('TextButton')
+    local itemBtn = Instance.new("TextButton")
     itemBtn.Size = UDim2.new(1, 0, 0, 25)
     itemBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     itemBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -3011,24 +3011,24 @@ dropItemDropdownBtn.MouseButton1Click:Connect(function()
     dropItemList.Visible = not dropItemList.Visible
 end)
 
-local dropAmountInput = Instance.new('TextBox')
+local dropAmountInput = Instance.new("TextBox")
 dropAmountInput.Size = UDim2.new(0.9, 0, 0, 30)
 dropAmountInput.BackgroundColor3 = Color3.fromRGB(45, 52, 54)
 dropAmountInput.TextColor3 = Color3.fromRGB(223, 230, 233)
 dropAmountInput.Font = Enum.Font.Gotham
 dropAmountInput.TextSize = 12
-dropAmountInput.PlaceholderText = 'Jumlah Drop (misal: -9999999)'
-dropAmountInput.Text = '-9999999'
+dropAmountInput.PlaceholderText = "Jumlah Drop (misal: -9999999)"
+dropAmountInput.Text = "-9999999"
 dropAmountInput.LayoutOrder = 8
 dropAmountInput.Parent = giftTab
 
-local autoDropBagBtn = Instance.new('TextButton')
+local autoDropBagBtn = Instance.new("TextButton")
 autoDropBagBtn.Size = UDim2.new(0.9, 0, 0, 35)
 autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
 autoDropBagBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 autoDropBagBtn.Font = Enum.Font.GothamBold
 autoDropBagBtn.TextSize = 12
-autoDropBagBtn.Text = 'Drop Isi Tas (Sesuai Pilihan)'
+autoDropBagBtn.Text = "Drop Isi Tas (Sesuai Pilihan)"
 autoDropBagBtn.LayoutOrder = 9
 autoDropBagBtn.Parent = giftTab
 
@@ -3037,23 +3037,23 @@ autoDropBagBtn.MouseButton1Click:Connect(function()
     local dropAmount = tonumber(dropAmountInput.Text) or -9999999
     local dropRemote = State.GiftRemote
     if not dropRemote then
-        autoDropBagBtn.Text = 'Remote tidak ditemukan!'
+        autoDropBagBtn.Text = "Remote tidak ditemukan!"
         wait(2)
-        autoDropBagBtn.Text = 'Drop Isi Tas (Sesuai Pilihan)'
+        autoDropBagBtn.Text = "Drop Isi Tas (Sesuai Pilihan)"
         return
     end
-    autoDropBagBtn.Text = 'Proses Dropping...'
+    autoDropBagBtn.Text = "Proses Dropping..."
     autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(241, 196, 15)
     spawn(function()
         local myChar = LocalPlayer.Character
-        local myHrp = myChar and myChar:FindFirstChild('HumanoidRootPart')
+        local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
         if not myHrp then
-            autoDropBagBtn.Text = 'Drop Isi Tas (Sesuai Pilihan)'
+            autoDropBagBtn.Text = "Drop Isi Tas (Sesuai Pilihan)"
             autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
             return
         end
         local targetCFrame = myHrp.CFrame * CFrame.new(0, 0, -5)
-        if filterText == 'Semua Item' then
+        if filterText == "Semua Item" then
             for i = 2, #ALL_GAME_ITEMS do
                 pcall(function()
                     dropRemote:FireServer(ALL_GAME_ITEMS[i], dropAmount, targetCFrame)
@@ -3065,10 +3065,10 @@ autoDropBagBtn.MouseButton1Click:Connect(function()
                 dropRemote:FireServer(filterText, dropAmount, targetCFrame)
             end)
         end
-        autoDropBagBtn.Text = 'Drop Selesai!'
+        autoDropBagBtn.Text = "Drop Selesai!"
         autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
         wait(2)
-        autoDropBagBtn.Text = 'Drop Isi Tas (Sesuai Pilihan)'
+        autoDropBagBtn.Text = "Drop Isi Tas (Sesuai Pilihan)"
         autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
     end)
 end)
