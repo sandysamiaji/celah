@@ -2954,7 +2954,7 @@ local ALL_GAME_ITEMS = {
     "Adurite", "Essence", "Crystal Chunk", "Steel Chunk",
     "God Rock", "Coin", "Coins", "Token", "Tokens", "Survivor Token", "Survivor Tokens",
     "Fiber Seeds", "Berry Seeds", "Corn Seeds",
-    "Sun Fruit Seeds", "Blood Fruit Seeds", "Blue Fruit Seeds"
+    "Sun Fruit Seeds", "Blood Fruit Seeds", "Blue Fruit Seeds","Animal Hide"
 }
 
 dropItemDropdownBtn = Instance.new("TextButton")
