@@ -2961,7 +2961,7 @@ dropItemDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 dropItemDropdownBtn.Font = Enum.Font.Gotham
 dropItemDropdownBtn.TextSize = 12
 dropItemDropdownBtn.Text = "Semua Item"
-dropItemDropdownBtn.LayoutOrder = 5.1
+dropItemDropdownBtn.LayoutOrder = 6
 dropItemDropdownBtn.Parent = giftTab
 
 local dropItemList = Instance.new("ScrollingFrame")
@@ -2971,7 +2971,7 @@ dropItemList.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 dropItemList.BorderSizePixel = 0
 dropItemList.ScrollBarThickness = 4
 dropItemList.Visible = false
-dropItemList.LayoutOrder = 5.2
+dropItemList.LayoutOrder = 7
 dropItemList.Parent = giftTab
 
 local dropItemLayout = Instance.new("UIListLayout")
@@ -3039,7 +3039,7 @@ dropAmountInput.Font = Enum.Font.GothamSemibold
 dropAmountInput.TextSize = 12
 dropAmountInput.PlaceholderText = "Jumlah Item (misal: 10)"
 dropAmountInput.Text = "10"
-dropAmountInput.LayoutOrder = 6
+dropAmountInput.LayoutOrder = 8
 dropAmountInput.Parent = giftTab
 do
     local c = Instance.new("UICorner")
@@ -3060,7 +3060,7 @@ autoDropBagBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 autoDropBagBtn.Font = Enum.Font.GothamBold
 autoDropBagBtn.TextSize = 12
 autoDropBagBtn.Text = "Drop Isi Tas (Sesuai Pilihan)"
-autoDropBagBtn.LayoutOrder = 6
+autoDropBagBtn.LayoutOrder = 9
 autoDropBagBtn.Parent = giftTab
 
 autoDropBagBtn.MouseButton1Click:Connect(function()
