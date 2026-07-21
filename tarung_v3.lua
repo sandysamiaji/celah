@@ -2955,7 +2955,7 @@ local ALL_GAME_ITEMS = {
     "God Rock", "Coin"
 }
 
-local dropItemDropdownBtn = Instance.new("TextButton")
+dropItemDropdownBtn = Instance.new("TextButton")
 dropItemDropdownBtn.Size = UDim2.new(0.9, 0, 0, 30)
 dropItemDropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 dropItemDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -2965,7 +2965,7 @@ dropItemDropdownBtn.Text = "Semua Item"
 dropItemDropdownBtn.LayoutOrder = 6
 dropItemDropdownBtn.Parent = giftTab
 
-local dropItemList = Instance.new("ScrollingFrame")
+dropItemList = Instance.new("ScrollingFrame")
 dropItemList.Size = UDim2.new(0.9, 0, 0, 100)
 dropItemList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 dropItemList.BorderSizePixel = 0
@@ -2974,13 +2974,13 @@ dropItemList.Visible = false
 dropItemList.LayoutOrder = 7
 dropItemList.Parent = giftTab
 
-local dropItemLayout = Instance.new("UIListLayout")
+dropItemLayout = Instance.new("UIListLayout")
 dropItemLayout.SortOrder = Enum.SortOrder.LayoutOrder
 dropItemLayout.Parent = dropItemList
 
 for i = 1, #ALL_GAME_ITEMS do
     local itemName = ALL_GAME_ITEMS[i]
-    local itemBtn = Instance.new("TextButton")
+    itemBtn = Instance.new("TextButton")
     itemBtn.Size = UDim2.new(1, 0, 0, 25)
     itemBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     itemBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -3001,7 +3001,7 @@ dropItemDropdownBtn.MouseButton1Click:Connect(function()
     dropItemList.Visible = not dropItemList.Visible
 end)
 
-local dropAmountInput = Instance.new("TextBox")
+dropAmountInput = Instance.new("TextBox")
 dropAmountInput.Size = UDim2.new(0.9, 0, 0, 30)
 dropAmountInput.BackgroundColor3 = Color3.fromRGB(45, 52, 54)
 dropAmountInput.TextColor3 = Color3.fromRGB(223, 230, 233)
@@ -3012,7 +3012,7 @@ dropAmountInput.Text = "-9999999"
 dropAmountInput.LayoutOrder = 8
 dropAmountInput.Parent = giftTab
 
-local autoDropBagBtn = Instance.new("TextButton")
+autoDropBagBtn = Instance.new("TextButton")
 autoDropBagBtn.Size = UDim2.new(0.9, 0, 0, 35)
 autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
 autoDropBagBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
