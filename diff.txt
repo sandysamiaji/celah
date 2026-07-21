@@ -1,0 +1,739 @@
+--- tarung.lua
++++ tarung_v2.lua
+@@ -117,0 +118,2 @@
++    LockFling = false,
++    AutoLockKiller = false,
+@@ -1426,0 +1429 @@
++            
+@@ -1428,0 +1432 @@
++            
+@@ -1433,0 +1438,8 @@
++    
++    -- Cleanup
++    pcall(function()
++        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
++        if hrp then
++            hrp.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1)
++        end
++    end)
+@@ -1451,0 +1464,3 @@
++                homeCFrame = hrp.CFrame
++            elseif (hrp.Position - homeCFrame.Position).Magnitude > 10 then
++                -- Deteksi jika player teleport manual (jarak mendadak > 20 studs), update anchor
+@@ -1471,0 +1487,3 @@
++                
++                -- Bypass Anti-Fling musuh dengan memperberat massa karakter
++                hrp.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5, 1, 1)
+@@ -1482 +1500 @@
+-                -- RENDERSTEPPED (sebelum render): Visual normal (reset rotasi & velocity)
++                -- RENDERSTEPPED (sebelum render): Jaga posisi tetap di home dan jaga rotasi tetap normal
+@@ -1484 +1501,0 @@
+-                hrp.RotVelocity = Vector3.new(0, 0, 0)
+@@ -1486,2 +1503,2 @@
+-                -- Jaga posisi tetap di home
+-                hrp.CFrame = CFrame.new(homeCFrame.Position)
++                -- Jaga posisi dan rotasi sesuai dengan homeCFrame agar kamera tidak pusing
++                hrp.CFrame = CFrame.new(homeCFrame.Position) * (homeCFrame - homeCFrame.Position)
+@@ -1512,0 +1530 @@
++            hrp.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1)
+@@ -1516,0 +1535,115 @@
++local lockFlingThread = nil
++
++local function lockFlingLoop()
++    local lp = Players.LocalPlayer
++    local movel = 0.1
++    local homeCFrame = nil
++    
++    pcall(function()
++        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
++        if hrp then homeCFrame = hrp.CFrame end
++    end)
++    
++    while State.LockFling do
++        local targetName = State.SelectedPlayer
++        local targetPlayer = targetName and Players:FindFirstChild(targetName)
++        
++        if not targetPlayer then
++            State.LockFling = false
++            break
++        end
++
++        local c = lp.Character
++        local hrp = c and c:FindFirstChild("HumanoidRootPart")
++        
++        if hrp then
++            local targetChar = targetPlayer.Character
++            local targetHrp = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
++            local targetHum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
++            
++            if targetHrp and targetHum and targetHum.Health > 0 then
++                pcall(function()
++                    local cam = workspace.CurrentCamera
++                    if cam and cam.CameraSubject ~= targetHum then
++                        cam.CameraSubject = targetHum
++                    end
++                end)
++                
++                -- Gunakan pcall agar jika target tiba-tiba hancur/leave di tengah frame, thread tidak mati!
++                local success, err = pcall(function()
++                    RunService.Heartbeat:Wait()
++                    -- Cek ulang eksistensi target setelah Wait
++                    if not targetHrp or not targetHrp.Parent then return end
++                    
++                    hrp.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5, 1, 1)
++                    local vel = hrp.Velocity
++                    
++                    -- Posisi fisik (Mesin penabrak): Mundur 3 stud ke arah acak, lalu tembak ke arah musuh!
++                    local randomDir = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
++                    hrp.CFrame = CFrame.new(targetHrp.Position + (randomDir * 3))
++                    
++                    hrp.RotVelocity = Vector3.new(State.FlingVelocity, State.FlingVelocity, State.FlingVelocity)
++                    -- Arahkan velocity tepat menembus musuh dari arah acak tersebut
++                    hrp.Velocity = (-randomDir) * State.FlingVelocity
++                    
++                    RunService.RenderStepped:Wait()
++                    if not targetHrp or not targetHrp.Parent then return end
++                    
++                    -- Jangan set RotVelocity ke 0! Biarkan karakter asli berputar dan menabrak secara nyata di layar.
++                    hrp.Velocity = vel
++                    
++                    -- Kembalikan posisi persis ke musuh, tapi pertahankan rotasi brutalnya agar server dan layar sinkron
++                    hrp.CFrame = CFrame.new(targetHrp.Position) * (hrp.CFrame - hrp.CFrame.Position)
++                    
++                    RunService.Stepped:Wait()
++                    if not targetHrp or not targetHrp.Parent then return end
++                    hrp.Velocity = vel + Vector3.new(0, movel, 0)
++                    movel = -movel
++                end)
++                
++                if not success then
++                    -- Jika error (misal target hilang mendadak), tunggu sejenak lalu lanjut
++                    RunService.Heartbeat:Wait()
++                end
++            else
++                -- Target sedang mati/hilang, kembali ke homeCFrame dan tunggu respawn
++                if homeCFrame then
++                    pcall(function()
++                        hrp.CFrame = homeCFrame
++                        hrp.Velocity = Vector3.new(0, 0, 0)
++                        hrp.RotVelocity = Vector3.new(0, 0, 0)
++                    end)
++                end
++                
++                -- Kembalikan kamera ke karakter kita sementara menunggu
++                pcall(function()
++                    local cam = workspace.CurrentCamera
++                    local myHum = c:FindFirstChildOfClass("Humanoid")
++                    if cam and myHum and cam.CameraSubject ~= myHum then
++                        cam.CameraSubject = myHum
++                    end
++                end)
++                
++                RunService.Heartbeat:Wait()
++            end
++        else
++            RunService.Heartbeat:Wait()
++        end
++    end
++    
++    -- Cleanup (pasti tereksekusi ketika State.LockFling dimatikan, karena thread terlindungi pcall)
++    pcall(function()
++        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
++        if hrp then
++            if homeCFrame then hrp.CFrame = homeCFrame end
++            hrp.Velocity = Vector3.new(0, 0, 0)
++            hrp.RotVelocity = Vector3.new(0, 0, 0)
++            hrp.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1)
++        end
++        local myHum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
++        if myHum then
++            workspace.CurrentCamera.CameraSubject = myHum
++        end
++    end)
++end
++
+@@ -1518,0 +1652,2 @@
++createToggle("LockFlingToggle", "Lock Fling (Target)", "LockFling", 3.5, teleportTab)
++createToggle("AutoLockKillerToggle", "Auto Lock Killer (Revenge)", "AutoLockKiller", 3.6, teleportTab)
+@@ -1572,0 +1708,6 @@
++        if State.LockFling then
++            if not lockFlingThread or coroutine.status(lockFlingThread) == "dead" then
++                lockFlingThread = coroutine.create(lockFlingLoop)
++                coroutine.resume(lockFlingThread)
++            end
++        end
+@@ -1586 +1727 @@
+-tpContainer.Size = UDim2.new(0.9, 0, 0, 175)
++tpContainer.Size = UDim2.new(0.9, 0, 0, 245)
+@@ -1659,0 +1801,200 @@
++
++local isTracking = false
++local trackConnection = nil
++local trackGui = nil
++
++local trackPlayerBtn = Instance.new("TextButton")
++trackPlayerBtn.Size = UDim2.new(1, 0, 0, 30)
++trackPlayerBtn.Position = UDim2.new(0, 0, 0, 175)
++trackPlayerBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
++trackPlayerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
++trackPlayerBtn.Font = Enum.Font.GothamBold
++trackPlayerBtn.TextSize = 12
++trackPlayerBtn.Text = "Lacak Pemain (Off)"
++trackPlayerBtn.Parent = tpContainer
++
++local function clearTrack()
++    if trackGui then
++        trackGui:Destroy()
++        trackGui = nil
++    end
++end
++
++trackPlayerBtn.MouseButton1Click:Connect(function()
++    isTracking = not isTracking
++    if isTracking then
++        trackPlayerBtn.Text = "Lacak Pemain (On)"
++        trackPlayerBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
++        trackConnection = RunService.RenderStepped:Connect(function()
++            if not State.SelectedPlayer then clearTrack() return end
++            local tPlayer = Players:FindFirstChild(State.SelectedPlayer)
++            local tChar = tPlayer and tPlayer.Character
++            local tHead = tChar and tChar:FindFirstChild("Head")
++            if tHead then
++                if not trackGui or trackGui.Parent ~= tHead then
++                    clearTrack()
++                    trackGui = Instance.new("BillboardGui")
++                    trackGui.Name = "TargetTracker"
++                    trackGui.Adornee = tHead
++                    trackGui.Size = UDim2.new(0, 80, 0, 70)
++                    trackGui.StudsOffset = Vector3.new(0, 3, 0)
++                    trackGui.AlwaysOnTop = true
++                    
++                    local arrow = Instance.new("TextLabel")
++                    arrow.Name = "Arrow"
++                    arrow.Size = UDim2.new(1, 0, 0.6, 0)
++                    arrow.Position = UDim2.new(0, 0, 0, 0)
++                    arrow.BackgroundTransparency = 1
++                    arrow.Text = "▼"
++                    arrow.TextColor3 = Color3.fromRGB(255, 0, 0)
++                    arrow.TextScaled = true
++                    arrow.Font = Enum.Font.GothamBlack
++                    arrow.TextStrokeTransparency = 0
++                    arrow.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
++                    arrow.Parent = trackGui
++                    
++                    local distLabel = Instance.new("TextLabel")
++                    distLabel.Name = "Distance"
++                    distLabel.Size = UDim2.new(1, 0, 0.4, 0)
++                    distLabel.Position = UDim2.new(0, 0, 0.6, 0)
++                    distLabel.BackgroundTransparency = 1
++                    distLabel.Text = "0m"
++                    distLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
++                    distLabel.TextScaled = true
++                    distLabel.Font = Enum.Font.GothamBold
++                    distLabel.TextStrokeTransparency = 0
++                    distLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
++                    distLabel.Parent = trackGui
++                    
++                    trackGui.Parent = tHead
++                end
++                
++                -- Update jarak secara real-time
++                local myChar = LocalPlayer.Character
++                local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
++                local targetRoot = tChar:FindFirstChild("HumanoidRootPart")
++                if myRoot and targetRoot and trackGui:FindFirstChild("Distance") then
++                    local dist = math.floor((myRoot.Position - targetRoot.Position).Magnitude)
++                    trackGui.Distance.Text = tostring(dist) .. "m"
++                end
++            else
++                clearTrack()
++            end
++        end)
++    else
++        trackPlayerBtn.Text = "Lacak Pemain (Off)"
++        trackPlayerBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
++        if trackConnection then
++            trackConnection:Disconnect()
++            trackConnection = nil
++        end
++        clearTrack()
++    end
++end)
++
++do
++    local flyToTargetSpeed = 20
++    local isFlyingToTarget = false
++    local flyConnection = nil
++    
++    local flyToTargetBtn = Instance.new("TextButton")
++    flyToTargetBtn.Size = UDim2.new(0.68, 0, 0, 30)
++    flyToTargetBtn.Position = UDim2.new(0, 0, 0, 210)
++    flyToTargetBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
++    flyToTargetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
++    flyToTargetBtn.Font = Enum.Font.GothamBold
++    flyToTargetBtn.TextSize = 12
++    flyToTargetBtn.Text = "Terbang ke Target (Off)"
++    flyToTargetBtn.Parent = tpContainer
++    
++    local flySpeedInput = Instance.new("TextBox")
++    flySpeedInput.Size = UDim2.new(0.3, 0, 0, 30)
++    flySpeedInput.Position = UDim2.new(0.7, 0, 0, 210)
++    flySpeedInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
++    flySpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
++    flySpeedInput.Font = Enum.Font.Gotham
++    flySpeedInput.TextSize = 11
++    flySpeedInput.Text = tostring(flyToTargetSpeed)
++    flySpeedInput.PlaceholderText = "Speed"
++    flySpeedInput.Parent = tpContainer
++    
++    flySpeedInput.FocusLost:Connect(function()
++        local num = tonumber(flySpeedInput.Text)
++        if num then
++            flyToTargetSpeed = num
++        else
++            flySpeedInput.Text = tostring(flyToTargetSpeed)
++        end
++    end)
++    
++    flyToTargetBtn.MouseButton1Click:Connect(function()
++        isFlyingToTarget = not isFlyingToTarget
++        if isFlyingToTarget then
++            flyToTargetBtn.Text = "Terbang ke Target (On)"
++            flyToTargetBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
++            
++            local c = LocalPlayer.Character
++            local hrp = c and c:FindFirstChild("HumanoidRootPart")
++            
++            local bv = Instance.new("BodyVelocity")
++            bv.Name = "FlyToTargetBV"
++            bv.MaxForce = Vector3.new(100000, 100000, 100000)
++            bv.Velocity = Vector3.new(0, 0, 0)
++            if hrp then bv.Parent = hrp end
++            
++            flyConnection = RunService.Heartbeat:Connect(function(dt)
++                if not State.SelectedPlayer then return end
++                local tPlayer = Players:FindFirstChild(State.SelectedPlayer)
++                local tChar = tPlayer and tPlayer.Character
++                local tHrp = tChar and tChar:FindFirstChild("HumanoidRootPart")
++                
++                local c = LocalPlayer.Character
++                local hrp = c and c:FindFirstChild("HumanoidRootPart")
++                local hum = c and c:FindFirstChildOfClass("Humanoid")
++                
++                if tHrp and hrp and hum then
++                    hum.PlatformStand = true
++                    if not hrp:FindFirstChild("FlyToTargetBV") then
++                        bv = Instance.new("BodyVelocity")
++                        bv.Name = "FlyToTargetBV"
++                        bv.MaxForce = Vector3.new(100000, 100000, 100000)
++                        bv.Velocity = Vector3.new(0, 0, 0)
++                        bv.Parent = hrp
++                    end
++                    
++                    -- Anti-collision (Noclip)
++                    for _, part in ipairs(c:GetDescendants()) do
++                        if part:IsA("BasePart") then
++                            part.CanCollide = false
++                        end
++                    end
++                    
++                    local dist = (tHrp.Position - hrp.Position).Magnitude
++                    if dist > 3 then
++                        local dir = (tHrp.Position - hrp.Position).Unit
++                        hrp.CFrame = CFrame.lookAt(hrp.Position + (dir * flyToTargetSpeed * dt), tHrp.Position)
++                    else
++                        hrp.CFrame = CFrame.lookAt(hrp.Position, tHrp.Position)
++                    end
++                end
++            end)
++        else
++            flyToTargetBtn.Text = "Terbang ke Target (Off)"
++            flyToTargetBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
++            if flyConnection then
++                flyConnection:Disconnect()
++                flyConnection = nil
++            end
++            local c = LocalPlayer.Character
++            local hum = c and c:FindFirstChildOfClass("Humanoid")
++            local hrp = c and c:FindFirstChild("HumanoidRootPart")
++            if hum then hum.PlatformStand = false end
++            if hrp then 
++                local bv = hrp:FindFirstChild("FlyToTargetBV")
++                if bv then bv:Destroy() end
++                hrp.Velocity = Vector3.new(0, 0, 0)
++                hrp.RotVelocity = Vector3.new(0, 0, 0)
++            end
++        end
++    end)
++end
+@@ -1734 +2075 @@
+-                tpContainer.Size = UDim2.new(0.9, 0, 0, 175)
++                tpContainer.Size = UDim2.new(0.9, 0, 0, 245)
+@@ -1747 +2088 @@
+-        tpContainer.Size = UDim2.new(0.9, 0, 0, 375)
++        tpContainer.Size = UDim2.new(0.9, 0, 0, 445)
+@@ -1755 +2096 @@
+-        tpContainer.Size = UDim2.new(0.9, 0, 0, 375)
++        tpContainer.Size = UDim2.new(0.9, 0, 0, 445)
+@@ -1757 +2098 @@
+-        tpContainer.Size = UDim2.new(0.9, 0, 0, 175)
++        tpContainer.Size = UDim2.new(0.9, 0, 0, 245)
+@@ -2742,0 +3084,220 @@
++local dropAmountContainer = Instance.new("Frame")
++dropAmountContainer.Size = UDim2.new(0.9, 0, 0, 30)
++dropAmountContainer.BackgroundTransparency = 1
++dropAmountContainer.LayoutOrder = 4
++dropAmountContainer.Parent = giftTab
++
++local dropAmountLabel = Instance.new("TextLabel")
++dropAmountLabel.Size = UDim2.new(0.6, 0, 1, 0)
++dropAmountLabel.BackgroundTransparency = 1
++dropAmountLabel.Text = "Set Drop Amount:"
++dropAmountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
++dropAmountLabel.Font = Enum.Font.GothamBold
++dropAmountLabel.TextSize = 12
++dropAmountLabel.TextXAlignment = Enum.TextXAlignment.Left
++dropAmountLabel.Parent = dropAmountContainer
++
++local dropAmountInput = Instance.new("TextBox")
++dropAmountInput.Size = UDim2.new(0.35, 0, 1, 0)
++dropAmountInput.Position = UDim2.new(0.65, 0, 0, 0)
++dropAmountInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
++dropAmountInput.TextColor3 = Color3.fromRGB(255, 255, 255)
++dropAmountInput.Font = Enum.Font.Gotham
++dropAmountInput.TextSize = 12
++dropAmountInput.Text = "-10"
++dropAmountInput.Parent = dropAmountContainer
++
++local dropItemFilterContainer = Instance.new("Frame")
++dropItemFilterContainer.Size = UDim2.new(0.9, 0, 0, 30)
++dropItemFilterContainer.BackgroundTransparency = 1
++dropItemFilterContainer.LayoutOrder = 5
++dropItemFilterContainer.Parent = giftTab
++
++local dropItemFilterLabel = Instance.new("TextLabel")
++dropItemFilterLabel.Size = UDim2.new(0.35, 0, 1, 0)
++dropItemFilterLabel.BackgroundTransparency = 1
++dropItemFilterLabel.Text = "Pilih Item Drop:"
++dropItemFilterLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
++dropItemFilterLabel.Font = Enum.Font.GothamBold
++dropItemFilterLabel.TextSize = 12
++dropItemFilterLabel.TextXAlignment = Enum.TextXAlignment.Left
++dropItemFilterLabel.Parent = dropItemFilterContainer
++
++local dropItemDropdownBtn = Instance.new("TextButton")
++dropItemDropdownBtn.Size = UDim2.new(0.65, 0, 1, 0)
++dropItemDropdownBtn.Position = UDim2.new(0.35, 0, 0, 0)
++dropItemDropdownBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
++dropItemDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
++dropItemDropdownBtn.Font = Enum.Font.Gotham
++dropItemDropdownBtn.TextSize = 12
++dropItemDropdownBtn.Text = "Semua Item"
++dropItemDropdownBtn.Parent = dropItemFilterContainer
++
++local dropItemList = Instance.new("ScrollingFrame")
++dropItemList.Size = UDim2.new(1, 0, 0, 120)
++dropItemList.Position = UDim2.new(0, 0, 1, 0)
++dropItemList.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
++dropItemList.BorderSizePixel = 0
++dropItemList.ScrollBarThickness = 4
++dropItemList.ZIndex = 5
++dropItemList.Visible = false
++dropItemList.Parent = dropItemDropdownBtn
++
++local dropItemListLayout = Instance.new("UIListLayout")
++dropItemListLayout.Parent = dropItemList
++dropItemListLayout.SortOrder = Enum.SortOrder.LayoutOrder
++
++dropItemDropdownBtn.MouseButton1Click:Connect(function()
++    dropItemList.Visible = not dropItemList.Visible
++    if dropItemList.Visible then
++        for _, child in ipairs(dropItemList:GetChildren()) do
++            if child:IsA("TextButton") then child:Destroy() end
++        end
++        
++        local function createOption(name, order)
++            local btn = Instance.new("TextButton")
++            btn.Size = UDim2.new(1, 0, 0, 25)
++            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
++            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
++            btn.Font = Enum.Font.Gotham
++            btn.TextSize = 11
++            btn.Text = name
++            btn.LayoutOrder = order
++            btn.ZIndex = 6
++            btn.Parent = dropItemList
++            
++            btn.MouseButton1Click:Connect(function()
++                dropItemDropdownBtn.Text = name
++                dropItemList.Visible = false
++            end)
++        end
++        
++        createOption("Semua Item", 1)
++        
++        local backpack = LocalPlayer:FindFirstChild("Backpack")
++        if backpack then
++            local found = {}
++            local order = 2
++            for _, tool in ipairs(backpack:GetChildren()) do
++                if tool:IsA("Tool") and not found[tool.Name] then
++                    found[tool.Name] = true
++                    createOption(tool.Name, order)
++                    order = order + 1
++                end
++            end
++            dropItemList.CanvasSize = UDim2.new(0, 0, 0, (order - 1) * 25)
++        end
++    end
++end)
++
++local autoDropBagBtn = Instance.new("TextButton")
++autoDropBagBtn.Size = UDim2.new(0.9, 0, 0, 30)
++autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
++autoDropBagBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
++autoDropBagBtn.Font = Enum.Font.GothamBold
++autoDropBagBtn.TextSize = 12
++autoDropBagBtn.Text = "Drop Isi Tas (Sesuai Pilihan)"
++autoDropBagBtn.LayoutOrder = 6
++autoDropBagBtn.Parent = giftTab
++
++autoDropBagBtn.MouseButton1Click:Connect(function()
++    local dropRemote = State.GiftRemote
++    local argsTemplate = State.GiftArgs
++
++    if not dropRemote then
++        -- Coba cari remote otomatis jika belum ada yang direkam
++        local names = {"Drop", "DropItem", "DropItems"}
++        for _, name in ipairs(names) do
++            pcall(function()
++                if ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild(name) then
++                    dropRemote = ReplicatedStorage.Events[name]
++                elseif ReplicatedStorage:FindFirstChild(name) then
++                    dropRemote = ReplicatedStorage[name]
++                end
++            end)
++            if dropRemote then break end
++        end
++    end
++
++    if not dropRemote then
++        giftStatus.Text = "Status: Gagal auto-detect! Jatuhkan 1 barang manual dulu."
++        giftStatus.TextColor3 = Color3.fromRGB(231, 76, 60)
++        return
++    end
++
++    local dropAmount = tonumber(dropAmountInput.Text) or -10
++    local backpack = LocalPlayer:FindFirstChild("Backpack")
++    if not backpack then return end
++    
++    local filterText = dropItemDropdownBtn.Text
++
++    autoDropBagBtn.Text = "Proses Dropping..."
++    autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(241, 196, 15)
++
++    spawn(function()
++        local count = 0
++        
++        if filterText ~= "Semua Item" and filterText ~= "" then
++            -- Bypass backpack check, paksa drop item spesifik (untuk item gaib/invisible)
++            local newArgs = {}
++            if argsTemplate then
++                for i, v in ipairs(argsTemplate) do
++                    if i == 1 then
++                        newArgs[i] = filterText
++                    elseif type(v) == "number" then
++                        newArgs[i] = dropAmount
++                    else
++                        newArgs[i] = v
++                    end
++                end
++            else
++                newArgs = {filterText, dropAmount}
++            end
++            
++            task.spawn(function()
++                pcall(function()
++                    State.IsLoopDropping = true
++                    dropRemote:FireServer(unpack(newArgs))
++                    State.IsLoopDropping = false
++                end)
++            end)
++            count = 1
++        else
++            -- Drop semua isi tas yang benar-benar ada
++            for _, tool in ipairs(backpack:GetChildren()) do
++                if tool:IsA("Tool") then
++                    local newArgs = {}
++                    if argsTemplate then
++                        for i, v in ipairs(argsTemplate) do
++                            if i == 1 then
++                                newArgs[i] = tool.Name
++                            elseif type(v) == "number" then
++                                newArgs[i] = dropAmount
++                            else
++                                newArgs[i] = v
++                            end
++                        end
++                    else
++                        newArgs = {tool.Name, dropAmount}
++                    end
++                    
++                    task.spawn(function()
++                        pcall(function()
++                            State.IsLoopDropping = true
++                            dropRemote:FireServer(unpack(newArgs))
++                            State.IsLoopDropping = false
++                        end)
++                    end)
++                    count = count + 1
++                end
++            end
++        end
++        
++        autoDropBagBtn.Text = "Selesai (" .. tostring(count) .. " Item)!"
++        autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
++        wait(2)
++        autoDropBagBtn.Text = "Drop Isi Tas (Sesuai Pilihan)"
++        autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
++    end)
++end)
++
+@@ -2750 +3311 @@
+-refreshGiftBtn.LayoutOrder = 4
++refreshGiftBtn.LayoutOrder = 7
+@@ -2756 +3317 @@
+-giftBtnContainer.LayoutOrder = 5
++giftBtnContainer.LayoutOrder = 8
+@@ -2783 +3344 @@
+-giftPlayerList.LayoutOrder = 6
++giftPlayerList.LayoutOrder = 9
+@@ -2832,0 +3394,8 @@
++        
++        if State.GiftCaptured then
++            State.GiftCaptured = false
++            pcall(function()
++                giftStatus.Text = "Status: Captured [" .. tostring(State.GiftArgs and State.GiftArgs[1] or "item") .. "]!"
++                giftStatus.TextColor3 = Color3.fromRGB(46, 204, 113)
++            end)
++        end
+@@ -3038 +3607 @@
+-    if State.AuraKill then
++    if State.AuraKill or State.LockFling then
+@@ -3044 +3613,3 @@
+-                    if (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= (State.AuraRadius + 10) then
++                    -- Jika LockFling aktif, target utama selalu diserang walau terlempar jauh
++                    local isLockTarget = State.LockFling and State.SelectedPlayer == player.Name
++                    if isLockTarget or (State.AuraKill and (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= (State.AuraRadius + 10)) then
+@@ -3096,3 +3667,3 @@
+-        -- Jangan aktifkan anti-fling saat sedang menjadi hantu (FlingAura/AutoAssassin)
+-        -- karena kita butuh velocity ekstrem untuk melempar musuh
+-        if not State.FlingAura and hitAndRunBtn.Text == "Auto Assassin" then
++        -- Jangan aktifkan anti-fling saat sedang menjadi hantu (FlingAura/AutoAssassin) atau TouchFling/LockFling
++        -- karena kita butuh velocity ekstrem untuk melempar musuh tanpa nge-anchor diri sendiri
++        if not State.FlingAura and not State.TouchFling and not State.LockFling and hitAndRunBtn.Text == "Auto Assassin" then
+@@ -3128 +3699 @@
+-    if (State.AuraHarvest or State.AuraKill) and (currentTime - lastAttackTime >= State.AttackCooldown) then
++    if (State.AuraHarvest or State.AuraKill or State.LockFling) and (currentTime - lastAttackTime >= State.AttackCooldown) then
+@@ -3288 +3859,2 @@
+-            if not fakeFloor then
++            if not fakeFloor or not fakeFloor.Parent then
++                if fakeFloor then fakeFloor:Destroy() end
+@@ -3297 +3869,2 @@
+-            if not bbg then
++            if not bbg or bbg.Parent ~= root then
++                if bbg then bbg:Destroy() end
+@@ -3303 +3876,2 @@
+-            if not bve then
++            if not bve or bve.Parent ~= root then
++                if bve then bve:Destroy() end
+@@ -3311,2 +3885,4 @@
+-            -- Pasang lantai di bawah kaki agar animasi jalan/idle tetap berjalan
+-            fakeFloor.CFrame = root.CFrame - Vector3.new(0, 3.2, 0)
++            -- Pasang lantai di bawah kaki agar animasi jalan/idle tetap berjalan secara dinamis (sesuai HipHeight/Avatar)
++            local hipHeight = hum.HipHeight > 0 and hum.HipHeight or 2
++            local dropOffset = hipHeight + (root.Size.Y / 2) + 0.2
++            fakeFloor.CFrame = root.CFrame - Vector3.new(0, dropOffset, 0)
+@@ -3321,0 +3898,4 @@
++            else
++                -- Mencegah bug karakter melayang pelan ke atas setelah fitur Lock/Assassin dimatikan
++                root.Velocity = Vector3.new(0, 0, 0)
++                root.RotVelocity = Vector3.new(0, 0, 0)
+@@ -3350,4 +3930,9 @@
+-        return
+-    end
+-    
+-    -- Infinite Drop / Duplication Exploit (Spoofing Drop Amount)
++        return nil
++    end
++    
++    -- Auto Respawn block
++    if State.AutoRespawn and method == "FireServer" and self.Name == "OnDied" then
++        return nil
++    end
++    
++    -- Infinite Drop Hack
+@@ -3357 +3942 @@
+-                args[i] = -999999 -- Underflow hack: Coba tipu server bahwa kita nge-drop minus
++                args[i] = -999999
+@@ -3363 +3948 @@
+-    -- Auto Gift Interception
++    -- Auto Gift Intercept
+@@ -3367,22 +3952,5 @@
+-        pcall(function()
+-            giftStatus.Text = "Status: Captured [" .. tostring(args[1] or "item") .. "]!"
+-            giftStatus.TextColor3 = Color3.fromRGB(46, 204, 113)
+-        end)
+-        return
+-    end
+-    
+-    -- Sistem Trace & Logging
+-    if State.SpyTrace and (method == "FireServer" or method == "InvokeServer") then
+-        if self.Name ~= "Sync" and self.Name ~= "RequestSync" and self.Name ~= "Update" and self.Name ~= "Mouse" and self.Name ~= "Ping" then
+-            local argsStr = ""
+-            for i, v in ipairs(args) do
+-                -- Tangkap tipe data asli (berguna untuk melihat CFrame/Vector3/String)
+-                local vStr = type(v) == "userdata" and typeof(v) .. "(" .. tostring(v) .. ")" or tostring(v)
+-                argsStr = argsStr .. vStr .. (i < #args and ", " or "")
+-            end
+-            if string.len(argsStr) > 500 then argsStr = string.sub(argsStr, 1, 500) .. "..." end
+-            logAction("SPY-REMOTE", string.format("%s | Args: [%s]", self.Name, argsStr))
+-        end
+-    end
+-    
+-    return oldNamecall(self, unpack(args))
++        State.GiftCaptured = true -- signal to UI updater outside hook
++        return nil
++    end
++    
++    return oldNamecall(self, ...)
+@@ -3400,0 +3969,29 @@
++    local hum = char:WaitForChild("Humanoid", 5)
++    if hum then
++        hum.Died:Connect(function()
++            if State.AutoLockKiller then
++                -- Cari tag "creator" yang biasa disematkan Roblox saat player dibunuh pemain lain
++                local creator = hum:FindFirstChild("creator")
++                if creator and creator.Value and creator.Value:IsA("Player") then
++                    local killerName = creator.Value.Name
++                    if killerName ~= LocalPlayer.Name then
++                        -- Aktifkan mode balas dendam (Extreme Mode / Lock Fling)
++                        State.SelectedPlayer = killerName
++                        State.LockFling = true
++                        
++                        -- Coba nyalakan ulang thread lock fling jika mati
++                        if lockFlingThread and coroutine.status(lockFlingThread) ~= "dead" then
++                            -- biarkan jalan
++                        else
++                            -- Kalau kita mau pastikan, biar RunService yang me-resume-nya nanti
++                        end
++                        
++                        pcall(function()
++                            logAction("REVENGE", "Killed by " .. killerName .. "! Auto-Lock Fling (Extreme) ACTIVATED!")
++                        end)
++                    end
++                end
++            end
++        end)
++    end
++
