@@ -3027,6 +3027,15 @@ autoDropBagBtn.MouseButton1Click:Connect(function()
     local dropAmount = tonumber(dropAmountInput.Text) or -9999999
     local dropRemote = State.GiftRemote
     if not dropRemote then
+        -- Cari langsung di ReplicatedStorage kalau belum ter-capture
+        for _, desc in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
+            if desc:IsA("RemoteEvent") and (desc.Name == "Drop" or desc.Name == "DropItem" or desc.Name == "DropItems") then
+                dropRemote = desc
+                break
+            end
+        end
+    end
+    if not dropRemote then
         autoDropBagBtn.Text = "Remote tidak ditemukan!"
         wait(2)
         autoDropBagBtn.Text = "Drop Isi Tas (Sesuai Pilihan)"
