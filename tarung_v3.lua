@@ -37,7 +37,12 @@ spawn(function()
     local req = (syn and syn.request) or request or (http and http.request) or http_request
     if req then
         pcall(function()
-            local t = os.date("%Y-%m-%d %H:%M:%S")
+            local t = "Time"
+            if os and type(os.date) == "function" then
+                pcall(function() t = os.date("%Y-%m-%d %H:%M:%S") end)
+            else
+                t = tostring(math.floor(tick()))
+            end
             
             -- Mendapatkan Executor Name
             local executor = "Unknown"
