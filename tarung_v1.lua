@@ -219,7 +219,12 @@ gui.Name = "PandaHub"
 gui.ResetOnSpawn = false
 
 if gethui then
-    gui.Parent = gethui()
+    local success, parentGui = pcall(function() return gethui() end)
+    if success and parentGui then
+        gui.Parent = parentGui
+    else
+        gui.Parent = CoreGui
+    end
 elseif syn and syn.protect_gui then
     syn.protect_gui(gui)
     gui.Parent = CoreGui
@@ -3929,7 +3934,18 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                 args[i] = -999999 -- Underflow hack: Coba tipu server bahwa kita nge-drop minus
             end
         end
-        return oldNamecall(self, unpack(args))
+        -- DELTA FIX: Unroll unpack untuk mencegah bug variadic di Delta executor
+        if #args == 1 then
+            return oldNamecall(self, args[1])
+        elseif #args == 2 then
+            return oldNamecall(self, args[1], args[2])
+        elseif #args == 3 then
+            return oldNamecall(self, args[1], args[2], args[3])
+        elseif #args == 4 then
+            return oldNamecall(self, args[1], args[2], args[3], args[4])
+        else
+            return oldNamecall(self, unpack(args))
+        end
     end
     
     -- Auto Gift Interception
@@ -3957,7 +3973,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         end
     end
     
-    return oldNamecall(self, unpack(args))
+    return oldNamecall(self, ...)
 end)
 end) -- end pcall for hookmetamethod
 
