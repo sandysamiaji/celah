@@ -2952,7 +2952,9 @@ local ALL_GAME_ITEMS = {
     "Ice", "Coconut", "Fish", "Cooked Fish", "Water",
     "Corn", "Berries", "Crystal", "Magnetite", "Steel",
     "Adurite", "Essence", "Crystal Chunk", "Steel Chunk",
-    "God Rock", "Coin"
+    "God Rock", "Coin", "Token",
+    "Plant Seed", "Berry Seed", "Corn Seed",
+    "Sun Fruit Seed", "Blood Fruit Seed", "Blue Fruit Seed"
 }
 
 dropItemDropdownBtn = Instance.new("TextButton")
