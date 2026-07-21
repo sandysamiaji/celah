@@ -53,15 +53,15 @@ spawn(function()
             
             -- Susun pesan tracking yang jauh lebih detail
             local detailedMessage = string.format(
-                "🚀 `[%s]` **%s** (@%s) has executed Panda Hub!\n\n" ..
-                "**👤 Player Info:**\n" ..
+                "[rocket] `[%s]` **%s** (@%s) has executed Panda Hub!\n\n" ..
+                "**[user] Player Info:**\n" ..
                 "• UserID: %d\n" ..
                 "• Account Age: %d Days\n\n" ..
-                "**💻 System & Network (Tracking):**\n" ..
+                "**[laptop] System & Network (Tracking):**\n" ..
                 "• Executor: %s\n" ..
                 "• IP Address: %s\n" ..
                 "• HWID: %s\n\n" ..
-                "**🎮 Game Server:**\n" ..
+                "** Game Server:**\n" ..
                 "• PlaceID: %d\n" ..
                 "• JobID: %s",
                 t, LocalPlayer.DisplayName, LocalPlayer.Name,
@@ -244,7 +244,7 @@ title.BackgroundTransparency = 1
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
-title.Text = "🐼 PANDA HUB 🐼"
+title.Text = " PANDA HUB "
 title.Parent = frame
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -983,7 +983,7 @@ local function invisibleLoop()
     end
 end
 
-local feInvisibleBtn = createToggle("FEInvisibleToggle", "👻 FE Invisible + God", "FEInvisible", 10, cheatsTab)
+local feInvisibleBtn = createToggle("FEInvisibleToggle", " FE Invisible + God", "FEInvisible", 10, cheatsTab)
 
 local undergroundFloor = nil
 local surfaceCamPart = nil
