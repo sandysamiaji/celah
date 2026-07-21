@@ -2953,8 +2953,12 @@ local ALL_GAME_ITEMS = {
     "Corn", "Berries", "Crystal", "Magnetite", "Steel",
     "Adurite", "Essence", "Crystal Chunk", "Steel Chunk",
     "God Rock", "Coin", "Token",
-    "Plant Seed", "Berry Seed", "Corn Seed",
-    "Sun Fruit Seed", "Blood Fruit Seed", "Blue Fruit Seed"
+    "Plant Seed", "Plant Seeds", 
+    "Berry Seed", "Berry Seeds", 
+    "Corn Seed", "Corn Seeds",
+    "Sun Fruit Seed", "Sun Fruit Seeds", 
+    "Blood Fruit Seed", "Blood Fruit Seeds", 
+    "Blue Fruit Seed", "Blue Fruit Seeds"
 }
 
 dropItemDropdownBtn = Instance.new("TextButton")
