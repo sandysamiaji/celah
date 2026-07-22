@@ -192,13 +192,14 @@ baseDropdown.LayoutOrder = 7
 baseDropdown.Parent = builderTab
 
 local baseList = Instance.new("ScrollingFrame")
-baseList.Size = UDim2.new(0.9, 0, 0, 0)
+baseList.Size = UDim2.new(1, 0, 0, 150)
+baseList.Position = UDim2.new(0, 0, 1, 0)
 baseList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 baseList.BorderSizePixel = 0
 baseList.ScrollBarThickness = 4
 baseList.Visible = false
-baseList.LayoutOrder = 8
-baseList.Parent = builderTab
+baseList.ZIndex = 10
+baseList.Parent = baseDropdown
 
 local baseListLayout = Instance.new("UIListLayout")
 baseListLayout.Parent = baseList
@@ -288,6 +289,7 @@ local function updateBaseList()
         btn.TextSize = 12
         btn.Text = bName
         btn.Name = bName
+        btn.ZIndex = 11
         btn.Parent = baseList
         
         btn.MouseButton1Click:Connect(function()
@@ -295,7 +297,6 @@ local function updateBaseList()
             baseDropdown.Text = bName
             baseNameInput.Text = bName -- Set nama base ke textbox biar mudah diedit
             baseList.Visible = false
-            baseList.Size = UDim2.new(0.9, 0, 0, 0)
             
             -- Set SavedBase ke base yang dipilih agar siap di-paste
             SavedBase = BaseDatabase[bName]
@@ -310,9 +311,6 @@ baseDropdown.MouseButton1Click:Connect(function()
     baseList.Visible = not baseList.Visible
     if baseList.Visible then
         updateBaseList()
-        baseList.Size = UDim2.new(0.9, 0, 0, 100)
-    else
-        baseList.Size = UDim2.new(0.9, 0, 0, 0)
     end
 end)
 

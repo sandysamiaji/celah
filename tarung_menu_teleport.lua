@@ -127,13 +127,13 @@ delayInput.FocusLost:Connect(function()
 end)
 
 local playerList = Instance.new("ScrollingFrame")
-playerList.Size = UDim2.new(1, 0, 0, 200)
-playerList.Position = UDim2.new(0, 0, 0, 138)
+playerList.Size = UDim2.new(1, 0, 0, 150)
+playerList.Position = UDim2.new(0, 0, 1, 0)
 playerList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 playerList.ScrollBarThickness = 4
 playerList.Visible = false
 playerList.ZIndex = 10
-playerList.Parent = tpContainer
+playerList.Parent = playerDropdown
 
 local isTracking = false
 local trackConnection = nil
@@ -365,7 +365,6 @@ local function updatePlayerList()
                 State.SelectedPlayer = player.Name
                 playerDropdown.Text = player.Name
                 playerList.Visible = false
-                tpContainer.Size = UDim2.new(0.9, 0, 0, 245)
             end)
             ySize = ySize + 25
         end
@@ -377,18 +376,12 @@ refreshBtn.MouseButton1Click:Connect(function()
     updatePlayerList()
     playerDropdown.Text = "Pilih Pemain..."
     selectedPlayer = nil
-    if playerList.Visible then
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 445)
-    end
 end)
 
 playerDropdown.MouseButton1Click:Connect(function()
     playerList.Visible = not playerList.Visible
     if playerList.Visible then
         updatePlayerList()
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 445)
-    else
-        tpContainer.Size = UDim2.new(0.9, 0, 0, 245)
     end
 end)
 
@@ -850,38 +843,47 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- Solusi untuk Mobile: Berikan 'TP Tool' jika TeleportToMouse aktif
+-- Solusi elegan untuk Mobile (dan PC): Tombol melayang "🎯 TP" di layar saat fitur aktif
+local CoreGui = game:GetService("CoreGui")
+local tpGui = Instance.new("ScreenGui")
+tpGui.Name = "PandaHub_MobileTP"
+tpGui.Parent = CoreGui
+
+local tpBtn = Instance.new("TextButton")
+tpBtn.Size = UDim2.new(0, 50, 0, 50)
+tpBtn.Position = UDim2.new(1, -70, 0.5, 0) -- Di sebelah kanan tengah layar
+tpBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpBtn.Font = Enum.Font.GothamBold
+tpBtn.TextSize = 14
+tpBtn.Text = "🎯 TP"
+tpBtn.Visible = false
+tpBtn.Parent = tpGui
+
+-- Buat tombol membulat cantik
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(1, 0)
+corner.Parent = tpBtn
+
+tpBtn.MouseButton1Click:Connect(function()
+    if not State.TeleportToMouse then return end
+    local mouse = LocalPlayer:GetMouse()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp and mouse.Hit then
+        hrp.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
+        if logAction then logAction("TELEPORT", "Teleported via 🎯 TP Button!") end
+    end
+end)
+
+-- Pantau perubahan state untuk menampilkan/menyembunyikan tombol
 task.spawn(function()
     while true do
-        wait(1)
-        local bp = LocalPlayer:FindFirstChild("Backpack")
-        local char = LocalPlayer.Character
-        
+        wait(0.5)
         if State.TeleportToMouse then
-            if bp and not bp:FindFirstChild("TP Tool (Mobile)") and not (char and char:FindFirstChild("TP Tool (Mobile)")) then
-                local tool = Instance.new("Tool")
-                tool.Name = "TP Tool (Mobile)"
-                tool.RequiresHandle = false
-                tool.CanBeDropped = false
-                
-                tool.Activated:Connect(function()
-                    if not State.TeleportToMouse then return end
-                    local mouse = LocalPlayer:GetMouse()
-                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    if hrp and mouse.Hit then
-                        hrp.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
-                        if logAction then logAction("TELEPORT", "Teleported via TP Tool!") end
-                    end
-                end)
-                tool.Parent = bp
-            end
+            tpBtn.Visible = true
         else
-            if bp and bp:FindFirstChild("TP Tool (Mobile)") then
-                bp:FindFirstChild("TP Tool (Mobile)"):Destroy()
-            end
-            if char and char:FindFirstChild("TP Tool (Mobile)") then
-                char:FindFirstChild("TP Tool (Mobile)"):Destroy()
-            end
+            tpBtn.Visible = false
         end
     end
 end)

@@ -181,13 +181,14 @@ dropItemDropdownBtn.LayoutOrder = 6
 dropItemDropdownBtn.Parent = giftTab
 
 dropItemList = Instance.new("ScrollingFrame")
-dropItemList.Size = UDim2.new(0.9, 0, 0, 100)
+dropItemList.Size = UDim2.new(1, 0, 0, 150)
+dropItemList.Position = UDim2.new(0, 0, 1, 0)
 dropItemList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 dropItemList.BorderSizePixel = 0
 dropItemList.ScrollBarThickness = 4
 dropItemList.Visible = false
-dropItemList.LayoutOrder = 7
-dropItemList.Parent = giftTab
+dropItemList.ZIndex = 10
+dropItemList.Parent = dropItemDropdownBtn
 
 dropItemLayout = Instance.new("UIListLayout")
 dropItemLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -203,6 +204,7 @@ for i = 1, #ALL_GAME_ITEMS do
     itemBtn.TextSize = 12
     itemBtn.Text = itemName
     itemBtn.LayoutOrder = i
+    itemBtn.ZIndex = 11
     itemBtn.Parent = dropItemList
     itemBtn.MouseButton1Click:Connect(function()
         dropItemDropdownBtn.Text = itemName
