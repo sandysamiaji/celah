@@ -737,6 +737,7 @@ end
 
 UI.createToggle("TouchFling", "Touch Fling (Vibrate)", "TouchFling", 2, teleportTab)
 UI.createToggle("FlingAura", "Fling Aura (Area Fling)", "FlingAura", 3, teleportTab)
+UI.createToggle("TeleportToSelectedBtn", "Teleport (Pilih Pemain)", "TeleportToSelected", 3.2, teleportTab)
 UI.createToggle("TeleportToMouseBtn", "Teleport ke Mouse (C)", "TeleportToMouse", 3.3, teleportTab)
 UI.createToggle("CamFollowBtn", "Kamera Ikuti Target", "CamFollow", 3.4, teleportTab)
 UI.createToggle("LockFlingToggle", "Lock Fling (Target)", "LockFling", 3.5, teleportTab)

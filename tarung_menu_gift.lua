@@ -162,6 +162,7 @@ dropItemDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 dropItemDropdownBtn.Font = Enum.Font.Gotham
 dropItemDropdownBtn.TextSize = 12
 dropItemDropdownBtn.Text = "Semua Item"
+State.CustomDropItem = "Semua Item"
 dropItemDropdownBtn.LayoutOrder = 10
 dropItemDropdownBtn.ZIndex = 20
 dropItemDropdownBtn.Parent = giftTab
@@ -194,6 +195,7 @@ for i = 1, #ALL_GAME_ITEMS do
     itemBtn.Parent = dropItemList
     itemBtn.MouseButton1Click:Connect(function()
         dropItemDropdownBtn.Text = itemName
+        State.CustomDropItem = itemName
         dropItemList.Visible = false
     end)
 end

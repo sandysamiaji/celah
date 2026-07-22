@@ -385,7 +385,8 @@ track(RunService.RenderStepped:Connect(function()
         local hum = char:FindFirstChild("Humanoid")
         
         if State.Fly and root and hum then
-            if not fakeFloor then
+            if not fakeFloor or not fakeFloor.Parent then
+                if fakeFloor then fakeFloor:Destroy() end
                 fakeFloor = Instance.new("Part")
                 fakeFloor.Size = Vector3.new(5, 1, 5)
                 fakeFloor.Anchored = true
@@ -394,13 +395,15 @@ track(RunService.RenderStepped:Connect(function()
                 fakeFloor.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
                 fakeFloor.Parent = workspace
             end
-            if not bbg then
+            if not bbg or bbg.Parent ~= root then
+                if bbg then bbg:Destroy() end
                 bbg = Instance.new("BodyGyro")
                 bbg.P = 9e4
                 bbg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
                 bbg.Parent = root
             end
-            if not bve then
+            if not bve or bve.Parent ~= root then
+                if bve then bve:Destroy() end
                 bve = Instance.new("BodyVelocity")
                 bve.maxForce = Vector3.new(9e9, 9e9, 9e9)
                 bve.Parent = root
@@ -450,11 +453,18 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         return
     end
     
+    -- Auto Respawn block
+    if State.AutoRespawn and method == "FireServer" and self.Name == "OnDied" then
+        return nil
+    end
+
     -- Infinite Drop / Duplication Exploit (Spoofing Drop Amount)
     if State.InfiniteDrop and method == "FireServer" and (self.Name == "Drop" or self.Name == "DropItem" or self.Name == "DropItems") then
         for i, v in ipairs(args) do
             if type(v) == "number" then
-                args[i] = State.CustomDropAmount or -9999999 -- Underflow hack: Ambil dari UI depan
+                args[i] = State.CustomDropAmount or -9999999 -- Mengambil jumlah dari UI Gift
+            elseif type(v) == "string" and State.CustomDropItem and State.CustomDropItem ~= "Semua Item" then
+                args[i] = State.CustomDropItem -- Mengambil nama item dari UI Gift
             end
         end
         return oldNamecall(self, unpack(args))
