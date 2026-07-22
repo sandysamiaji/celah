@@ -131,16 +131,53 @@ giftBtnContainer.Parent = giftTab
 
 local ALL_GAME_ITEMS = {
     "Semua Item",
-    "Wood", "Stone", "Rock", "Iron Ore", "Gold Ore",
+    
+    -- ==========================================
+    -- 1. MATERIAL ALAM & ORE (MENTAH)
+    -- ==========================================
+    "Wood", "Stick", "Stone", "Rock", "Coal", 
+    "Iron Ore", "Gold Ore", "Magnetite", "Crystal", "Adurite", 
+    "Crystal Chunk", "Steel Chunk", "God Rock", "Obsidian", 
+    "Emerald", "Pink Diamond", "Void Shard", "Void Stone",
+    
+    -- ==========================================
+    -- 2. MATERIAL OLAHAN (BARS & PARTS)
+    -- ==========================================
+    "Steel", "Iron Bar", "Gold Bar", "Magnetite Bar", "Crystal Bar", "Adurite Bar",
+    "Rope", "Leather", "Shelly", "Vine", "Cloth",
+    
+    -- ==========================================
+    -- 3. TANAMAN, MAKANAN & MEDIS (CONSUMABLES)
+    -- ==========================================
     "Fiber", "Leaves", "Plant", "Raw Meat", "Cooked Meat",
-    "Sun Fruit", "Blood Fruit", "Blue Fruit", "Jelly",
+    "Sun Fruit", "Blood Fruit", "Blue Fruit", "Strange Fruit", "Jelly",
     "Ice", "Coconut", "Fish", "Cooked Fish", "Water",
-    "Corn", "Berries", "Crystal", "Magnetite", "Steel",
-    "Adurite", "Essence", "Crystal Chunk", "Steel Chunk",
-    "God Rock", "Coin", "Coins", "Token", "Tokens", "Survivor Token", "Survivor Tokens",
+    "Corn", "Berries", "Animal Hide", "Essence", "Spirit",
+    "Bandage", "Bandages", "Medkit", "Medkits", "Healing Potion", "Healing Potions", -- << Ditambahkan di sini
+    
+    -- ==========================================
+    -- 4. BENIH TUMBUHAN (SEEDS)
+    -- ==========================================
     "Fiber Seeds", "Berry Seeds", "Corn Seeds",
-    "Sun Fruit Seeds", "Blood Fruit Seeds", "Blue Fruit Seeds", "Animal Hide"
+    "Sun Fruit Seeds", "Blood Fruit Seeds", "Blue Fruit Seeds", "Strange Fruit Seeds",
+    
+    -- ==========================================
+    -- 5. MATA UANG & TOKEN (CURRENCY)
+    -- ==========================================
+    "Coin", "Coins", "Gold Coin", "Gold Coins",
+    "Cash", "Money", "Credit", "Credits",
+    "Token", "Tokens", "Survivor Token", "Survivor Tokens",
+    "Rebirth Token", "Rebirth Tokens", "Mojo", "Ticket", "Tickets",
+    "Gem", "Gems", "Diamond", "Diamonds", "Shard", "Shards",
+
+    -- ==========================================
+    -- 6. HEWAN JINAK & LIAR (ANIMALS & ENEMIES)
+    -- ==========================================
+    "Bunny", "Rabbit", "Deer", "Wolf", "Alpha Wolf", "Bear", "Polar Bear", 
+    "Fox", "Arctic Fox", "Boar", "Mammoth", "Hellephant", "Scorpion", "Frog",
+    "Sekte", "Cultist", "Jungle Cultist", "The Deer", "The Owl", "The Ram"
 }
+
 
 
 
