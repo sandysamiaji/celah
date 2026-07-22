@@ -413,8 +413,10 @@ track(RunService.RenderStepped:Connect(function()
             
             hum.PlatformStand = false
             
-            -- Pasang lantai di bawah kaki agar animasi jalan/idle tetap berjalan
-            fakeFloor.CFrame = root.CFrame - Vector3.new(0, 3.2, 0)
+            -- Pasang lantai di bawah kaki agar animasi jalan/idle tetap berjalan secara dinamis
+            local hipHeight = hum.HipHeight > 0 and hum.HipHeight or 2
+            local dropOffset = hipHeight + (root.Size.Y / 2) + 0.2
+            fakeFloor.CFrame = root.CFrame - Vector3.new(0, dropOffset, 0)
             
             -- Arahkan badan karakter mengikuti kamera secara horizontal (agar tidak nungging)
             local look = camera.CFrame.LookVector
@@ -424,6 +426,10 @@ track(RunService.RenderStepped:Connect(function()
             local dir = camera.CFrame.LookVector * -moveVec.Z + camera.CFrame.RightVector * moveVec.X
             if dir.Magnitude > 0 then
                 dir = dir.Unit
+            else
+                -- Mencegah bug karakter melayang pelan ke atas setelah fitur Lock/Assassin dimatikan
+                root.Velocity = Vector3.new(0, 0, 0)
+                root.RotVelocity = Vector3.new(0, 0, 0)
             end
             
             bve.velocity = dir * State.FlySpeed

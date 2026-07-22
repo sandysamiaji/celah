@@ -3,55 +3,42 @@ import re
 with open('tarung_menu_cheats.lua', 'r', encoding='utf-8') as f:
     content = f.read()
 
-target = '''          if State.Fly and root and hum then
-              if not fakeFloor then
-                  fakeFloor = Instance.new("Part")
-                  fakeFloor.Size = Vector3.new(5, 1, 5)
-                  fakeFloor.Anchored = true
-                  fakeFloor.Transparency = 1
-                  fakeFloor.CanCollide = true
-                  fakeFloor.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
-                  fakeFloor.Parent = workspace
-              end
-              if not bbg then
-                  bbg = Instance.new("BodyGyro")
-                  bbg.P = 9e4
-                  bbg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-                  bbg.Parent = root
-              end
-              if not bve then
-                  bve = Instance.new("BodyVelocity")
-                  bve.maxForce = Vector3.new(9e9, 9e9, 9e9)
-                  bve.Parent = root
-              end'''
+target = '''            local moveVec = getMoveVector()
+            local dir = camera.CFrame.LookVector * -moveVec.Z + camera.CFrame.RightVector * moveVec.X
+            if dir.Magnitude > 0 then
+                dir = dir.Unit
+            end
+            
+            bve.velocity = dir * State.FlySpeed'''
 
-replacement = '''          if State.Fly and root and hum then
-              if not fakeFloor or not fakeFloor.Parent then
-                  if fakeFloor then fakeFloor:Destroy() end
-                  fakeFloor = Instance.new("Part")
-                  fakeFloor.Size = Vector3.new(5, 1, 5)
-                  fakeFloor.Anchored = true
-                  fakeFloor.Transparency = 1
-                  fakeFloor.CanCollide = true
-                  fakeFloor.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
-                  fakeFloor.Parent = workspace
-              end
-              if not bbg or bbg.Parent ~= root then
-                  if bbg then bbg:Destroy() end
-                  bbg = Instance.new("BodyGyro")
-                  bbg.P = 9e4
-                  bbg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-                  bbg.Parent = root
-              end
-              if not bve or bve.Parent ~= root then
-                  if bve then bve:Destroy() end
-                  bve = Instance.new("BodyVelocity")
-                  bve.maxForce = Vector3.new(9e9, 9e9, 9e9)
-                  bve.Parent = root
-              end'''
+replacement = '''            local moveVec = getMoveVector()
+            local dir = camera.CFrame.LookVector * -moveVec.Z + camera.CFrame.RightVector * moveVec.X
+            if dir.Magnitude > 0 then
+                dir = dir.Unit
+            else
+                -- Mencegah bug karakter melayang pelan ke atas setelah fitur Lock/Assassin dimatikan
+                root.Velocity = Vector3.new(0, 0, 0)
+                root.RotVelocity = Vector3.new(0, 0, 0)
+            end
+            
+            bve.velocity = dir * State.FlySpeed'''
 
-content = content.replace(target, replacement)
-
-with open('tarung_menu_cheats.lua', 'w', encoding='utf-8') as f:
-    f.write(content)
-print("Fixed Fly logic for character respawn")
+if target in content:
+    content = content.replace(target, replacement)
+    
+    # Also fix the fakeFloor height calculation
+    target2 = '''            -- Pasang lantai di bawah kaki agar animasi jalan/idle tetap berjalan
+            fakeFloor.CFrame = root.CFrame - Vector3.new(0, 3.2, 0)'''
+            
+    replacement2 = '''            -- Pasang lantai di bawah kaki agar animasi jalan/idle tetap berjalan secara dinamis
+            local hipHeight = hum.HipHeight > 0 and hum.HipHeight or 2
+            local dropOffset = hipHeight + (root.Size.Y / 2) + 0.2
+            fakeFloor.CFrame = root.CFrame - Vector3.new(0, dropOffset, 0)'''
+            
+    content = content.replace(target2, replacement2)
+    
+    with open('tarung_menu_cheats.lua', 'w', encoding='utf-8') as f:
+        f.write(content)
+    print("Fixed Fly logic in cheats menu")
+else:
+    print("Target not found")
