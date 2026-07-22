@@ -131,43 +131,15 @@ giftBtnContainer.Parent = giftTab
 
 local ALL_GAME_ITEMS = {
     "Semua Item",
-    
-    -- ==========================================
-    -- 1. MATERIAL ALAM & ORE (MENTAH)
-    -- ==========================================
-    "Wood", "Stick", "Stone", "Rock", "Coal", 
-    "Iron Ore", "Gold Ore", "Magnetite", "Crystal", "Adurite", 
-    "Crystal Chunk", "Steel Chunk", "God Rock", "Obsidian", 
-    "Emerald", "Pink Diamond", "Void Shard", "Void Stone",
-    
-    -- ==========================================
-    -- 2. MATERIAL OLAHAN (BARS & PARTS)
-    -- ==========================================
-    "Steel", "Iron Bar", "Gold Bar", "Magnetite Bar", "Crystal Bar", "Adurite Bar",
-    "Rope", "Leather", "Shelly", "Vine", "Cloth",
-    
-    -- ==========================================
-    -- 3. TANAMAN, MAKANAN & KONSUMSI
-    -- ==========================================
+    "Wood", "Stone", "Rock", "Iron Ore", "Gold Ore",
     "Fiber", "Leaves", "Plant", "Raw Meat", "Cooked Meat",
-    "Sun Fruit", "Blood Fruit", "Blue Fruit", "Strange Fruit", "Jelly",
+    "Sun Fruit", "Blood Fruit", "Blue Fruit", "Jelly",
     "Ice", "Coconut", "Fish", "Cooked Fish", "Water",
-    "Corn", "Berries", "Animal Hide", "Essence", "Spirit",
-    
-    -- ==========================================
-    -- 4. BENIH TUMBUHAN (SEEDS)
-    -- ==========================================
+    "Corn", "Berries", "Crystal", "Magnetite", "Steel",
+    "Adurite", "Essence", "Crystal Chunk", "Steel Chunk",
+    "God Rock", "Coin", "Coins", "Token", "Tokens", "Survivor Token", "Survivor Tokens",
     "Fiber Seeds", "Berry Seeds", "Corn Seeds",
-    "Sun Fruit Seeds", "Blood Fruit Seeds", "Blue Fruit Seeds", "Strange Fruit Seeds",
-    
-    -- ==========================================
-    -- 5. MATA UANG & TOKEN (CURRENCY & PREMIUM)
-    -- ==========================================
-    "Coin", "Coins", "Gold Coin", "Gold Coins",
-    "Cash", "Money", "Credit", "Credits",
-    "Token", "Tokens", "Survivor Token", "Survivor Tokens",
-    "Rebirth Token", "Rebirth Tokens", "Mojo", "Ticket", "Tickets",
-    "Gem", "Gems", "Diamond", "Diamonds", "Shard", "Shards"
+    "Sun Fruit Seeds", "Blood Fruit Seeds", "Blue Fruit Seeds", "Animal Hide"
 }
 
 
@@ -413,6 +385,7 @@ local function autoGiftLoop()
                             -- 3. Siapkan argumen drop (paksa posisi di bawah kaki target)
                             local newArgs = {}
                             local foundPos = false
+                            local overrideAmount = tonumber(dropAmountInput.Text)
                             for i, v in ipairs(State.GiftArgs) do
                                 if typeof(v) == "CFrame" then
                                     newArgs[i] = CFrame.new(targetPos)
@@ -420,6 +393,8 @@ local function autoGiftLoop()
                                 elseif typeof(v) == "Vector3" then
                                     newArgs[i] = targetPos
                                     foundPos = true
+                                elseif type(v) == "number" and overrideAmount then
+                                    newArgs[i] = overrideAmount
                                 else
                                     newArgs[i] = v
                                 end
