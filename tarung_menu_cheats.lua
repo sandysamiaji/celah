@@ -465,8 +465,8 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         State.GiftRemote = self
         State.GiftArgs = args
         pcall(function()
-            giftStatus.Text = "Status: Captured [" .. tostring(args[1] or "item") .. "]!"
-            giftStatus.TextColor3 = Color3.fromRGB(46, 204, 113)
+            State.GiftStatusLabel.Text = "Status: Captured [" .. tostring(args[1] or "item") .. "]!"
+            State.GiftStatusLabel.TextColor3 = Color3.fromRGB(46, 204, 113)
         end)
         return
     end

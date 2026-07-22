@@ -102,6 +102,7 @@ giftDropDelayInput.FocusLost:Connect(function()
 end)
 
 local giftStatus = Instance.new("TextLabel")
+State.GiftStatusLabel = giftStatus
 giftStatus.Name = "GiftStatusLabel"
 giftStatus.Size = UDim2.new(0.9, 0, 0, 30)
 giftStatus.BackgroundTransparency = 1
@@ -181,7 +182,7 @@ dropDivider.TextSize = 12
 dropDivider.LayoutOrder = 9
 dropDivider.Parent = giftTab
 
-dropItemDropdownBtn = Instance.new("TextButton")
+local dropItemDropdownBtn = Instance.new("TextButton")
 
 dropItemDropdownBtn.Size = UDim2.new(0.9, 0, 0, 30)
 dropItemDropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -193,7 +194,7 @@ dropItemDropdownBtn.LayoutOrder = 10
 dropItemDropdownBtn.ZIndex = 20
 dropItemDropdownBtn.Parent = giftTab
 
-dropItemList = Instance.new("ScrollingFrame")
+local dropItemList = Instance.new("ScrollingFrame")
 dropItemList.Size = UDim2.new(1, 0, 0, 150)
 dropItemList.Position = UDim2.new(0, 0, 1, 0)
 dropItemList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -203,7 +204,7 @@ dropItemList.Visible = false
 dropItemList.ZIndex = 10
 dropItemList.Parent = dropItemDropdownBtn
 
-dropItemLayout = Instance.new("UIListLayout")
+local dropItemLayout = Instance.new("UIListLayout")
 dropItemLayout.SortOrder = Enum.SortOrder.LayoutOrder
 dropItemLayout.Parent = dropItemList
 
@@ -231,7 +232,7 @@ dropItemDropdownBtn.MouseButton1Click:Connect(function()
     dropItemList.Visible = not dropItemList.Visible
 end)
 
-dropAmountInput = Instance.new("TextBox")
+local dropAmountInput = Instance.new("TextBox")
 dropAmountInput.Size = UDim2.new(0.9, 0, 0, 30)
 dropAmountInput.BackgroundColor3 = Color3.fromRGB(45, 52, 54)
 dropAmountInput.TextColor3 = Color3.fromRGB(223, 230, 233)
@@ -242,7 +243,7 @@ dropAmountInput.Text = "-9999999"
 dropAmountInput.LayoutOrder = 11
 dropAmountInput.Parent = giftTab
 
-autoDropBagBtn = Instance.new("TextButton")
+local autoDropBagBtn = Instance.new("TextButton")
 autoDropBagBtn.Size = UDim2.new(0.9, 0, 0, 35)
 autoDropBagBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
 autoDropBagBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
