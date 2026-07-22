@@ -794,6 +794,26 @@ local function auraHarvestLoop()
                                     cachedPickupEvent:FireServer(obj)
                                 end)
                             end
-end-- Farm loops (AutoEat, AutoHeal, AutoCook, AuraHarvest) have been moved to tarung_menu_farm.luand
+
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+spawn(function()
+    while true do
+        wait(1)
+        if State.AuraHarvest then
+            if not auraHarvestThread or coroutine.status(auraHarvestThread) == "dead" then
+                auraHarvestThread = coroutine.create(auraHarvestLoop)
+                coroutine.resume(auraHarvestThread)
+            end
+        end
+    end
+end)
+
 
 
