@@ -400,7 +400,7 @@ track(RunService.Stepped:Connect(function()
     if State.AntiFling then
         -- Jangan aktifkan anti-fling saat sedang menjadi hantu (FlingAura/AutoAssassin)
         -- karena kita butuh velocity ekstrem untuk melempar musuh
-        if not State.FlingAura and hitAndRunBtn.Text == "Auto Assassin" then
+        if not State.FlingAura and not State.AutoAssassinActive then
             local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 -- Jika ada orang lain yang mencoba Fling kita (Velocity sangat tinggi)

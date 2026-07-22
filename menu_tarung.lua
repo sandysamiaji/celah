@@ -120,5 +120,6 @@ loadModule("tarung_menu_teleport.lua")
 loadModule("tarung_menu_builder.lua")
 loadModule("tarung_menu_gift.lua")
 loadModule("tarung_menu_info.lua")
+loadModule("tarung_menu_anti.lua")
 
 print("[PandaHub] Berhasil di-load secara modular!")

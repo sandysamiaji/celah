@@ -134,6 +134,7 @@ Tabs.Teleport = createTab("Teleport", false)
 Tabs.Builder = createTab("Builder", false)
 Tabs.Info = createTab("Info", false)
 Tabs.Gift = createTab("Gift", false)
+Tabs.Anti = createTab("Anti", false)
 
 UI.switchTab = function(tab)
     for _, t in pairs(Tabs) do
@@ -189,6 +190,7 @@ UI.createNavBtn("Teleport", Tabs.Teleport)
 UI.createNavBtn("Builder", Tabs.Builder)
 UI.createNavBtn("Info", Tabs.Info)
 UI.createNavBtn("Gift", Tabs.Gift)
+UI.createNavBtn("Anti", Tabs.Anti)
 
 UI.createToggle = function(name, text, stateKey, layoutOrder, parentTab, callback)
     local btn = Instance.new("TextButton")

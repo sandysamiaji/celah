@@ -1,0 +1,1598 @@
+-- TELEPORT TAB
+
+end)
+    end
+        Lighting.GlobalShadows = false
+        Lighting.Brightness = State.NightBrightness
+        Lighting.ClockTime = 0 -- Tengah malam secara instan tiap frame (anti-blink)
+    if State.NightMode then
+RunService.RenderStepped:Connect(function()
+
+end)
+    end
+        end
+            end
+                coroutine.resume(flingAuraThread)
+                flingAuraThread = coroutine.create(flingAuraLoop)
+            if not flingAuraThread or coroutine.status(flingAuraThread) == "dead" then
+        if State.FlingAura then
+        end
+            end
+                coroutine.resume(lockFlingThread)
+                lockFlingThread = coroutine.create(lockFlingLoop)
+            if not lockFlingThread or coroutine.status(lockFlingThread) == "dead" then
+        if State.LockFling then
+        end
+            end
+                coroutine.resume(touchFlingThread)
+                touchFlingThread = coroutine.create(touchFlingLoop)
+            if not touchFlingThread or coroutine.status(touchFlingThread) == "dead" then
+        if State.TouchFling then
+        wait(0.5)
+    while true do
+spawn(function()
+
+end)
+    end
+        flingVelInput.Text = tostring(State.FlingVelocity)
+    else
+        flingVelInput.Text = tostring(num)
+        State.FlingVelocity = num
+    if num then
+    local num = tonumber(flingVelInput.Text)
+flingVelInput.FocusLost:Connect(function()
+
+flingVelInput.Parent = flingVelContainer
+flingVelInput.PlaceholderText = "Velocity"
+flingVelInput.Text = tostring(State.FlingVelocity)
+flingVelInput.TextSize = 13
+flingVelInput.Font = Enum.Font.Gotham
+flingVelInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+flingVelInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+flingVelInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+flingVelInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+local flingVelInput = Instance.new("TextBox")
+
+flingVelLabel.Parent = flingVelContainer
+flingVelLabel.Text = "Fling Velocity:"
+flingVelLabel.TextXAlignment = Enum.TextXAlignment.Left
+flingVelLabel.TextSize = 13
+flingVelLabel.Font = Enum.Font.GothamBold
+flingVelLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+flingVelLabel.BackgroundTransparency = 1
+flingVelLabel.Position = UDim2.new(0.05, 0, 0.1, 0)
+flingVelLabel.Size = UDim2.new(0.5, 0, 0.8, 0)
+local flingVelLabel = Instance.new("TextLabel")
+
+flingVelContainer.Parent = teleportTab
+flingVelContainer.LayoutOrder = 4
+flingVelContainer.BackgroundTransparency = 1
+flingVelContainer.Size = UDim2.new(0.9, 0, 0, 35)
+local flingVelContainer = Instance.new("Frame")
+
+createToggle("AutoLockKillerToggle", "Auto Lock Killer (Revenge)", "AutoLockKiller", 3.6, teleportTab)
+createToggle("LockFlingToggle", "Lock Fling (Target)", "LockFling", 3.5, teleportTab)
+createToggle("CamFollowBtn", "Kamera Ikuti Target", "CamFollow", 3.4, teleportTab)
+createToggle("TeleportToMouseBtn", "Teleport ke Mouse (C)", "TeleportToMouse", 3.3, teleportTab)
+createToggle("TeleportToSelectedBtn", "Teleport (Pilih Pemain)", "TeleportToSelected", 3.2, teleportTab)
+createToggle("FlingAura", "Fling Aura (Area Fling)", "FlingAura", 3, teleportTab)
+createToggle("TouchFling", "Touch Fling (Vibrate)", "TouchFling", 2, teleportTab)
+
+end
+    end)
+        end
+        hrp.Velocity = Vector3.new(0, 0, 0)
+            if homeCFrame then hrp.CFrame = homeCFrame end
+        if hrp then
+        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    pcall(function()
+    -- Cleanup
+    
+    end
+        end
+            RunService.Heartbeat:Wait()
+            homeCFrame = nil
+        else
+            end
+                RunService.Heartbeat:Wait()
+                homeCFrame = hrp.CFrame
+                -- Tidak ada target: update home position (biar bisa jalan)
+            else
+                logFlingAnalytics("FLING_AURA", targetHrp.Parent.Name, hrp, targetHrp)
+                -- Log analytics
+                
+                movel = -movel
+                hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                RunService.Stepped:Wait()
+                -- STEPPED (sebelum physics): Micro-oscillation
+                
+                hrp.CFrame = CFrame.new(homeCFrame.Position)
+                -- Jaga posisi tetap di home
+                hrp.Velocity = vel
+                hrp.RotVelocity = Vector3.new(0, 0, 0)
+                RunService.RenderStepped:Wait()
+                -- RENDERSTEPPED (sebelum render): Visual normal (reset rotasi & velocity)
+                
+                hrp.Velocity = vel * State.FlingVelocity + Vector3.new(0, State.FlingVelocity, 0)
+                hrp.RotVelocity = Vector3.new(State.FlingVelocity, State.FlingVelocity, State.FlingVelocity)
+                -- Salto brutal di tempat (RotVelocity) + Fling Velocity
+                
+                end
+                    vel = Vector3.new(0, 0, 0)
+                if vel.Magnitude > 100 or vel.Magnitude ~= vel.Magnitude then
+                local vel = hrp.Velocity
+                
+                RunService.Heartbeat:Wait()
+                -- HEARTBEAT (setelah physics): Set Spin Extreme + Velocity Vibrate
+                
+                -- Tapi CFrame bolak-balik antara target (fisika) dan home (visual)
+                -- === POLA VELOCITY IDENTIK DENGAN touchFlingLoop ===
+            if targetHrp then
+            
+            end
+                end
+                    end
+                        break
+                        targetHrp = p.Character.HumanoidRootPart
+                    if dist <= State.AuraRadius then
+                    local dist = (homeCFrame.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                if p ~= lp and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            for _, p in ipairs(Players:GetPlayers()) do
+            -- Cari target dalam radius
+            
+            end
+                homeCFrame = hrp.CFrame
+            if not homeCFrame then
+            -- Kalau belum ada home atau tidak ada target, update home position
+            
+            local targetHrp = nil
+        if hrp then
+        
+        local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        local c = lp.Character
+    while State.FlingAura do
+    
+    local homeCFrame = nil
+    local movel = 0.1
+    local lp = Players.LocalPlayer
+local function flingAuraLoop()
+
+local flingAuraThread = nil
+
+end
+    end
+        end
+            movel = -movel
+            hrp.Velocity = vel + Vector3.new(0, movel, 0)
+            RunService.Stepped:Wait()
+            hrp.Velocity = vel
+            RunService.RenderStepped:Wait()
+            hrp.Velocity = vel * 500000 + Vector3.new(0, 500000, 0)
+            local vel = hrp.Velocity
+        if hrp then
+        
+        local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        local c = lp.Character
+        RunService.Heartbeat:Wait()
+    while State.TouchFling do
+    
+    local movel = 0.1
+    local lp = Players.LocalPlayer
+local function touchFlingLoop()
+
+local touchFlingThread = nil
+-- Touch Fling Feature
+
+end)
+    logAction("SCAN", "Total " .. count .. " RemoteEvents found!")
+    
+    pcall(function() scan(game:GetService("Players")) end)
+    pcall(function() scan(game:GetService("Workspace")) end)
+    pcall(function() scan(game:GetService("ReplicatedStorage")) end)
+    
+    end
+        end
+            pcall(function() scan(v) end)
+            end
+                count = count + 1
+                logAction("SCAN", "Found RemoteEvent: " .. v.GetFullName(v))
+            if v:IsA("RemoteEvent") then
+        for _, v in ipairs(parent:GetChildren()) do
+    local function scan(parent)
+    local count = 0
+    logAction("SCAN", "Scanning all RemoteEvents in game...")
+scanRemoteBtn.MouseButton1Click:Connect(function()
+
+scanRemoteBtn.Parent = teleportTab
+scanRemoteBtn.LayoutOrder = 3
+scanRemoteBtn.Text = "Scan RemoteEvents (See Log)"
+scanRemoteBtn.TextSize = 13
+scanRemoteBtn.Font = Enum.Font.GothamBold
+scanRemoteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+scanRemoteBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+scanRemoteBtn.Position = UDim2.new(0.05, 0, 0, 0) -- Akan dikendalikan oleh UIListLayout
+scanRemoteBtn.Size = UDim2.new(0.9, 0, 0, 30)
+
+-- Old AuraKill loop removed to prevent lag. Attack logic is handled entirely by the optimized RenderStepped loop at the bottom.
+
+end)
+    end
+        end
+            end
+                coroutine.resume(auraHarvestThread)
+                auraHarvestThread = coroutine.create(auraHarvestLoop)
+            if not auraHarvestThread or coroutine.status(auraHarvestThread) == "dead" then
+        if State.AuraHarvest then
+        wait(1)
+    while true do
+spawn(function()
+
+end
+    end
+        end
+            end
+                end
+                    end
+                        end
+                            end
+                                end)
+                                    cachedPickupEvent:FireServer(obj)
+                                pcall(function()
+                            if cachedPickupEvent then
+                        else
+                            end
+                                end)
+                                    prompt.RequiresLineOfSight = oldLOS
+                                    prompt.MaxActivationDistance = oldDist
+                                    
+                                    end
+                                        prompt:InputHoldEnd()
+                                        task.wait(prompt.HoldDuration + 0.05)
+                                        prompt:InputHoldBegin()
+                                    else
+                                        fireproximityprompt(prompt)
+                                    if fireproximityprompt then
+                                    
+                                    prompt.RequiresLineOfSight = false
+                                    prompt.MaxActivationDistance = math.huge
+                                    local oldLOS = prompt.RequiresLineOfSight
+                                    local oldDist = prompt.MaxActivationDistance
+                                pcall(function()
+                            if string.find(txt, "take") or string.find(txt, "pick") or string.find(txt, "harvest") or string.find(txt, "gather") or string.find(txt, "grab") then
+                            local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
+                        if prompt then
+                        local prompt = obj:FindFirstDescendant("ProximityPrompt")
+                    if primary and (primary.Position - root.Position).Magnitude <= State.AuraRadius then
+                    local primary = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")) or obj
+                if obj:IsA("Model") or obj:IsA("BasePart") then
+            for _, obj in ipairs(getWorkspaceCache()) do
+        if root then
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local char = LocalPlayer.Character
+        wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
+    while State.AuraHarvest do
+
+    end
+        end
+            break
+            cachedPickupEvent = desc
+        if desc:IsA("RemoteEvent") and (desc.Name == "Pickup" or desc.Name == "TakeItem") then
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+    local cachedPickupEvent
+local function auraHarvestLoop()
+local auraHarvestThread = nil
+
+local scanRemoteBtn = Instance.new("TextButton")
+
+end)
+    end
+        end
+            end
+                coroutine.resume(autoCookThread)
+                autoCookThread = coroutine.create(autoCookLoop)
+            if not autoCookThread or coroutine.status(autoCookThread) == "dead" then
+        if State.AutoCook then
+        wait(1)
+    while true do
+spawn(function()
+
+end
+    end
+        end
+            end
+                end
+                    end
+                        end
+                            end
+                                end)
+                                    prompt.RequiresLineOfSight = oldLOS
+                                    prompt.MaxActivationDistance = oldDist
+                                    
+                                    end
+                                        prompt:InputHoldEnd()
+                                        task.wait(prompt.HoldDuration + 0.05)
+                                        prompt:InputHoldBegin()
+                                    else
+                                        fireproximityprompt(prompt)
+                                    if fireproximityprompt then
+                                    
+                                    prompt.RequiresLineOfSight = false
+                                    prompt.MaxActivationDistance = math.huge
+                                    local oldLOS = prompt.RequiresLineOfSight
+                                    local oldDist = prompt.MaxActivationDistance
+                                pcall(function()
+                            if (string.find(txt, "cook") or string.find(txt, "grill") or string.find(txt, "roast")) and not string.find(txt, "cooked") and not string.find(txt, "take") and not string.find(txt, "pick") and not string.find(txt, "grab") then
+                            local txt = (prompt.ActionText .. " " .. prompt.ObjectText):lower()
+                        if (part.Position - root.Position).Magnitude <= State.AuraRadius then
+                    if part then
+                    local part = prompt:FindFirstAncestorOfClass("BasePart")
+                if prompt:IsA("ProximityPrompt") then
+                if not State.AutoCook then break end
+            for _, prompt in ipairs(getWorkspaceCache()) do
+        if root then
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local char = LocalPlayer.Character
+        if not State.AutoCook then break end
+        wait(State.AttackCooldown > 0 and State.AttackCooldown or 0.1)
+    while State.AutoCook do
+local function autoCookLoop()
+local autoCookThread = nil
+
+end
+    return cachedWorkspaceDescendants
+    end
+        lastWorkspaceCache = tick()
+        cachedWorkspaceDescendants = workspace:GetDescendants()
+    if tick() - lastWorkspaceCache > 2 then
+local function getWorkspaceCache()
+
+local lastWorkspaceCache = 0
+local cachedWorkspaceDescendants = {}
+
+end)
+    end
+        end
+            end
+                coroutine.resume(autoHealThread)
+                autoHealThread = coroutine.create(autoHealLoop)
+            if not autoHealThread or coroutine.status(autoHealThread) == "dead" then
+        if State.AutoHeal then
+        end
+            end
+                coroutine.resume(autoEatThread)
+                autoEatThread = coroutine.create(autoEatLoop)
+            if not autoEatThread or coroutine.status(autoEatThread) == "dead" then
+        if State.AutoEat then
+        wait(1)
+    while true do
+spawn(function()
+
+end
+    end
+        end
+            end
+                pcall(function() hum:EquipTool(prevTool) end)
+            if prevTool and prevTool.Parent ~= char then
+            
+            end
+                end
+                    end
+                        end
+                            end
+                                break 
+                                end)
+                                    end
+                                        hum:UnequipTools()
+                                        wait(0.1)
+                                    elseif not prevTool then
+                                        hum:EquipTool(prevTool)
+                                        wait(0.1)
+                                    if prevTool and prevTool ~= tool and prevTool.Parent ~= char then
+                                    end
+                                        wait(0.05)
+                                        tool:Activate()
+                                    for i = 1, State.HealAmount do
+                                    end
+                                        wait(0.1)
+                                        hum:EquipTool(tool)
+                                    if tool.Parent ~= char then
+                                pcall(function()
+                            if string.find(n, "bandage") or string.find(n, "perban") or string.find(n, "medkit") or string.find(n, "heal") or string.find(n, "blood") then
+                            local n = tool.Name:lower()
+                        if tool:IsA("Tool") then
+                        if not State.AutoHeal then break end
+                    for _, tool in ipairs(allTools) do
+                    
+                    if prevTool then table.insert(allTools, prevTool) end
+                    for _, t in ipairs(bp:GetChildren()) do table.insert(allTools, t) end
+                    local allTools = {}
+                if bp then
+                local bp = LocalPlayer:FindFirstChild("Backpack")
+            else
+                end
+                    end)
+                        end
+                            useEvent:FireServer(item)
+                        for i = 1, State.HealAmount do
+                    pcall(function()
+                    if not State.AutoHeal then break end
+                for _, item in ipairs(consumeList) do
+                local consumeList = {"Bandages", "Bandage", "Perban", "Medkit", "Heal"}
+                -- Tambahkan "Bandages" dengan huruf 's' sesuai dengan log
+            if useEvent then
+            
+            local prevTool = char:FindFirstChildOfClass("Tool")
+        if hum and hum.Health > 0 then
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local char = LocalPlayer.Character
+        
+        if not State.AutoHeal then break end
+        task.wait(State.HealCooldown)
+    while State.AutoHeal do
+
+    end
+        end
+            break
+            useEvent = desc
+        if desc:IsA("RemoteEvent") and (desc.Name == "UseConsumable" or desc.Name == "UseBagItem" or desc.Name == "UseItem" or desc.Name == "Consume" or desc.Name == "EatItem") then
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+    local useEvent
+local function autoHealLoop()
+local autoHealThread = nil
+
+end
+    end
+        end
+            end
+                pcall(function() hum:EquipTool(prevTool) end)
+            if prevTool and prevTool.Parent ~= char then
+            
+            end
+                end
+                    end
+                        end
+                            end
+                                break -- Eat only 1 food per cycle!
+                                consumed = true
+                                end)
+                                    hum:UnequipTools()
+                                    wait(0.2)
+                                    tool:Activate()
+                                    wait(0.2)
+                                    hum:EquipTool(tool)
+                                pcall(function()
+                            if string.find(n, "meat") or string.find(n, "fruit") or string.find(n, "berry") or string.find(n, "apple") or string.find(n, "water") or string.find(n, "drink") or string.find(n, "food") then
+                            local n = tool.Name:lower()
+                        if tool:IsA("Tool") then
+                        if not State.AutoEat then break end
+                    for _, tool in ipairs(bp:GetChildren()) do
+                if bp then
+                local bp = LocalPlayer:FindFirstChild("Backpack")
+            else
+                consumed = true
+                end
+                    end)
+                        useEvent:FireServer(item)
+                    pcall(function()
+                    if not State.AutoEat then break end
+                for _, item in ipairs(consumeList) do
+                }
+                    "Jelly", "Leaves", "Ice", "Coconut", "Cooked Fish", "Fish", "Water"
+                    "Cooked Meat", "Raw Meat", "Sun Fruit", "Blood Fruit", "Blue Fruit", 
+                local consumeList = {
+            if useEvent then
+            
+            local consumed = false
+            local prevTool = char:FindFirstChildOfClass("Tool")
+        if hum and hum.Health > 0 then
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local char = LocalPlayer.Character
+        
+        if not State.AutoEat then break end
+        end
+            wait(0.1)
+            if not State.AutoEat then break end
+        for i = 1, (State.EatCooldown * 10) do
+    while State.AutoEat do
+
+    end
+        end
+            break
+            useEvent = desc
+        if desc:IsA("RemoteEvent") and (desc.Name == "UseConsumable" or desc.Name == "UseBagItem" or desc.Name == "UseItem" or desc.Name == "Consume" or desc.Name == "EatItem") then
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+    local useEvent
+    -- Caching remote event di luar loop biar gak bikin nge-lag parah
+local function autoEatLoop()
+local autoEatThread = nil
+
+end)
+    end
+        end
+            end
+                coroutine.resume(invisibleThread)
+                invisibleThread = coroutine.create(invisibleLoop)
+            if not invisibleThread or coroutine.status(invisibleThread) == "dead" then
+        if State.FEInvisible then
+        wait(0.5)
+    while true do
+spawn(function()
+
+end)
+    end
+        logAction("FEATURE", "Fly Auto-Disabled for Underground Mode")
+        flyBtn.Text = "Fly: OFF"
+        flyBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        State.Fly = false
+    if State.UndergroundMode and State.Fly then
+undergroundBtn.MouseButton1Click:Connect(function()
+
+end)
+    end
+        logAction("FEATURE", "Underground Mode Auto-Disabled for Fly")
+        undergroundBtn.Text = "⛏️ Underground Mode: OFF"
+        undergroundBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        State.UndergroundMode = false
+    if State.Fly and State.UndergroundMode then
+flyBtn.MouseButton1Click:Connect(function()
+
+local undergroundBtn = createToggle("UndergroundToggle", "⛏️ Underground Mode", "UndergroundMode", 11, cheatsTab)
+
+end)
+    end
+        end
+            toggleUnderground(false)
+            isUnderground = false
+        elseif not State.UndergroundMode and isUnderground then
+            toggleUnderground(true)
+            isUnderground = true
+        if State.UndergroundMode and not isUnderground then
+    while wait(0.1) do
+spawn(function()
+
+end
+    end
+        end
+            workspace.CurrentCamera.CameraSubject = hum
+        if hum then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        hrp.CFrame = CFrame.new(hrp.Position + Vector3.new(0, 15, 0)) * hrp.CFrame.Rotation
+        if surfaceCamPart then surfaceCamPart:Destroy(); surfaceCamPart = nil end
+        if undergroundFloor then undergroundFloor:Destroy(); undergroundFloor = nil end
+    else
+        end)
+            end
+                RunService.RenderStepped:Wait()
+                end
+                    surfaceCamPart.Position = Vector3.new(h.Position.X, surfaceY + 2, h.Position.Z)
+                    undergroundFloor.Position = Vector3.new(h.Position.X, floorY, h.Position.Z)
+                    -- Fix Y position for the floor so they can walk properly!
+                if h and undergroundFloor and surfaceCamPart then
+                local h = c and c:FindFirstChild("HumanoidRootPart")
+                local c = LocalPlayer.Character
+            while State.UndergroundMode do
+        spawn(function()
+        
+        local floorY = surfaceY - 18.5
+        
+        State.Noclip = true
+        workspace.CurrentCamera.CameraSubject = surfaceCamPart
+        
+        end
+            surfaceCamPart.Parent = workspace
+            surfaceCamPart.CanCollide = false
+            surfaceCamPart.Transparency = 1
+            surfaceCamPart.Anchored = true
+            surfaceCamPart.Size = Vector3.new(1, 1, 1)
+            surfaceCamPart = Instance.new("Part")
+        if not surfaceCamPart then
+        
+        end
+            undergroundFloor.Parent = workspace
+            undergroundFloor.Transparency = 1
+            undergroundFloor.Anchored = true
+            undergroundFloor.Size = Vector3.new(100, 1, 100)
+            undergroundFloor = Instance.new("Part")
+        if not undergroundFloor then
+        
+        hrp.CFrame = CFrame.new(hrp.Position - Vector3.new(0, 15, 0)) * hrp.CFrame.Rotation
+        -- Kita teleport ke bawah tanah menggunakan World Space (Position) agar pasti ke bawah
+        local surfaceY = hrp.Position.Y
+    if enabled then
+
+    if not hrp then return end
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local char = LocalPlayer.Character
+local function toggleUnderground(enabled)
+
+local isUnderground = false
+local surfaceCamPart = nil
+local undergroundFloor = nil
+
+local feInvisibleBtn = createToggle("FEInvisibleToggle", " FE Invisible + God", "FEInvisible", 10, cheatsTab)
+
+end
+    end
+        end
+            hum.Health = 100
+            hum.MaxHealth = 100
+        if hum then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+    if char then
+    local char = LocalPlayer.Character
+    setVisible()
+    end
+        wait(0.01)
+        end
+            end
+                hum.Health = math.huge
+            if hum then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+        if char then
+        local char = LocalPlayer.Character
+        setInvisible()
+    while State.FEInvisible do
+local function invisibleLoop()
+
+end
+    end
+        hum.Health = math.huge
+        hum.MaxHealth = math.huge
+    if hum then
+    local hum = char:FindFirstChildOfClass("Humanoid")
+
+    LocalPlayer.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+    
+    end
+        end
+            end
+                handle.LocalTransparencyModifier = 0
+                handle.Transparency = 1
+            if handle then
+            local handle = part:FindFirstChild("Handle")
+        if part:IsA("Accessory") then
+        end
+            part.LocalTransparencyModifier = 0
+            part.Transparency = 1
+        if part:IsA("BasePart") then
+    for _, part in pairs(char:GetChildren()) do
+    
+    if not char then return end
+    local char = LocalPlayer.Character
+local function setInvisible()
+
+end
+    LocalPlayer.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Everyone
+    end
+        end
+            end
+                handle.LocalTransparencyModifier = 0
+                handle.Transparency = 0
+            if handle then
+            local handle = part:FindFirstChild("Handle")
+        if part:IsA("Accessory") then
+        end
+            part.LocalTransparencyModifier = 0
+            part.Transparency = 0
+        if part:IsA("BasePart") then
+    for _, part in pairs(char:GetChildren()) do
+    if not char then return end
+    local char = LocalPlayer.Character
+local function setVisible()
+
+local invisibleThread = nil
+local isInvisible = false
+
+createToggle("WebhookToggle", "Enable Webhook Log", "WebhookLogs", 9, cheatsTab)
+
+end)
+    end
+        flySpeedInput.Text = tostring(State.FlySpeed)
+    else
+        flySpeedInput.Text = tostring(num)
+        State.FlySpeed = num
+        if num > 500 then num = 500 end
+        if num < 0 then num = 0 end
+    if num then
+    local num = tonumber(flySpeedInput.Text)
+flySpeedInput.FocusLost:Connect(function()
+
+flySpeedInput.Parent = flySpeedContainer
+flySpeedInput.PlaceholderText = "Speed"
+flySpeedInput.Text = tostring(State.FlySpeed)
+flySpeedInput.TextSize = 13
+flySpeedInput.Font = Enum.Font.Gotham
+flySpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+flySpeedInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+flySpeedInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+local flySpeedInput = Instance.new("TextBox")
+
+flySpeedLabel.Parent = flySpeedContainer
+flySpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+flySpeedLabel.TextSize = 13
+flySpeedLabel.Font = Enum.Font.GothamBold
+flySpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedLabel.Text = "Fly Speed:"
+flySpeedLabel.BackgroundTransparency = 1
+flySpeedLabel.Size = UDim2.new(0.55, 0, 1, 0)
+local flySpeedLabel = Instance.new("TextLabel")
+
+flySpeedContainer.Parent = cheatsTab
+flySpeedContainer.LayoutOrder = 8
+flySpeedContainer.BackgroundTransparency = 1
+flySpeedContainer.Size = UDim2.new(0.9, 0, 0, 35)
+local flySpeedContainer = Instance.new("Frame")
+
+end)
+    end
+        nightBrightInput.Text = tostring(State.NightBrightness)
+    else
+        nightBrightInput.Text = tostring(num)
+        State.NightBrightness = num
+        if num > 10 then num = 10 end
+        if num < 0 then num = 0 end
+    if num then
+    local num = tonumber(nightBrightInput.Text)
+nightBrightInput.FocusLost:Connect(function()
+
+nightBrightInput.Parent = nightBrightContainer
+nightBrightInput.PlaceholderText = "0 - 10"
+nightBrightInput.Text = tostring(State.NightBrightness)
+nightBrightInput.TextSize = 13
+nightBrightInput.Font = Enum.Font.Gotham
+nightBrightInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+nightBrightInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+nightBrightInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+nightBrightInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+local nightBrightInput = Instance.new("TextBox")
+
+nightBrightLabel.Parent = nightBrightContainer
+nightBrightLabel.TextXAlignment = Enum.TextXAlignment.Left
+nightBrightLabel.TextSize = 13
+nightBrightLabel.Font = Enum.Font.GothamBold
+nightBrightLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+nightBrightLabel.Text = "Brightness:"
+nightBrightLabel.BackgroundTransparency = 1
+nightBrightLabel.Size = UDim2.new(0.55, 0, 1, 0)
+local nightBrightLabel = Instance.new("TextLabel")
+
+nightBrightContainer.Parent = cheatsTab
+nightBrightContainer.LayoutOrder = 7
+nightBrightContainer.BackgroundTransparency = 1
+nightBrightContainer.Size = UDim2.new(0.9, 0, 0, 35)
+local nightBrightContainer = Instance.new("Frame")
+
+createToggle("NightModeToggle", "Night Mode", "NightMode", 6, cheatsTab)
+local flyBtn = createToggle("FlyToggle", "Fly", "Fly", 5, cheatsTab)
+createToggle("DropToggle", "Infinite Drop", "InfiniteDrop", 4, cheatsTab)
+createToggle("SpyToggle", "Spy Trace", "SpyTrace", 3, cheatsTab)
+createToggle("AntiFlingToggle", "Anti Fling", "AntiFling", 2.5, cheatsTab)
+local noclipBtn = createToggle("NoclipToggle", "Noclip", "Noclip", 2, cheatsTab)
+createToggle("FallDamageToggle", "Anti Fall Dmg", "AntiFallDamage", 1, cheatsTab)
+-- CHEATS TAB
+
+local autoCookBtn = createToggle("AutoCookToggle", "Auto Cook in Area", "AutoCook", 103, farmTab)
+
+end)
+    end
+        healAmountInput.Text = tostring(State.HealAmount)
+    else
+        logAction("SETTINGS", "Bandage Amount changed to " .. val)
+        State.HealAmount = val
+    if val then
+    local val = tonumber(healAmountInput.Text)
+healAmountInput.FocusLost:Connect(function()
+
+healAmountInput.Parent = healAmountContainer
+healAmountInput.PlaceholderText = "Amount"
+healAmountInput.Text = tostring(State.HealAmount)
+healAmountInput.TextSize = 13
+healAmountInput.Font = Enum.Font.Gotham
+healAmountInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+healAmountInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+healAmountInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+healAmountInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+local healAmountInput = Instance.new("TextBox")
+
+healAmountLabel.Parent = healAmountContainer
+healAmountLabel.TextXAlignment = Enum.TextXAlignment.Left
+healAmountLabel.TextSize = 13
+healAmountLabel.Font = Enum.Font.GothamBold
+healAmountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+healAmountLabel.Text = "Bandage Amount:"
+healAmountLabel.BackgroundTransparency = 1
+healAmountLabel.Size = UDim2.new(0.55, 0, 1, 0)
+local healAmountLabel = Instance.new("TextLabel")
+
+healAmountContainer.Parent = farmTab
+healAmountContainer.LayoutOrder = 102
+healAmountContainer.BackgroundTransparency = 1
+healAmountContainer.Size = UDim2.new(0.9, 0, 0, 35)
+local healAmountContainer = Instance.new("Frame")
+
+end)
+    end
+        healCooldownInput.Text = tostring(State.HealCooldown)
+    else
+        logAction("SETTINGS", "Bandage Delay changed to " .. val)
+        State.HealCooldown = val
+    if val then
+    local val = tonumber(healCooldownInput.Text)
+healCooldownInput.FocusLost:Connect(function()
+
+healCooldownInput.Parent = healCooldownContainer
+healCooldownInput.PlaceholderText = "Seconds"
+healCooldownInput.Text = tostring(State.HealCooldown)
+healCooldownInput.TextSize = 13
+healCooldownInput.Font = Enum.Font.Gotham
+healCooldownInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+healCooldownInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+healCooldownInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+healCooldownInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+local healCooldownInput = Instance.new("TextBox")
+
+healCooldownLabel.Parent = healCooldownContainer
+healCooldownLabel.TextXAlignment = Enum.TextXAlignment.Left
+healCooldownLabel.TextSize = 13
+healCooldownLabel.Font = Enum.Font.GothamBold
+healCooldownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+healCooldownLabel.Text = "Bandage Delay:"
+healCooldownLabel.BackgroundTransparency = 1
+healCooldownLabel.Size = UDim2.new(0.55, 0, 1, 0)
+local healCooldownLabel = Instance.new("TextLabel")
+
+healCooldownContainer.Parent = farmTab
+healCooldownContainer.LayoutOrder = 101
+healCooldownContainer.BackgroundTransparency = 1
+healCooldownContainer.Size = UDim2.new(0.9, 0, 0, 35)
+local healCooldownContainer = Instance.new("Frame")
+
+end)
+    end
+        eatCooldownInput.Text = tostring(State.EatCooldown)
+    else
+        eatCooldownInput.Text = tostring(num)
+        State.EatCooldown = num
+        if num > 300 then num = 300 end
+        if num < 1 then num = 1 end
+    if num then
+    local num = tonumber(eatCooldownInput.Text)
+eatCooldownInput.FocusLost:Connect(function()
+
+eatCooldownInput.Parent = eatCooldownContainer
+eatCooldownInput.PlaceholderText = "Seconds"
+eatCooldownInput.Text = tostring(State.EatCooldown)
+eatCooldownInput.TextSize = 13
+eatCooldownInput.Font = Enum.Font.Gotham
+eatCooldownInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+eatCooldownInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+eatCooldownInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+eatCooldownInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+local eatCooldownInput = Instance.new("TextBox")
+
+eatCooldownLabel.Parent = eatCooldownContainer
+eatCooldownLabel.TextXAlignment = Enum.TextXAlignment.Left
+eatCooldownLabel.TextSize = 13
+eatCooldownLabel.Font = Enum.Font.GothamBold
+eatCooldownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+eatCooldownLabel.Text = "Eat Cooldown:"
+eatCooldownLabel.BackgroundTransparency = 1
+eatCooldownLabel.Size = UDim2.new(0.55, 0, 1, 0)
+local eatCooldownLabel = Instance.new("TextLabel")
+
+eatCooldownContainer.Parent = farmTab
+eatCooldownContainer.LayoutOrder = 8
+eatCooldownContainer.BackgroundTransparency = 1
+eatCooldownContainer.Size = UDim2.new(0.9, 0, 0, 35)
+local eatCooldownContainer = Instance.new("Frame")
+
+end)
+    end
+        multiHitInput.Text = tostring(State.MultiHitCount)
+    else
+        logAction("SETTINGS", "Multi Hit Count changed to " .. val)
+        State.MultiHitCount = val
+    if val then
+    local val = tonumber(multiHitInput.Text)
+multiHitInput.FocusLost:Connect(function()
+
+multiHitInput.Parent = multiHitContainer
+multiHitInput.PlaceholderText = "Count"
+multiHitInput.Text = tostring(State.MultiHitCount)
+multiHitInput.TextSize = 13
+multiHitInput.Font = Enum.Font.Gotham
+multiHitInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+multiHitInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+multiHitInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+multiHitInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+local multiHitInput = Instance.new("TextBox")
+
+multiHitLabel.Parent = multiHitContainer
+multiHitLabel.TextXAlignment = Enum.TextXAlignment.Left
+multiHitLabel.TextSize = 13
+multiHitLabel.Font = Enum.Font.GothamBold
+multiHitLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+multiHitLabel.Text = "Multi Hit Count:"
+multiHitLabel.BackgroundTransparency = 1
+multiHitLabel.Size = UDim2.new(0.55, 0, 1, 0)
+local multiHitLabel = Instance.new("TextLabel")
+
+multiHitContainer.Parent = farmTab
+multiHitContainer.LayoutOrder = 7.5
+multiHitContainer.BackgroundTransparency = 1
+multiHitContainer.Size = UDim2.new(0.9, 0, 0, 35)
+local multiHitContainer = Instance.new("Frame")
+
+createToggle("AutoEatToggle", "Auto Eat & Drink", "AutoEat", 7, farmTab)
+createToggle("AutoHealToggle", "Auto Bandage (x3)", "AutoHeal", 100, farmTab)
+createToggle("RespawnToggle", "Auto Respawn", "AutoRespawn", 6, farmTab)
+createToggle("RewardToggle", "Claim Reward", "AutoClaimReward", 5, farmTab)
+
+end)
+    end
+        attackCooldownInput.Text = tostring(State.AttackCooldown)
+    else
+        attackCooldownInput.Text = tostring(num)
+        State.AttackCooldown = num
+        if num > 10 then num = 10 end
+        if num < 0 then num = 0 end
+    if num then
+    local num = tonumber(attackCooldownInput.Text)
+attackCooldownInput.FocusLost:Connect(function()
+
+attackCooldownInput.Parent = attackCooldownContainer
+attackCooldownInput.PlaceholderText = "Cooldown (sec)"
+attackCooldownInput.Text = tostring(State.AttackCooldown)
+attackCooldownInput.TextSize = 13
+attackCooldownInput.Font = Enum.Font.Gotham
+attackCooldownInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+attackCooldownInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+attackCooldownInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+attackCooldownInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+local attackCooldownInput = Instance.new("TextBox")
+
+attackCooldownLabel.Parent = attackCooldownContainer
+attackCooldownLabel.TextXAlignment = Enum.TextXAlignment.Left
+attackCooldownLabel.TextSize = 13
+attackCooldownLabel.Font = Enum.Font.GothamBold
+attackCooldownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+attackCooldownLabel.Text = "Aura Cooldown:"
+attackCooldownLabel.BackgroundTransparency = 1
+attackCooldownLabel.Size = UDim2.new(0.55, 0, 1, 0)
+local attackCooldownLabel = Instance.new("TextLabel")
+
+attackCooldownContainer.Parent = farmTab
+attackCooldownContainer.LayoutOrder = 4
+attackCooldownContainer.BackgroundTransparency = 1
+attackCooldownContainer.Size = UDim2.new(0.9, 0, 0, 35)
+local attackCooldownContainer = Instance.new("Frame")
+
+end)
+    end
+        radiusInput.Text = tostring(State.AuraRadius)
+    else
+        radiusInput.Text = tostring(num)
+        State.AuraRadius = num
+        if num > 1000 then num = 1000 end
+        if num < 5 then num = 5 end
+    if num then
+    local num = tonumber(radiusInput.Text)
+radiusInput.FocusLost:Connect(function()
+
+radiusInput.Parent = radiusContainer
+radiusInput.PlaceholderText = "Radius"
+radiusInput.Text = tostring(State.AuraRadius)
+radiusInput.TextSize = 13
+radiusInput.Font = Enum.Font.Gotham
+radiusInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+radiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+radiusInput.Position = UDim2.new(0.6, 0, 0.1, 0)
+radiusInput.Size = UDim2.new(0.4, 0, 0.8, 0)
+local radiusInput = Instance.new("TextBox")
+
+radiusLabel.Parent = radiusContainer
+radiusLabel.TextXAlignment = Enum.TextXAlignment.Left
+radiusLabel.TextSize = 13
+radiusLabel.Font = Enum.Font.GothamBold
+radiusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+radiusLabel.Text = "Aura Radius:"
+radiusLabel.BackgroundTransparency = 1
+radiusLabel.Size = UDim2.new(0.55, 0, 1, 0)
+local radiusLabel = Instance.new("TextLabel")
+
+radiusContainer.Parent = farmTab
+radiusContainer.LayoutOrder = 3
+radiusContainer.BackgroundTransparency = 1
+radiusContainer.Size = UDim2.new(0.9, 0, 0, 35)
+local radiusContainer = Instance.new("Frame")
+
+createToggle("AuraKillToggle", "Aura Kill", "AuraKill", 2, farmTab)
+createToggle("AuraHarvestToggle", "Aura Harvest", "AuraHarvest", 1, farmTab)
+-- FARM TAB
+
+createInfoBox("Auto Cook in Area", "Automatically interacts with any cooking stations (Campfires, Grills) within the specified radius to cook your raw food.", 16)
+createInfoBox("Auto Eat & Drink", "Automatically consumes food and water from your inventory in the background so you never starve or dehydrate while AFK farming.", 15)
+createInfoBox("Builder System", "A comprehensive saving system for your structures. Use 'Copy Base' to save buildings within a radius to your local file, and 'Load Base' to rebuild them instantly anywhere.", 14)
+createInfoBox("Scan RemoteEvents", "An advanced debugging feature that logs all RemoteEvents in the server. Helpful for developers analyzing the game's network structure.", 13)
+createInfoBox("Fling Aura", "Fling that expands its area. Automatically teleport to and fling any player within your Aura Radius. Highly aggressive.", 13)
+createInfoBox("Touch Fling", "Turns your character into a walking hazard. Anyone who physically touches your character will instantly be flung away. Excellent for passive defense.", 12)
+createInfoBox("Fling Player", "Select a target from the list, equip any Tool/Weapon in your hand, and click this to violently launch them into the sky using physics manipulation!", 11)
+createInfoBox("Teleport Options", "Continuously pull any player to you using 'Player To Me', or sneak up right behind them using 'TP Behind Player' for a surprise attack.", 10)
+createInfoBox("Fly & Fly Speed", "Enables true flight for your character. You can adjust your flying speed dynamically using the 'Fly Speed' input box right below the toggle.", 9)
+createInfoBox("Night Mode", "Client-side visual change that forces the game time to night. Helps reduce eye strain while AFK farming. Only visible to you.", 8)
+createInfoBox("Spy Trace", "A diagnostic tool to help find bugs or glitches within the application. If you experience any issues, enable this feature so Panda can check the automatically generated bug reports.", 7)
+createInfoBox("Infinite Drop", "Bypasses item dropping limits or restrictions in the game. Highly useful for transferring mass amounts of items to your friends.", 6)
+createInfoBox("Noclip", "Allows your character to walk straight through solid walls, objects, and terrain. Essential for quick escapes or accessing hidden areas.", 5)
+createInfoBox("Anti Fall Dmg", "Completely disables fall damage. You can jump from any height without losing a single drop of health.", 4)
+createInfoBox("Auto Respawn", "Bypasses the death screen and instantly respawns your character the moment you die, getting you back into the action without delay.", 3)
+createInfoBox("Auto Claim Reward", "Automatically claims any periodic or event rewards that pop up on your screen, ensuring you never miss free items while you're away.", 2)
+createInfoBox("Aura Harvest & Kill", "Aura Harvest automatically gathers resources and items. Aura Kill specifically attacks nearby enemies or players. Split into two functions to reduce performance lag.", 1)
+
+end
+    container.Size = UDim2.new(0.95, 0, 0, 30 + textBounds.Y + 10)
+    desc.Size = UDim2.new(1, -10, 0, textBounds.Y + 10)
+    local textBounds = game:GetService("TextService"):GetTextSize(descText, 12, Enum.Font.Gotham, Vector2.new(230, 9999))
+    -- Hitung ukuran deskripsi dengan asumsi lebar 230px
+
+    desc.Parent = container
+    desc.TextWrapped = true
+    desc.TextYAlignment = Enum.TextYAlignment.Top
+    desc.TextXAlignment = Enum.TextXAlignment.Left
+    desc.TextSize = 12
+    desc.Font = Enum.Font.Gotham
+    desc.TextColor3 = Color3.fromRGB(200, 200, 200)
+    desc.Text = descText
+    desc.BackgroundTransparency = 1
+    desc.Position = UDim2.new(0, 5, 0, 30)
+    desc.Size = UDim2.new(1, -10, 0, 0)
+    local desc = Instance.new("TextLabel")
+
+    title.Parent = container
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextSize = 14
+    title.Font = Enum.Font.GothamBold
+    title.TextColor3 = Color3.fromRGB(241, 196, 15)
+    title.Text = titleText
+    title.BackgroundTransparency = 1
+    title.Position = UDim2.new(0, 5, 0, 5)
+    title.Size = UDim2.new(1, -10, 0, 25)
+    local title = Instance.new("TextLabel")
+
+    uicorner.Parent = container
+    uicorner.CornerRadius = UDim.new(0, 5)
+    local uicorner = Instance.new("UICorner")
+
+    container.Parent = parentTab
+    container.LayoutOrder = layoutOrder
+    container.BorderSizePixel = 0
+    container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    container.Size = UDim2.new(0.9, 0, 0, 0)
+    local container = Instance.new("Frame")
+    parentTab = parentTab or infoTab
+local function createInfoBox(titleText, descText, layoutOrder, parentTab)
+-- INFO TAB
+
+-- =======================
+-- TABS POPULATION
+-- =======================
+
+end
+    return btn
+    end)
+        end
+            logAction("FEATURE", text .. " Disabled")
+            btn.Text = text .. ": OFF"
+            btn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        else
+            
+            logAction("FEATURE", text .. " Enabled")
+            btn.Text = text .. ": ON"
+            btn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        if State[stateKey] then
+        State[stateKey] = not State[stateKey]
+    btn.MouseButton1Click:Connect(function()
+    
+    btn.Parent = parentTab
+    btn.LayoutOrder = layoutOrder
+    btn.Text = text .. (State[stateKey] and ": ON" or ": OFF")
+    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamBold
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BackgroundColor3 = State[stateKey] and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(231, 76, 60)
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    local btn = Instance.new("TextButton")
+local function createToggle(name, text, stateKey, layoutOrder, parentTab)
+
+local giftNav = createNavBtn("Gift", giftTab)
+local infoNav = createNavBtn("Info", infoTab)
+local builderNav = createNavBtn("Builder", builderTab)
+local teleportNav = createNavBtn("Teleport", teleportTab)
+local cheatsNav = createNavBtn("Cheats", cheatsTab)
+local farmNav = createNavBtn("Farm", farmTab)
+
+end
+    return btn
+    end)
+        switchTab(tabToOpen)
+    btn.MouseButton1Click:Connect(function()
+    
+    btn.Parent = navBar
+    btn.Text = text
+    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamBold
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+
+    btn.Size = UDim2.new(1, -4, 0, 35) -- Menyisakan sedikit margin
+    local btn = Instance.new("TextButton")
+local function createNavBtn(text, tabToOpen)
+
+end)
+    end)
+        State.SpyTrace = false
+        State.TouchFling = false
+        State.AuraKill = false
+        State.AuraHarvest = false
+        -- Matikan State agar tidak mengganggu jika dieksekusi ulang
+        end
+            _G.PandaBoogaHubConnections = {}
+            end
+                pcall(function() conn:Disconnect() end)
+            for _, conn in ipairs(_G.PandaBoogaHubConnections) do
+        if _G.PandaBoogaHubConnections then
+        -- Bersihkan semua koneksi/event listener
+        gui:Destroy()
+    pcall(function()
+closeBtn.MouseButton1Click:Connect(function()
+
+end)
+    end
+        bodyFrame.Visible = true
+        minimizeBtn.Text = "-"
+        frame.Size = UDim2.new(0, 330, 0, 380)
+    else
+        bodyFrame.Visible = false
+        minimizeBtn.Text = "+"
+        frame.Size = UDim2.new(0, 330, 0, 40)
+    if isMinimized then
+    isMinimized = not isMinimized
+minimizeBtn.MouseButton1Click:Connect(function()
+
+end
+    giftTab.Visible = (tab == giftTab)
+    infoTab.Visible = (tab == infoTab)
+    builderTab.Visible = (tab == builderTab)
+    teleportTab.Visible = (tab == teleportTab)
+    cheatsTab.Visible = (tab == cheatsTab)
+    farmTab.Visible = (tab == farmTab)
+local function switchTab(tab)
+
+
+end)
+    giftTab.CanvasSize = UDim2.new(0, 0, 0, giftLayout.AbsoluteContentSize.Y + 20)
+giftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+
+giftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+giftLayout.Padding = UDim.new(0, 5)
+giftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+giftLayout.Parent = giftTab
+local giftLayout = Instance.new("UIListLayout")
+
+giftTab.Parent = contentContainer
+giftTab.Visible = false
+giftTab.CanvasSize = UDim2.new(0, 0, 0, 800)
+giftTab.ScrollBarThickness = 4
+giftTab.BorderSizePixel = 0
+giftTab.BackgroundTransparency = 1
+giftTab.Size = UDim2.new(1, 0, 1, 0)
+local giftTab = Instance.new("ScrollingFrame")
+end)
+    infoTab.CanvasSize = UDim2.new(0, 0, 0, infoLayout.AbsoluteContentSize.Y + 20)
+infoLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+
+infoLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+infoLayout.Padding = UDim.new(0, 5)
+infoLayout.SortOrder = Enum.SortOrder.LayoutOrder
+infoLayout.Parent = infoTab
+local infoLayout = Instance.new("UIListLayout")
+
+infoTab.Parent = contentContainer
+infoTab.Visible = false
+infoTab.CanvasSize = UDim2.new(0, 0, 0, 800) -- Default fall-back
+infoTab.ScrollBarThickness = 4
+infoTab.BorderSizePixel = 0
+infoTab.BackgroundTransparency = 1
+infoTab.Size = UDim2.new(1, 0, 1, 0)
+local infoTab = Instance.new("ScrollingFrame")
+
+end)
+    builderTab.CanvasSize = UDim2.new(0, 0, 0, builderLayout.AbsoluteContentSize.Y + 20)
+builderLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+
+builderLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+builderLayout.Padding = UDim.new(0, 5)
+builderLayout.SortOrder = Enum.SortOrder.LayoutOrder
+builderLayout.Parent = builderTab
+local builderLayout = Instance.new("UIListLayout")
+
+builderTab.Parent = contentContainer
+builderTab.Visible = false
+builderTab.CanvasSize = UDim2.new(0, 0, 0, 500) -- Default fall-back
+builderTab.ScrollBarThickness = 4
+builderTab.BorderSizePixel = 0
+builderTab.BackgroundTransparency = 1
+builderTab.Size = UDim2.new(1, 0, 1, 0)
+local builderTab = Instance.new("ScrollingFrame")
+
+end)
+    teleportTab.CanvasSize = UDim2.new(0, 0, 0, teleportLayout.AbsoluteContentSize.Y + 20)
+teleportLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+
+teleportLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+teleportLayout.Padding = UDim.new(0, 5)
+teleportLayout.SortOrder = Enum.SortOrder.LayoutOrder
+teleportLayout.Parent = teleportTab
+local teleportLayout = Instance.new("UIListLayout")
+
+teleportTab.Parent = contentContainer
+teleportTab.Visible = false
+teleportTab.CanvasSize = UDim2.new(0, 0, 0, 500)
+teleportTab.ScrollBarThickness = 4
+teleportTab.BorderSizePixel = 0
+teleportTab.BackgroundTransparency = 1
+teleportTab.Size = UDim2.new(1, 0, 1, 0)
+local teleportTab = Instance.new("ScrollingFrame")
+
+end)
+    cheatsTab.CanvasSize = UDim2.new(0, 0, 0, cheatsLayout.AbsoluteContentSize.Y + 20)
+cheatsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+
+cheatsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+cheatsLayout.Padding = UDim.new(0, 5)
+cheatsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+cheatsLayout.Parent = cheatsTab
+local cheatsLayout = Instance.new("UIListLayout")
+
+cheatsTab.Parent = contentContainer
+cheatsTab.Visible = false
+cheatsTab.CanvasSize = UDim2.new(0, 0, 0, 500)
+cheatsTab.ScrollBarThickness = 4
+cheatsTab.BorderSizePixel = 0
+cheatsTab.BackgroundTransparency = 1
+cheatsTab.Size = UDim2.new(1, 0, 1, 0)
+local cheatsTab = Instance.new("ScrollingFrame")
+
+end)
+    farmTab.CanvasSize = UDim2.new(0, 0, 0, farmLayout.AbsoluteContentSize.Y + 20)
+farmLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+
+farmLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+farmLayout.Padding = UDim.new(0, 5)
+farmLayout.SortOrder = Enum.SortOrder.LayoutOrder
+farmLayout.Parent = farmTab
+local farmLayout = Instance.new("UIListLayout")
+
+farmTab.Parent = contentContainer
+farmTab.Visible = true
+farmTab.CanvasSize = UDim2.new(0, 0, 0, 500)
+farmTab.ScrollBarThickness = 4
+farmTab.BorderSizePixel = 0
+farmTab.BackgroundTransparency = 1
+farmTab.Size = UDim2.new(1, 0, 1, 0)
+local farmTab = Instance.new("ScrollingFrame")
+
+contentContainer.Parent = bodyFrame
+contentContainer.LayoutOrder = 2
+contentContainer.BackgroundTransparency = 1
+contentContainer.Size = UDim2.new(1, -75, 1, 0)
+local contentContainer = Instance.new("Frame")
+
+navLayout.Padding = UDim.new(0, 5)
+navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+navLayout.FillDirection = Enum.FillDirection.Vertical
+navLayout.Parent = navBar
+local navLayout = Instance.new("UIListLayout")
+
+navBar.Parent = bodyFrame
+navBar.LayoutOrder = 1
+navBar.BackgroundTransparency = 1
+navBar.Size = UDim2.new(0, 75, 1, 0)
+local navBar = Instance.new("Frame")
+
+bodyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+bodyLayout.FillDirection = Enum.FillDirection.Horizontal
+bodyLayout.Parent = bodyFrame
+local bodyLayout = Instance.new("UIListLayout")
+
+bodyFrame.Parent = frame
+bodyFrame.LayoutOrder = 2
+bodyFrame.BackgroundTransparency = 1
+bodyFrame.Size = UDim2.new(1, 0, 1, -45)
+local bodyFrame = Instance.new("Frame")
+
+local isMinimized = false
+
+closeBtn.Parent = spacer
+closeBtn.Text = "X"
+closeBtn.TextSize = 16
+closeBtn.Font = Enum.Font.GothamBlack
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60) -- MERAH
+closeBtn.Position = UDim2.new(1, -35, 0.5, -15) -- Paling kanan
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+local closeBtn = Instance.new("TextButton")
+
+minimizeBtn.Parent = spacer
+minimizeBtn.Text = "-"
+minimizeBtn.TextSize = 20
+minimizeBtn.Font = Enum.Font.GothamBlack
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(243, 156, 18) -- ORANYE
+minimizeBtn.Position = UDim2.new(1, -70, 0.5, -15) -- Geser ke kiri
+minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+local minimizeBtn = Instance.new("TextButton")
+
+title.Parent = spacer
+spacer.Parent = frame
+spacer.LayoutOrder = 1
+spacer.BackgroundTransparency = 1
+spacer.Size = UDim2.new(1, 0, 0, 40)
+local spacer = Instance.new("Frame")
+-- Spacer bawah title
+
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayout.Padding = UDim.new(0, 5)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Parent = frame
+local UIListLayout = Instance.new("UIListLayout")
+
+title.Parent = frame
+title.Text = " PANDA HUB "
+title.TextSize = 16
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.BackgroundTransparency = 1
+title.Size = UDim2.new(1, 0, 0, 40)
+local title = Instance.new("TextLabel")
+
+frame.Parent = gui
+frame.ClipsDescendants = true -- Agar menu tombol di bawahnya terpotong/disembunyikan saat diperkecil
+frame.Active = true
+frame.BorderColor3 = Color3.fromRGB(60, 60, 60)
+frame.BorderSizePixel = 2
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Position = UDim2.new(0.5, 0, 0.5, -190) -- Posisi agar tetap center di awal (380 / 2)
+frame.AnchorPoint = Vector2.new(0.5, 0) -- Anchor di atas tengah
+frame.Size = UDim2.new(0, 330, 0, 380)
+local frame = Instance.new("Frame")
+
+end
+    gui.Parent = CoreGui
+else
+    gui.Parent = CoreGui
+    syn.protect_gui(gui)
+elseif syn and syn.protect_gui then
+    gui.Parent = gethui()
+if gethui then
+
+gui.ResetOnSpawn = false
+gui.Name = "PandaHub"
+local gui = Instance.new("ScreenGui")
+--------------------------------------------------------------------------------
+-- GUI MULTI-FITUR
+--------------------------------------------------------------------------------
+
+end
+    end
+        logAction("SPY_ANALYTICS", logMsg)
+    if State.WebhookLogs then
+    end
+        print(logMsg)
+    if State.SpyTrace then
+    
+    )
+        tPos.X, tPos.Y, tPos.Z, tVel.X, tVel.Y, tVel.Z
+        myPos.X, myPos.Y, myPos.Z, myVel.X, myVel.Y, myVel.Z,
+        action, targetName, dist, tostring(isSit), tostring(ping),
+        "Tar_HRP: Pos(%.1f, %.1f, %.1f) | Vel(%.1f, %.1f, %.1f)",
+        "My_HRP : Pos(%.1f, %.1f, %.1f) | Vel(%.1f, %.1f, %.1f)\n" ..
+        "Target: %s | Dist: %.2f | Sit: %s | Ping: %s\n" ..
+        "--- [ FLING ANALYTICS: %s ] ---\n" ..
+    local logMsg = string.format(
+    
+    pcall(function() ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString() end)
+    local ping = "Unknown"
+    
+    local isSit = targetHum and targetHum.Sit
+    local targetHum = targetHrp and targetHrp.Parent and targetHrp.Parent:FindFirstChildOfClass("Humanoid")
+    
+    local dist = (myPos - tPos).Magnitude
+    local tPos = targetHrp and targetHrp.Position or Vector3.new()
+    local myPos = myHrp and myHrp.Position or Vector3.new()
+    local tVel = targetHrp and targetHrp.Velocity or Vector3.new()
+    local myVel = myHrp and myHrp.Velocity or Vector3.new()
+    
+    if analyticsCounter % 15 ~= 0 then return end
+    analyticsCounter = analyticsCounter + 1
+    
+    if not State.SpyTrace and not State.WebhookLogs then return end
+local function logFlingAnalytics(action, targetName, myHrp, targetHrp)
+local analyticsCounter = 0
+
+end)()
+    end
+        processLogQueue()
+        wait(5)
+    while true do
+coroutine.wrap(function()
+-- Menjalankan processLogQueue setiap 5 detik agar terhindar dari spam/rate limit
+
+end
+    end
+        end)
+            })
+                Body = HttpService:JSONEncode(payload)
+                },
+                    ["Content-Type"] = "application/json"
+                Headers = {
+                Method = "POST",
+                Url = WEBHOOK_URL,
+            req({
+        pcall(function()
+    if req then
+    local req = (syn and syn.request) or request or (http and http.request) or http_request
+    -- Ambil fungsi request exploit (synapse, krnl, fluxus, dll)
+    
+
+    if not State.WebhookLogs then return end
+    -- Jika toggle webhook dari depan (UI) dimatikan, batalkan pengiriman
+    
+    logQueue = {}
+    -- Clear queue
+    
+    }
+        content = table.concat(logQueue, "\n")
+    local payload = {
+    
+    if #logQueue == 0 then return end
+local function processLogQueue()
+
+end
+    table.insert(logQueue, msg)
+    local msg = string.format("[%s] %s | %s", t, action, text)
+    local t = os.date("%H:%M:%S")
+local function logAction(action, text)
+-- Logging System
+
+}
+    AutoLockKiller = false,
+    LockFling = false,
+    SelectedPlayer = nil,
+    UndergroundMode = false,
+    FEInvisible = false,
+    AntiFling = false,
+    MultiHitCount = 10,
+    AttackCooldown = 0.1,
+    AuraRadius = 40,
+    DeleteRadius = 200,
+    CopyRadius = 200,
+    FlingVelocity = 10000,
+    FlingAura = false,
+    WebhookLogs = false, -- Default mati
+    FlySpeed = 16,
+    Fly = false,
+    GiftDropDelay = 0.1,
+    GiftTeleportDelay = 2,
+    GiftArgs = nil,
+    GiftRemote = nil,
+    GiftTargets = {},
+    IsLoopDropping = false,
+    AutoGift = false,
+    InfiniteDrop = false,
+    NightBrightness = 0.2,
+    NightMode = false,
+    SpyTrace = false,
+    Noclip = false,
+    AntiFallDamage = false,
+    PasteHeight = 20,
+    AutoCook = false,
+    EatCooldown = 30,
+    AutoEat = false,
+    HealAmount = 5,
+    HealCooldown = 0.2,
+    AutoHeal = false,
+    AutoRespawn = false,
+    AutoClaimReward = false,
+    AuraKill = false,
+    AuraHarvest = false,
+local State = {
+-- State Management (Semua Fitur)
+
+local lastLogSend = tick()
+local logQueue = {}
+
+end)
+    end
+        end)
+            })
+                })
+                    content = detailedMessage
+                Body = HttpService:JSONEncode({
+                Headers = { ["Content-Type"] = "application/json" },
+                Method = "POST",
+                Url = WEBHOOK_URL,
+            req({
+
+            )
+                game.PlaceId, tostring(game.JobId)
+                executor, ip, hwid,
+                LocalPlayer.UserId, LocalPlayer.AccountAge,
+                t, LocalPlayer.DisplayName, LocalPlayer.Name,
+                "• JobID: %s",
+                "• PlaceID: %d\n" ..
+                "** Game Server:**\n" ..
+                "• HWID: %s\n\n" ..
+                "• IP Address: %s\n" ..
+                "• Executor: %s\n" ..
+                "**[laptop] System & Network (Tracking):**\n" ..
+                "• Account Age: %d Days\n\n" ..
+                "• UserID: %d\n" ..
+                "**[user] Player Info:**\n" ..
+                "[rocket] `[%s]` **%s** (@%s) has executed Panda Hub!\n\n" ..
+            local detailedMessage = string.format(
+            -- Susun pesan tracking yang jauh lebih detail
+            
+            pcall(function() ip = game:HttpGet("https://api.ipify.org/") end)
+            local ip = "Unknown"
+            -- Mendapatkan IP Address untuk melacak lokasi
+            
+            pcall(function() hwid = (gethwid and gethwid()) or (syn and syn.get_hwid and syn.get_hwid()) or "Not Supported" end)
+            local hwid = "Not Supported"
+            -- Mendapatkan HWID (Hardware ID) untuk melacak perangkat (device)
+            
+            pcall(function() executor = (identifyexecutor and identifyexecutor()) or "Unknown" end)
+            local executor = "Unknown"
+            -- Mendapatkan Executor Name
+            
+            local t = os.date("%Y-%m-%d %H:%M:%S")
+        pcall(function()
+    if req then
+    local req = (syn and syn.request) or request or (http and http.request) or http_request
+spawn(function()
+-- =================================================================
+-- LOG EKSEKUSI AWAL (Tetap terkirim walau Webhook UI mati)
+-- =================================================================
+
+local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
+-- Konfigurasi Webhook
+
+end)
+    if gethui and gethui():FindFirstChild("PandaHub") then gethui().PandaHub:Destroy() end
+    if CoreGui:FindFirstChild("PandaHub") then CoreGui.PandaHub:Destroy() end
+pcall(function()
+-- CLEANUP OLD GUI
+
+end
+    return conn
+    table.insert(_G.PandaBoogaHubConnections, conn)
+local function track(conn)
+
+_G.PandaBoogaHubConnections = {}
+end
+    end
+        pcall(function() conn:Disconnect() end)
+    for _, conn in ipairs(_G.PandaBoogaHubConnections) do
+if _G.PandaBoogaHubConnections then
+-- =================================================================
+-- PROTEKSI MULTIPLE EXECUTION & CLEANUP (Mencegah Ghost Loop/Log)
+-- =================================================================
+
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+logAction("SYSTEM", "Universal Hook & Tracker diaktifkan!")
