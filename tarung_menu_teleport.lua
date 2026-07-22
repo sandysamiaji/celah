@@ -737,7 +737,6 @@ end
 
 UI.createToggle("TouchFling", "Touch Fling (Vibrate)", "TouchFling", 2, teleportTab)
 UI.createToggle("FlingAura", "Fling Aura (Area Fling)", "FlingAura", 3, teleportTab)
-UI.createToggle("TeleportToSelectedBtn", "Teleport (Pilih Pemain)", "TeleportToSelected", 3.2, teleportTab)
 UI.createToggle("TeleportToMouseBtn", "Teleport ke Mouse (C)", "TeleportToMouse", 3.3, teleportTab)
 UI.createToggle("CamFollowBtn", "Kamera Ikuti Target", "CamFollow", 3.4, teleportTab)
 UI.createToggle("LockFlingToggle", "Lock Fling (Target)", "LockFling", 3.5, teleportTab)
@@ -849,23 +848,23 @@ local tpGui = Instance.new("ScreenGui")
 tpGui.Name = "PandaHub_MobileTP"
 tpGui.Parent = CoreGui
 
-local tpBtn = Instance.new("TextButton")
-tpBtn.Size = UDim2.new(0, 50, 0, 50)
-tpBtn.Position = UDim2.new(1, -70, 0.5, 0) -- Di sebelah kanan tengah layar
-tpBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-tpBtn.Font = Enum.Font.GothamBold
-tpBtn.TextSize = 14
-tpBtn.Text = "🎯 TP"
-tpBtn.Visible = false
-tpBtn.Parent = tpGui
+local mobileTpBtn = Instance.new("TextButton")
+mobileTpBtn.Size = UDim2.new(0, 50, 0, 50)
+mobileTpBtn.Position = UDim2.new(1, -70, 0.5, 0) -- Di sebelah kanan tengah layar
+mobileTpBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+mobileTpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+mobileTpBtn.Font = Enum.Font.GothamBold
+mobileTpBtn.TextSize = 14
+mobileTpBtn.Text = "🎯 TP"
+mobileTpBtn.Visible = false
+mobileTpBtn.Parent = tpGui
 
 -- Buat tombol membulat cantik
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(1, 0)
-corner.Parent = tpBtn
+corner.Parent = mobileTpBtn
 
-tpBtn.MouseButton1Click:Connect(function()
+mobileTpBtn.MouseButton1Click:Connect(function()
     if not State.TeleportToMouse then return end
     local mouse = LocalPlayer:GetMouse()
     local char = LocalPlayer.Character
@@ -881,9 +880,9 @@ task.spawn(function()
     while true do
         wait(0.5)
         if State.TeleportToMouse then
-            tpBtn.Visible = true
+            mobileTpBtn.Visible = true
         else
-            tpBtn.Visible = false
+            mobileTpBtn.Visible = false
         end
     end
 end)
@@ -913,6 +912,9 @@ local function lockFlingLoop()
             if tHrp and tHum and tHum.Health > 0 then
                 pcall(function()
                     hrp.CFrame = tHrp.CFrame * CFrame.new(0, 0.5, 0)
+                    for _, part in ipairs(c:GetDescendants()) do
+                        if part:IsA("BasePart") then part.CanCollide = false end
+                    end
                     hrp.Velocity = Vector3.new(10000, 10000, 10000)
                     hrp.RotVelocity = Vector3.new(10000, 10000, 10000)
                     
@@ -922,6 +924,12 @@ local function lockFlingLoop()
                     end
                 end)
             else
+                if State.AutoLockKiller and tHum and tHum.Health <= 0 then
+                    State.LockFling = false
+                    State.SelectedPlayer = nil
+                    if logAction then logAction("REVENGE", "Target terbunuh! Lock Fling dimatikan.") end
+                end
+                
                 if homeCFrame then
                     pcall(function()
                         hrp.CFrame = homeCFrame
@@ -957,4 +965,31 @@ local function lockFlingLoop()
             workspace.CurrentCamera.CameraSubject = myHum
         end
     end)
+end
+
+-- ==========================================
+-- AUTO LOCK KILLER (REVENGE) LOGIC
+-- ==========================================
+local function setupAutoLockKiller(char)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if hum then
+        hum.Died:Connect(function()
+            if State.AutoLockKiller then
+                local creator = hum:FindFirstChild("creator")
+                if creator and creator.Value and creator.Value:IsA("Player") then
+                    local killerName = creator.Value.Name
+                    if killerName ~= LocalPlayer.Name then
+                        State.SelectedPlayer = killerName
+                        State.LockFling = true
+                        if logAction then logAction("REVENGE", "Dibunuh oleh " .. killerName .. "! Auto-Lock Fling (Extreme) ACTIVATED!") end
+                    end
+                end
+            end
+        end)
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(setupAutoLockKiller)
+if LocalPlayer.Character then
+    setupAutoLockKiller(LocalPlayer.Character)
 end

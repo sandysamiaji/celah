@@ -16,7 +16,7 @@ local infoTab = Tabs.Info
 local logAction = getgenv().PandaHub.logAction
 
 -- INFO TAB
-local function UI.createInfoBox(titleText, descText, layoutOrder, parentTab)
+function UI.createInfoBox(titleText, descText, layoutOrder, parentTab)
     parentTab = parentTab or infoTab
     local container = Instance.new("Frame")
     container.Size = UDim2.new(0.9, 0, 0, 0)

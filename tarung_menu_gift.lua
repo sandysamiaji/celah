@@ -32,7 +32,7 @@ autoGiftBtn.Parent = giftTab
 local giftTpDelayContainer = Instance.new("Frame")
 giftTpDelayContainer.Size = UDim2.new(0.9, 0, 0, 35)
 giftTpDelayContainer.BackgroundTransparency = 1
-giftTpDelayContainer.LayoutOrder = 2.1
+giftTpDelayContainer.LayoutOrder = 3
 giftTpDelayContainer.Parent = giftTab
 
 local giftTpDelayLabel = Instance.new("TextLabel")
@@ -68,7 +68,7 @@ end)
 local giftDropDelayContainer = Instance.new("Frame")
 giftDropDelayContainer.Size = UDim2.new(0.9, 0, 0, 35)
 giftDropDelayContainer.BackgroundTransparency = 1
-giftDropDelayContainer.LayoutOrder = 2.2
+giftDropDelayContainer.LayoutOrder = 4
 giftDropDelayContainer.Parent = giftTab
 
 local giftDropDelayLabel = Instance.new("TextLabel")
@@ -109,7 +109,7 @@ giftStatus.Text = "Status: Drop an item to capture..."
 giftStatus.TextColor3 = Color3.fromRGB(241, 196, 15)
 giftStatus.Font = Enum.Font.GothamBold
 giftStatus.TextSize = 12
-giftStatus.LayoutOrder = 3
+giftStatus.LayoutOrder = 5
 giftStatus.Parent = giftTab
 
 local refreshGiftBtn = Instance.new("TextButton")
@@ -119,13 +119,13 @@ refreshGiftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 refreshGiftBtn.Font = Enum.Font.GothamBold
 refreshGiftBtn.TextSize = 12
 refreshGiftBtn.Text = "Refresh Player List"
-refreshGiftBtn.LayoutOrder = 4
+refreshGiftBtn.LayoutOrder = 6
 refreshGiftBtn.Parent = giftTab
 
 local giftBtnContainer = Instance.new("Frame")
 giftBtnContainer.Size = UDim2.new(0.9, 0, 0, 30)
 giftBtnContainer.BackgroundTransparency = 1
-giftBtnContainer.LayoutOrder = 5
+giftBtnContainer.LayoutOrder = 7
 giftBtnContainer.Parent = giftTab
 
 local ALL_GAME_ITEMS = {
@@ -170,14 +170,27 @@ local ALL_GAME_ITEMS = {
 }
 
 
+
+local dropDivider = Instance.new("TextLabel")
+dropDivider.Size = UDim2.new(0.9, 0, 0, 20)
+dropDivider.BackgroundTransparency = 1
+dropDivider.Text = "--- Manual Drop (Isi Tas) ---"
+dropDivider.TextColor3 = Color3.fromRGB(150, 150, 150)
+dropDivider.Font = Enum.Font.GothamBold
+dropDivider.TextSize = 12
+dropDivider.LayoutOrder = 9
+dropDivider.Parent = giftTab
+
 dropItemDropdownBtn = Instance.new("TextButton")
+
 dropItemDropdownBtn.Size = UDim2.new(0.9, 0, 0, 30)
 dropItemDropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 dropItemDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 dropItemDropdownBtn.Font = Enum.Font.Gotham
 dropItemDropdownBtn.TextSize = 12
 dropItemDropdownBtn.Text = "Semua Item"
-dropItemDropdownBtn.LayoutOrder = 6
+dropItemDropdownBtn.LayoutOrder = 10
+dropItemDropdownBtn.ZIndex = 20
 dropItemDropdownBtn.Parent = giftTab
 
 dropItemList = Instance.new("ScrollingFrame")
@@ -226,7 +239,7 @@ dropAmountInput.Font = Enum.Font.Gotham
 dropAmountInput.TextSize = 12
 dropAmountInput.PlaceholderText = "Jumlah Drop (misal: -9999999)"
 dropAmountInput.Text = "-9999999"
-dropAmountInput.LayoutOrder = 8
+dropAmountInput.LayoutOrder = 11
 dropAmountInput.Parent = giftTab
 
 autoDropBagBtn = Instance.new("TextButton")
@@ -236,7 +249,7 @@ autoDropBagBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 autoDropBagBtn.Font = Enum.Font.GothamBold
 autoDropBagBtn.TextSize = 12
 autoDropBagBtn.Text = "Drop Isi Tas (Sesuai Pilihan)"
-autoDropBagBtn.LayoutOrder = 9
+autoDropBagBtn.LayoutOrder = 12
 autoDropBagBtn.Parent = giftTab
 
 autoDropBagBtn.MouseButton1Click:Connect(function()
@@ -322,7 +335,7 @@ giftPlayerList.Size = UDim2.new(0.9, 0, 0, 200)
 giftPlayerList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 giftPlayerList.BorderSizePixel = 0
 giftPlayerList.ScrollBarThickness = 4
-giftPlayerList.LayoutOrder = 6
+giftPlayerList.LayoutOrder = 8
 giftPlayerList.Parent = giftTab
 
 local giftPlayerLayout = Instance.new("UIListLayout")

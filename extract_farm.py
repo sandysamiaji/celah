@@ -1,32 +1,32 @@
 import sys
-
-with open(r'd:\PROJECT_SANDY\iseng lua\tarung_v3.lua', 'r', encoding='utf-8') as f:
+with open('tarung_menu_cheats.lua', 'r', encoding='utf-8') as f:
     lines = f.readlines()
 
-out = []
-out.append('-- ==========================================\n')
-out.append('-- MENU FARM & LOGIC\n')
-out.append('-- ==========================================\n')
-out.append('local Players = game:GetService("Players")\n')
-out.append('local RunService = game:GetService("RunService")\n')
-out.append('local LocalPlayer = Players.LocalPlayer\n')
-out.append('local ReplicatedStorage = game:GetService("ReplicatedStorage")\n\n')
-out.append('local State = getgenv().PandaHub.State\n')
-out.append('local UI = getgenv().PandaHub.UI\n')
-out.append('local Tabs = getgenv().PandaHub.Tabs\n')
-out.append('local track = getgenv().PandaHub.track\n\n')
+start_idx = -1
+end_idx = -1
 
-# UI
-ui_lines = lines[585:779]
-for line in ui_lines:
-    # replace createToggle(...) with UI.createToggle(...)
-    line = line.replace('createToggle', 'UI.createToggle')
-    out.append(line)
+for i, line in enumerate(lines):
+    if line.startswith('local autoEatThread'):
+        start_idx = i
+        break
 
-# Logic
-logic_lines = lines[3282:3544]
-for line in logic_lines:
-    out.append(line)
+if start_idx != -1:
+    # Find the end of auraHarvestLoop or where the old AuraKill comment is
+    for i in range(start_idx, len(lines)):
+        if '-- Old AuraKill loop removed' in lines[i]:
+            end_idx = i
+            break
 
-with open(r'd:\PROJECT_SANDY\iseng lua\tarung_menu_farm.lua', 'w', encoding='utf-8') as f:
-    f.writelines(out)
+if start_idx != -1 and end_idx != -1:
+    farm_code = ''.join(lines[start_idx:end_idx])
+    
+    # Remove from cheats
+    new_cheats = lines[:start_idx] + lines[end_idx:]
+    with open('tarung_menu_cheats.lua', 'w', encoding='utf-8') as f:
+        f.writelines(new_cheats)
+        
+    with open('farm_logic.lua', 'w', encoding='utf-8') as f:
+        f.write(farm_code)
+    print(f'Extracted {end_idx - start_idx} lines of farm logic.')
+else:
+    print('Could not find boundaries.')
