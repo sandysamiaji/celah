@@ -454,7 +454,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     if State.InfiniteDrop and method == "FireServer" and (self.Name == "Drop" or self.Name == "DropItem" or self.Name == "DropItems") then
         for i, v in ipairs(args) do
             if type(v) == "number" then
-                args[i] = -999999 -- Underflow hack: Coba tipu server bahwa kita nge-drop minus
+                args[i] = State.CustomDropAmount or -9999999 -- Underflow hack: Ambil dari UI depan
             end
         end
         return oldNamecall(self, unpack(args))

@@ -205,6 +205,10 @@ dropItemDropdownBtn.MouseButton1Click:Connect(function()
 end)
 
 local dropAmountInput = Instance.new("TextBox")
+State.CustomDropAmount = -9999999
+dropAmountInput.FocusLost:Connect(function()
+    State.CustomDropAmount = tonumber(dropAmountInput.Text) or -9999999
+end)
 dropAmountInput.Size = UDim2.new(0.9, 0, 0, 30)
 dropAmountInput.BackgroundColor3 = Color3.fromRGB(45, 52, 54)
 dropAmountInput.TextColor3 = Color3.fromRGB(223, 230, 233)
