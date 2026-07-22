@@ -347,12 +347,14 @@ end))
 
 local camera = workspace.CurrentCamera
 local getMoveVector
-pcall(function()
-    local PlayerModule = require(LocalPlayer.PlayerScripts:WaitForChild("PlayerModule"))
-    local controls = PlayerModule:GetControls()
-    getMoveVector = function()
-        return controls:GetMoveVector()
-    end
+task.spawn(function()
+    pcall(function()
+        local PlayerModule = require(LocalPlayer.PlayerScripts:WaitForChild("PlayerModule", 5))
+        local controls = PlayerModule:GetControls()
+        getMoveVector = function()
+            return controls:GetMoveVector()
+        end
+    end)
 end)
 
 if not getMoveVector then

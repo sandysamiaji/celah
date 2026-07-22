@@ -426,7 +426,6 @@ track(RunService.Stepped:Connect(function()
 end))
 
 track(RunService.RenderStepped:Connect(function()
-    processLogQueue()
     local currentTime = tick()
     
     -- 1. AURA & COLLECT
