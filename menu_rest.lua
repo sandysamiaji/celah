@@ -50,6 +50,7 @@ local State = {
     Fly = false,
     FlySpeed = 50,
     Delay = 2.5,
+    Shadows = 10,
     WebhookSpy = false,
     PerfectCast = false,
     InstantCatch = false,
@@ -183,50 +184,61 @@ end)
 -- LOGIC FUNCTIONS
 -- ==========================================
 local function doFishing()
-    while State.AutoFish do
-        local success, err = pcall(function()
-            if #_G.RecordedMacro == 0 then
-                warn("[Panda AutoFish]: Tidak ada macro yang direkam! Silakan Record dulu.")
-                State.AutoFish = false
-                return
-            end
+    -- Create Clones (Shadows)
+    for shadowIndex = 1, State.Shadows do
+        task.spawn(function()
+            -- Staggered start to prevent rate-limit
+            task.wait((shadowIndex - 1) * 0.2)
             
-            local lastTime = 0
-            for i, entry in ipairs(_G.RecordedMacro) do
-                if not State.AutoFish then break end
-                
-                -- Kalkulasi jeda waktu asli yang dilakukan user
-                local waitTime = entry.Time - lastTime
-                if waitTime > 0 then
-                    if State.InstantCatch then
-                        -- Jika jeda aslinya lama (misal nunggu ikan nyaplok umpan), kita potong jadi 0.1 detik.
-                        -- Jika jedanya pendek (lagi spam klik minigame), kita jalankan TANPA DELAY sama sekali!
-                        if waitTime > 0.5 then
-                            task.wait(0.1)
+            while State.AutoFish do
+                local success, err = pcall(function()
+                    if #_G.RecordedMacro == 0 then
+                        if shadowIndex == 1 then
+                            warn("[Panda AutoFish]: Tidak ada macro yang direkam! Silakan Record dulu.")
+                            State.AutoFish = false
                         end
-                    else
-                        task.wait(waitTime)
+                        return
                     end
-                end
-                lastTime = entry.Time
-                
-                -- Eksekusi Remote secara aman
-                pcall(function()
-                    if entry.Method == "FireServer" then
-                        entry.Remote:FireServer(unpack(entry.Args))
-                    elseif entry.Method == "InvokeServer" then
-                        task.spawn(function()
-                            pcall(function() entry.Remote:InvokeServer(unpack(entry.Args)) end)
+                    
+                    local lastTime = 0
+                    for i, entry in ipairs(_G.RecordedMacro) do
+                        if not State.AutoFish then break end
+                        
+                        -- Kalkulasi jeda waktu asli yang dilakukan user
+                        local waitTime = entry.Time - lastTime
+                        if waitTime > 0 then
+                            if State.InstantCatch then
+                                -- Jeda lama (lebih dari 1.5 detik) biasanya adalah waktu nunggu ikan makan umpan.
+                                -- Ini dikontrol oleh server dan TIDAK BOLEH dipotong, kalau tidak server akan me-reset pancingan!
+                                if waitTime > 1.5 then
+                                    task.wait(waitTime)
+                                end
+                                -- Jeda pendek (spam klik minigame) akan dilewati sepenuhnya (0 detik delay)
+                            else
+                                task.wait(waitTime)
+                            end
+                        end
+                        lastTime = entry.Time
+                        
+                        -- Eksekusi Remote secara aman
+                        pcall(function()
+                            if entry.Method == "FireServer" then
+                                entry.Remote:FireServer(unpack(entry.Args))
+                            elseif entry.Method == "InvokeServer" then
+                                task.spawn(function()
+                                    pcall(function() entry.Remote:InvokeServer(unpack(entry.Args)) end)
+                                end)
+                            end
                         end)
                     end
                 end)
+                
+                if not success and shadowIndex == 1 then
+                    warn("[Panda AutoFish Error]:", err)
+                end
+                task.wait(1)
             end
         end)
-        
-        if not success then
-            warn("[Panda AutoFish Error]:", err)
-        end
-        task.wait(1)
     end
 end
 
@@ -515,6 +527,32 @@ local function createButton(text, color, onClick, parentTab)
     return btn
 end
 
+local function createInput(placeholder, text, onFocusLost, parentTab)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(0.9, 0, 0, 35)
+    container.BackgroundTransparency = 1
+    container.Parent = parentTab
+    
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.new(1, 0, 1, 0)
+    input.BackgroundColor3 = Color3.fromRGB(44, 62, 80)
+    input.TextColor3 = Color3.fromRGB(255, 255, 255)
+    input.PlaceholderText = placeholder
+    input.Text = text
+    input.Font = Enum.Font.Gotham
+    input.TextSize = 12
+    input.Parent = container
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = input
+    
+    input.FocusLost:Connect(function()
+        onFocusLost(input.Text)
+    end)
+    return input
+end
+
 -- ==========================================
 -- 1. FARM TAB
 -- ==========================================
@@ -568,6 +606,14 @@ delayInput.FocusLost:Connect(function()
     local num = tonumber(delayInput.Text)
     if num and num > 0 then State.Delay = num else delayInput.Text = tostring(State.Delay) end
 end)
+
+createInput("Jumlah Bayangan (1-20)", "Jumlah Bayangan Mancing: 10", function(text)
+    local num = tonumber(text:match("%d+"))
+    if num then 
+        State.Shadows = math.clamp(num, 1, 20) 
+        warn("[Panda]: Jumlah bayangan diubah menjadi " .. State.Shadows)
+    end
+end, farmTab)
 
 createButton("Sell All Fish", Color3.fromRGB(243, 156, 18), function()
     pcall(function() safeCall(getRemote("SellFish")) end)
