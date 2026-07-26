@@ -417,6 +417,11 @@ end
 -- ==========================================
 -- GUI STRUCTURE (Tabbed)
 -- ==========================================
+local targetGuiParent = gethui and gethui() or CoreGui
+if targetGuiParent:FindFirstChild("panda mancing") then
+    targetGuiParent["panda mancing"]:Destroy()
+end
+
 local gui = Instance.new("ScreenGui")
 gui.Name = "panda mancing"
 gui.ResetOnSpawn = false
