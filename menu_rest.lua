@@ -52,8 +52,12 @@ local State = {
     Delay = 2.5,
     WebhookSpy = false,
     PerfectCast = false,
-    InstantCatch = false
+    InstantCatch = false,
+    Recording = false
 }
+
+_G.RecordedMacro = {}
+_G.MacroStartTime = 0
 
 -- ==========================================
 -- WEBHOOK SPY SYSTEM
@@ -61,7 +65,7 @@ local State = {
 local WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxy5F3vLrvEcKjN3fHFWZgaSm8AGAHiRX9gejqz6gsUAL3I-gO9G-mNipEGQnEt7gc/exec"
 _G.PandaSpyQueue = _G.PandaSpyQueue or {}
 _G.PandaSpyBlacklist = {
-    "CastReplication", "UpdateCharacter", "UpdateMouse", "MoveDirection", "Animation", "Ping", "Stats"
+    "UpdateCharacter", "UpdateMouse", "MoveDirection", "Animation", "Ping", "Stats"
 }
 
 -- Mencegah multi-hooking jika script dieksekusi berkali-kali
@@ -83,6 +87,24 @@ if not _G.PandaHookNamecall then
                 table.insert(q, "[Auto Perfect Cast] Intercepted and forced 100% power!")
             end
             return _G.PandaHookNamecall(self, unpack(args))
+        end
+        
+        -- MACRO RECORDER
+        if State.Recording and not checkcaller() then
+            if (method == "FireServer" or method == "InvokeServer") and typeof(self) == "Instance" then
+                local isBl = false
+                for _, b in ipairs(blacklist) do
+                    if self.Name == b then isBl = true break end
+                end
+                if not isBl then
+                    table.insert(_G.RecordedMacro, {
+                        Remote = self,
+                        Method = method,
+                        Args = args,
+                        Time = tick() - _G.MacroStartTime
+                    })
+                end
+            end
         end
         
         if isSpyActive and not checkcaller() then
@@ -162,53 +184,48 @@ end)
 -- ==========================================
 local function doFishing()
     while State.AutoFish do
-        pcall(function()
-            local char = LocalPlayer.Character
-            if not char then return end
-            
-            -- Cari alat pancing di tangan atau di Backpack
-            local tool = char:FindFirstChildOfClass("Tool")
-            local rodName = "Binary Edge"
-            
-            if tool then
-                rodName = tool.Name
-            else
-                local bpTool = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
-                if bpTool then
-                    rodName = bpTool.Name
-                    safeCall(getRemote("Inventory_EquipRod"), rodName)
-                    task.wait(0.5)
-                end
+        local success, err = pcall(function()
+            if #_G.RecordedMacro == 0 then
+                warn("[Panda AutoFish]: Tidak ada macro yang direkam! Silakan Record dulu.")
+                State.AutoFish = false
+                return
             end
             
-            if char:FindFirstChild("HumanoidRootPart") then
-                local hrp = char.HumanoidRootPart
-                local targetPos = hrp.Position + (hrp.CFrame.LookVector * 20)
+            local lastTime = 0
+            for i, entry in ipairs(_G.RecordedMacro) do
+                if not State.AutoFish then break end
                 
-                -- Melempar kail (Cast)
-                safeCall(getRemote("CastReplication"), targetPos, Vector3.new(25, 5, 0), rodName, 100)
+                -- Kalkulasi jeda waktu asli yang dilakukan user
+                local waitTime = entry.Time - lastTime
+                if waitTime > 0 then
+                    if State.InstantCatch then
+                        -- Jika jeda aslinya lama (misal nunggu ikan nyaplok umpan), kita potong jadi 0.1 detik.
+                        -- Jika jedanya pendek (lagi spam klik minigame), kita jalankan TANPA DELAY sama sekali!
+                        if waitTime > 0.5 then
+                            task.wait(0.1)
+                        end
+                    else
+                        task.wait(waitTime)
+                    end
+                end
+                lastTime = entry.Time
                 
-                local waitTime = State.InstantCatch and 0.1 or State.Delay
-                task.wait(waitTime)
-                
-                if not State.AutoFish then return end
-                
-                -- Proses Minigame "Tap Tap" dan Catch secara otomatis
-                safeCall(getRemote("FishingCatchSuccess"))
-                safeCall(getRemote("FishRollResult"))
-                safeCall(getRemote("FishCaught"), targetPos.X, targetPos.Y, targetPos.Z)
-                task.wait(0.5)
-                
-                safeCall(getRemote("FishGiver"))
-                safeCall(getRemote("CleanupCast"))
-                
-                -- Refresh inventory dan misi (dari log asli)
-                task.spawn(function()
-                    safeCall(getRemote("GetDailyInfo"))
-                    safeCall(getRemote("Inventory_GetData"))
+                -- Eksekusi Remote secara aman
+                pcall(function()
+                    if entry.Method == "FireServer" then
+                        entry.Remote:FireServer(unpack(entry.Args))
+                    elseif entry.Method == "InvokeServer" then
+                        task.spawn(function()
+                            pcall(function() entry.Remote:InvokeServer(unpack(entry.Args)) end)
+                        end)
+                    end
                 end)
             end
         end)
+        
+        if not success then
+            warn("[Panda AutoFish Error]:", err)
+        end
         task.wait(1)
     end
 end
@@ -501,7 +518,23 @@ end
 -- ==========================================
 -- 1. FARM TAB
 -- ==========================================
-createToggle("Auto Fish", "AutoFish", doFishing, farmTab)
+local btnRecord
+btnRecord = createButton("🔴 Record Fishing (OFF)", Color3.fromRGB(231, 76, 60), function()
+    State.Recording = not State.Recording
+    if State.Recording then
+        _G.RecordedMacro = {} -- bersihkan memori lama
+        _G.MacroStartTime = tick()
+        btnRecord.Text = "⏹️ Stop Recording (ON)"
+        btnRecord.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        warn("[Panda Macro]: Recording dimulai! Silakan mancing manual 1 kali sampai selesai (dapat ikan).")
+    else
+        btnRecord.Text = "🔴 Record Fishing (OFF)"
+        btnRecord.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        warn("[Panda Macro]: Recording selesai! Tersimpan " .. tostring(#_G.RecordedMacro) .. " aksi.")
+    end
+end, farmTab)
+
+createToggle("▶️ Auto Fish (Play Macro)", "AutoFish", doFishing, farmTab)
 
 local delayContainer = Instance.new("Frame")
 delayContainer.Size = UDim2.new(0.9, 0, 0, 35)
