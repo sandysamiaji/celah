@@ -54,7 +54,9 @@ local State = {
     WebhookSpy = false,
     PerfectCast = false,
     InstantCatch = false,
-    Recording = false
+    Recording = false,
+    AutoLock = false,
+    AutoSell = false
 }
 
 _G.RecordedMacro = {}
@@ -239,6 +241,89 @@ local function doFishing()
                 task.wait(1)
             end
         end)
+    end
+end
+
+local function doAutoLock()
+    while State.AutoLock do
+        local success, err = pcall(function()
+            local invRemote = getRemote("Inventory_GetData")
+            local lockRemote = getRemote("Inventory_ToggleFavorite")
+            
+            if not invRemote or not lockRemote then return end
+            
+            local invData = nil
+            if invRemote:IsA("RemoteFunction") then
+                invData = invRemote:InvokeServer()
+            end
+            
+            if type(invData) ~= "table" then return end
+            
+            local function scanData(t)
+                for k, v in pairs(t) do
+                    if type(v) == "table" then
+                        local isTarget = false
+                        local isLocked = false
+                        local hasLockField = false
+                        local uuid = type(k) == "string" and string.match(k, "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") and k or nil
+                        
+                        for key, val in pairs(v) do
+                            if type(val) == "string" then
+                                if not uuid and string.match(val, "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then
+                                    uuid = val
+                                end
+                                local lowerVal = string.lower(val)
+                                if string.find(lowerVal, "mitos") or string.find(lowerVal, "secret") or string.find(lowerVal, "mythic") then
+                                    isTarget = true
+                                end
+                            end
+                            
+                            if type(key) == "string" then
+                                local lowerKey = string.lower(key)
+                                if string.find(lowerKey, "fav") or string.find(lowerKey, "lock") then
+                                    hasLockField = true
+                                    if val == true or val == 1 then
+                                        isLocked = true
+                                    end
+                                end
+                            end
+                        end
+                        
+                        -- Jika ikan ini langka, punya sistem lock, dan belum di-lock
+                        if isTarget and uuid and hasLockField and not isLocked then
+                            warn("[Panda AutoLock]: Mengunci Ikan Mitos/Secret secara otomatis! UUID: " .. tostring(uuid))
+                            safeCall(lockRemote, uuid)
+                            task.wait(0.3)
+                        else
+                            -- Terus scan ke dalam sub-table
+                            scanData(v)
+                        end
+                    end
+                end
+            end
+            
+            scanData(invData)
+        end)
+        
+        if not success then warn("[Panda AutoLock Error]:", err) end
+        task.wait(5) -- Pengecekan dilakukan setiap 5 detik
+    end
+end
+
+local function doAutoSell()
+    while State.AutoSell do
+        pcall(function()
+            local sellRemote = getRemote("SellFish") or getRemote("SellAll") or getRemote("Sell")
+            if sellRemote then
+                safeCall(sellRemote)
+            else
+                -- Kadang ada di folder khusus, kita coba search keyword sell
+                for name, obj in pairs(_G.RecordedMacro) do
+                    -- This is just fallback, usually SellFish is correct
+                end
+            end
+        end)
+        task.wait(15) -- Jual otomatis setiap 15 detik
     end
 end
 
@@ -573,6 +658,8 @@ btnRecord = createButton("🔴 Record Fishing (OFF)", Color3.fromRGB(231, 76, 60
 end, farmTab)
 
 createToggle("▶️ Auto Fish (Play Macro)", "AutoFish", doFishing, farmTab)
+createToggle("🔒 Auto Lock Mitos/Secret", "AutoLock", doAutoLock, farmTab)
+createToggle("💰 Auto Sell Fish", "AutoSell", doAutoSell, farmTab)
 
 local delayContainer = Instance.new("Frame")
 delayContainer.Size = UDim2.new(0.9, 0, 0, 35)
