@@ -13,11 +13,18 @@ pcall(function()
     if gethui and gethui():FindFirstChild("panda mancing") then gethui()["panda mancing"]:Destroy() end
 end)
 
--- Remotes
-local FishingSystem = ReplicatedStorage:WaitForChild("FishingSystem", 5)
-local InventoryEvents = FishingSystem and FishingSystem:WaitForChild("InventoryEvents", 5)
-local RewardRemotes = ReplicatedStorage:WaitForChild("RewardRemotes", 5)
-local BoatRental = ReplicatedStorage:WaitForChild("BoatRental", 5)
+-- Remotes (Dynamic Finder)
+local FoundRemotes = {}
+local function getRemote(name)
+    if FoundRemotes[name] then return FoundRemotes[name] end
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) then
+            FoundRemotes[name] = obj
+            return obj
+        end
+    end
+    return nil
+end
 
 local HttpService = game:GetService("HttpService")
 
@@ -140,64 +147,56 @@ end)
 -- ==========================================
 local function doFishing()
     while State.AutoFish do
-        if FishingSystem and InventoryEvents then
-            pcall(function()
-                -- Equip Rod & Cast
-                InventoryEvents.Inventory_EquipRod:FireServer()
-                task.wait(0.5)
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    local hrp = char.HumanoidRootPart
-                    local targetPos = hrp.Position + (hrp.CFrame.LookVector * 20)
-                    FishingSystem.CastReplication:FireServer(targetPos, Vector3.new(25, 5, 0), "Binary Edge", 100)
-                end
+        pcall(function()
+            local EquipRod = getRemote("Inventory_EquipRod")
+            if EquipRod then EquipRod:FireServer() end
+            task.wait(0.5)
+            
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local hrp = char.HumanoidRootPart
+                local targetPos = hrp.Position + (hrp.CFrame.LookVector * 20)
                 
-                -- Wait for user-defined Delay (Wait for fish to bite)
-                -- Jika InstantCatch menyala, kita potong waktu tunggu jadi instan (0.1 detik)
+                local Cast = getRemote("CastReplication")
+                if Cast then Cast:FireServer(targetPos, Vector3.new(25, 5, 0), "Binary Edge", 100) end
+                
                 local waitTime = State.InstantCatch and 0.1 or State.Delay
                 task.wait(waitTime)
                 
                 if not State.AutoFish then return end
                 
-                -- The exact sequence based on logs:
-                -- 1. Inventory_GetData
-                pcall(function() InventoryEvents.Inventory_GetData:InvokeServer() end)
+                local GetInv = getRemote("Inventory_GetData")
+                if GetInv then GetInv:InvokeServer() end
                 task.wait(0.5)
                 
-                -- 2. FishCaught with coordinates (using our targetPos)
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    local hrp = char.HumanoidRootPart
-                    local targetPos = hrp.Position + (hrp.CFrame.LookVector * 20)
-                    FishingSystem.FishCaught:FireServer(targetPos.X, targetPos.Y, targetPos.Z)
-                else
-                    FishingSystem.FishCaught:FireServer(0, 0, 0)
+                local Catch = getRemote("FishCaught")
+                if Catch then
+                    Catch:FireServer(targetPos.X, targetPos.Y, targetPos.Z)
                 end
                 
                 task.wait(0.5)
                 
-                -- 3. GetDailyInfo
-                pcall(function() RewardRemotes.GetDailyInfo:InvokeServer() end)
+                local GetDaily = getRemote("GetDailyInfo")
+                if GetDaily then GetDaily:InvokeServer() end
                 task.wait(0.5)
                 
-                -- 4. Inventory_GetData again
-                pcall(function() InventoryEvents.Inventory_GetData:InvokeServer() end)
-                
-                task.wait(1)
-            end)
-        end
+                if GetInv then GetInv:InvokeServer() end
+            end
+        end)
         task.wait(1)
     end
 end
 
 local function doAutoClaim()
     while State.AutoClaim do
-        if RewardRemotes then
-            pcall(function()
-                RewardRemotes.ClaimDaily:InvokeServer()
-                RewardRemotes.ClaimDailyMission:InvokeServer()
-                RewardRemotes.ClaimMission:InvokeServer()
-            end)
-        end
+        pcall(function()
+            local claim1 = getRemote("ClaimDaily")
+            local claim2 = getRemote("ClaimDailyMission")
+            local claim3 = getRemote("ClaimMission")
+            if claim1 then claim1:InvokeServer() end
+            if claim2 then claim2:InvokeServer() end
+            if claim3 then claim3:InvokeServer() end
+        end)
         task.wait(10)
     end
 end
@@ -205,7 +204,8 @@ end
 local function doSpamFireworks()
     while State.SpamFireworks do
         pcall(function()
-            ReplicatedStorage.FireworksToggle:FireServer()
+            local fw = getRemote("FireworksToggle")
+            if fw then fw:FireServer() end
         end)
         task.wait(0.5)
     end
@@ -515,7 +515,10 @@ delayInput.FocusLost:Connect(function()
 end)
 
 createButton("Sell All Fish", Color3.fromRGB(243, 156, 18), function()
-    pcall(function() FishingSystem.SellFish:FireServer() end)
+    pcall(function() 
+        local sell = getRemote("SellFish")
+        if sell then sell:FireServer() end
+    end)
 end, farmTab)
 
 createToggle("Auto Claim Rewards", "AutoClaim", doAutoClaim, farmTab)
@@ -663,28 +666,44 @@ end)
 -- 4. MISC TAB
 -- ==========================================
 createButton("Purchase Luck Boost", Color3.fromRGB(155, 89, 182), function()
-    pcall(function() ReplicatedStorage.PurchaseLuckBoost:FireServer() end)
+    pcall(function() 
+        local luck = getRemote("PurchaseLuckBoost")
+        if luck then luck:FireServer() end
+    end)
 end, miscTab)
 
 createButton("Show Hacker HUD", Color3.fromRGB(26, 188, 156), function()
-    pcall(function() ReplicatedStorage.ShowEventHackerHUD:FireServer() end)
+    pcall(function() 
+        local hud = getRemote("ShowEventHackerHUD")
+        if hud then hud:FireServer() end
+    end)
 end, miscTab)
 
 createButton("Rent Boat", Color3.fromRGB(52, 152, 219), function()
-    if BoatRental then pcall(function() BoatRental.RentBoat:FireServer() end) end
+    pcall(function() 
+        local boat = getRemote("RentBoat")
+        if boat then boat:FireServer() end
+    end)
 end, miscTab)
 
 createButton("Spam All Gifts", Color3.fromRGB(231, 76, 60), function()
     pcall(function() 
-        ReplicatedStorage.RoseGiftEvents:FireServer()
-        ReplicatedStorage.BungaGiftEvents:FireServer()
-        ReplicatedStorage.SunflowerGiftEvents:FireServer()
-        ReplicatedStorage.BonekaGiftEvents:FireServer()
+        local r1 = getRemote("RoseGiftEvents")
+        local r2 = getRemote("BungaGiftEvents")
+        local r3 = getRemote("SunflowerGiftEvents")
+        local r4 = getRemote("BonekaGiftEvents")
+        if r1 then r1:FireServer() end
+        if r2 then r2:FireServer() end
+        if r3 then r3:FireServer() end
+        if r4 then r4:FireServer() end
     end)
 end, miscTab)
 
 createButton("Toggle Night Zone", Color3.fromRGB(52, 73, 94), function()
-    pcall(function() ReplicatedStorage.NightZoneSync:FireServer() end)
+    pcall(function() 
+        local night = getRemote("NightZoneSync")
+        if night then night:FireServer() end
+    end)
 end, miscTab)
 
 createToggle("Spam Fireworks", "SpamFireworks", doSpamFireworks, miscTab)
