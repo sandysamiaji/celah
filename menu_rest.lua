@@ -16,14 +16,29 @@ end)
 -- Remotes (Dynamic Finder)
 local FoundRemotes = {}
 local function getRemote(name)
-    if FoundRemotes[name] then return FoundRemotes[name] end
+    if FoundRemotes[name] ~= nil then 
+        return FoundRemotes[name] == false and nil or FoundRemotes[name]
+    end
     for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
         if obj.Name == name and (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) then
             FoundRemotes[name] = obj
             return obj
         end
     end
+    FoundRemotes[name] = false
     return nil
+end
+
+local function safeCall(remote, ...)
+    if not remote then return end
+    if remote:IsA("RemoteEvent") then
+        remote:FireServer(...)
+    elseif remote:IsA("RemoteFunction") then
+        local args = {...}
+        task.spawn(function()
+            pcall(function() remote:InvokeServer(unpack(args)) end)
+        end)
+    end
 end
 
 local HttpService = game:GetService("HttpService")
@@ -148,8 +163,7 @@ end)
 local function doFishing()
     while State.AutoFish do
         pcall(function()
-            local EquipRod = getRemote("Inventory_EquipRod")
-            if EquipRod then EquipRod:FireServer() end
+            safeCall(getRemote("Inventory_EquipRod"))
             task.wait(0.5)
             
             local char = LocalPlayer.Character
@@ -157,30 +171,23 @@ local function doFishing()
                 local hrp = char.HumanoidRootPart
                 local targetPos = hrp.Position + (hrp.CFrame.LookVector * 20)
                 
-                local Cast = getRemote("CastReplication")
-                if Cast then Cast:FireServer(targetPos, Vector3.new(25, 5, 0), "Binary Edge", 100) end
+                safeCall(getRemote("CastReplication"), targetPos, Vector3.new(25, 5, 0), "Binary Edge", 100)
                 
                 local waitTime = State.InstantCatch and 0.1 or State.Delay
                 task.wait(waitTime)
                 
                 if not State.AutoFish then return end
                 
-                local GetInv = getRemote("Inventory_GetData")
-                if GetInv then GetInv:InvokeServer() end
+                safeCall(getRemote("Inventory_GetData"))
                 task.wait(0.5)
                 
-                local Catch = getRemote("FishCaught")
-                if Catch then
-                    Catch:FireServer(targetPos.X, targetPos.Y, targetPos.Z)
-                end
-                
+                safeCall(getRemote("FishCaught"), targetPos.X, targetPos.Y, targetPos.Z)
                 task.wait(0.5)
                 
-                local GetDaily = getRemote("GetDailyInfo")
-                if GetDaily then GetDaily:InvokeServer() end
+                safeCall(getRemote("GetDailyInfo"))
                 task.wait(0.5)
                 
-                if GetInv then GetInv:InvokeServer() end
+                safeCall(getRemote("Inventory_GetData"))
             end
         end)
         task.wait(1)
@@ -190,12 +197,9 @@ end
 local function doAutoClaim()
     while State.AutoClaim do
         pcall(function()
-            local claim1 = getRemote("ClaimDaily")
-            local claim2 = getRemote("ClaimDailyMission")
-            local claim3 = getRemote("ClaimMission")
-            if claim1 then claim1:InvokeServer() end
-            if claim2 then claim2:InvokeServer() end
-            if claim3 then claim3:InvokeServer() end
+            safeCall(getRemote("ClaimDaily"))
+            safeCall(getRemote("ClaimDailyMission"))
+            safeCall(getRemote("ClaimMission"))
         end)
         task.wait(10)
     end
@@ -204,8 +208,7 @@ end
 local function doSpamFireworks()
     while State.SpamFireworks do
         pcall(function()
-            local fw = getRemote("FireworksToggle")
-            if fw then fw:FireServer() end
+            safeCall(getRemote("FireworksToggle"))
         end)
         task.wait(0.5)
     end
@@ -515,10 +518,7 @@ delayInput.FocusLost:Connect(function()
 end)
 
 createButton("Sell All Fish", Color3.fromRGB(243, 156, 18), function()
-    pcall(function() 
-        local sell = getRemote("SellFish")
-        if sell then sell:FireServer() end
-    end)
+    pcall(function() safeCall(getRemote("SellFish")) end)
 end, farmTab)
 
 createToggle("Auto Claim Rewards", "AutoClaim", doAutoClaim, farmTab)
@@ -666,44 +666,28 @@ end)
 -- 4. MISC TAB
 -- ==========================================
 createButton("Purchase Luck Boost", Color3.fromRGB(155, 89, 182), function()
-    pcall(function() 
-        local luck = getRemote("PurchaseLuckBoost")
-        if luck then luck:FireServer() end
-    end)
+    pcall(function() safeCall(getRemote("PurchaseLuckBoost")) end)
 end, miscTab)
 
 createButton("Show Hacker HUD", Color3.fromRGB(26, 188, 156), function()
-    pcall(function() 
-        local hud = getRemote("ShowEventHackerHUD")
-        if hud then hud:FireServer() end
-    end)
+    pcall(function() safeCall(getRemote("ShowEventHackerHUD")) end)
 end, miscTab)
 
 createButton("Rent Boat", Color3.fromRGB(52, 152, 219), function()
-    pcall(function() 
-        local boat = getRemote("RentBoat")
-        if boat then boat:FireServer() end
-    end)
+    pcall(function() safeCall(getRemote("RentBoat")) end)
 end, miscTab)
 
 createButton("Spam All Gifts", Color3.fromRGB(231, 76, 60), function()
     pcall(function() 
-        local r1 = getRemote("RoseGiftEvents")
-        local r2 = getRemote("BungaGiftEvents")
-        local r3 = getRemote("SunflowerGiftEvents")
-        local r4 = getRemote("BonekaGiftEvents")
-        if r1 then r1:FireServer() end
-        if r2 then r2:FireServer() end
-        if r3 then r3:FireServer() end
-        if r4 then r4:FireServer() end
+        safeCall(getRemote("RoseGiftEvents"))
+        safeCall(getRemote("BungaGiftEvents"))
+        safeCall(getRemote("SunflowerGiftEvents"))
+        safeCall(getRemote("BonekaGiftEvents"))
     end)
 end, miscTab)
 
 createButton("Toggle Night Zone", Color3.fromRGB(52, 73, 94), function()
-    pcall(function() 
-        local night = getRemote("NightZoneSync")
-        if night then night:FireServer() end
-    end)
+    pcall(function() safeCall(getRemote("NightZoneSync")) end)
 end, miscTab)
 
 createToggle("Spam Fireworks", "SpamFireworks", doSpamFireworks, miscTab)
