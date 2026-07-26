@@ -91,7 +91,7 @@ if not _G.PandaHookNamecall then
             if isSpyActive then
                 table.insert(q, "[Auto Perfect Cast] Intercepted and forced 100% power!")
             end
-            return _G.PandaHookNamecall(self, unpack(args))
+            -- JANGAN di-return di sini agar macro recorder tetap bisa mendeteksi!
         end
         
         -- MACRO RECORDER
