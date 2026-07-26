@@ -28,7 +28,9 @@ local State = {
     Fly = false,
     FlySpeed = 50,
     Delay = 2.5,
-    WebhookSpy = false
+    WebhookSpy = false,
+    PerfectCast = false,
+    InstantCatch = false
 }
 
 -- ==========================================
@@ -49,6 +51,17 @@ if not _G.PandaHookNamecall then
         local isSpyActive = _G.PandaSpyActive or false
         local q = _G.PandaSpyQueue or {}
         local blacklist = _G.PandaSpyBlacklist or {}
+        
+        -- AUTO PERFECT CAST (Bekerja saat Mancing Manual)
+        if State.PerfectCast and method == "FireServer" and self.Name == "CastReplication" then
+            if args[4] and type(args[4]) == "number" then
+                args[4] = 100 -- Ubah power langsung jadi 100 (Perfect) sebelum masuk ke server
+            end
+            if isSpyActive then
+                table.insert(q, "[Auto Perfect Cast] Intercepted and forced 100% power!")
+            end
+            return _G.PandaHookNamecall(self, unpack(args))
+        end
         
         if isSpyActive and not checkcaller() then
             if (method == "FireServer" or method == "InvokeServer") and typeof(self) == "Instance" then
@@ -102,6 +115,26 @@ coroutine.wrap(function()
     end
 end)()
 
+-- Instant Catch GUI Bypass (Menghapus Minigame "Klik-Klik" di layar)
+RunService.RenderStepped:Connect(function()
+    if State.InstantCatch or State.AutoFish then
+        pcall(function()
+            local pg = LocalPlayer:FindFirstChild("PlayerGui")
+            if pg then
+                for _, gui in ipairs(pg:GetChildren()) do
+                    local name = string.lower(gui.Name)
+                    -- Sembunyikan UI yang berhubungan dengan minigame mancing
+                    if name ~= "panda mancing" and (string.match(name, "fish") or string.match(name, "minigame") or string.match(name, "catch") or string.match(name, "bar")) then
+                        if gui:IsA("ScreenGui") and gui.Enabled then
+                            gui.Enabled = false
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
 -- ==========================================
 -- LOGIC FUNCTIONS
 -- ==========================================
@@ -109,6 +142,7 @@ local function doFishing()
     while State.AutoFish do
         if FishingSystem and InventoryEvents then
             pcall(function()
+                -- Equip Rod & Cast
                 InventoryEvents.Inventory_EquipRod:FireServer()
                 task.wait(0.5)
                 local char = LocalPlayer.Character
@@ -118,16 +152,37 @@ local function doFishing()
                     FishingSystem.CastReplication:FireServer(targetPos, Vector3.new(25, 5, 0), "Binary Edge", 100)
                 end
                 
-                task.wait(State.Delay)
+                -- Wait for user-defined Delay (Wait for fish to bite)
+                -- Jika InstantCatch menyala, kita potong waktu tunggu jadi instan (0.1 detik)
+                local waitTime = State.InstantCatch and 0.1 or State.Delay
+                task.wait(waitTime)
                 
                 if not State.AutoFish then return end
-                FishingSystem.FishingCatchSuccess:FireServer()
-                FishingSystem.FishRollResult:FireServer()
-                FishingSystem.FishCaught:FireServer()
+                
+                -- The exact sequence based on logs:
+                -- 1. Inventory_GetData
+                pcall(function() InventoryEvents.Inventory_GetData:InvokeServer() end)
+                task.wait(0.5)
+                
+                -- 2. FishCaught with coordinates (using our targetPos)
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local hrp = char.HumanoidRootPart
+                    local targetPos = hrp.Position + (hrp.CFrame.LookVector * 20)
+                    FishingSystem.FishCaught:FireServer(targetPos.X, targetPos.Y, targetPos.Z)
+                else
+                    FishingSystem.FishCaught:FireServer(0, 0, 0)
+                end
                 
                 task.wait(0.5)
-                FishingSystem.FishGiver:FireServer()
-                FishingSystem.CleanupCast:FireServer()
+                
+                -- 3. GetDailyInfo
+                pcall(function() RewardRemotes.GetDailyInfo:InvokeServer() end)
+                task.wait(0.5)
+                
+                -- 4. Inventory_GetData again
+                pcall(function() InventoryEvents.Inventory_GetData:InvokeServer() end)
+                
+                task.wait(1)
             end)
         end
         task.wait(1)
@@ -464,6 +519,9 @@ createButton("Sell All Fish", Color3.fromRGB(243, 156, 18), function()
 end, farmTab)
 
 createToggle("Auto Claim Rewards", "AutoClaim", doAutoClaim, farmTab)
+
+createToggle("Instant Catch (Bypass Minigame)", "InstantCatch", nil, farmTab)
+createToggle("Auto Perfect Cast (Manual)", "PerfectCast", nil, farmTab)
 
 -- ==========================================
 -- 2. CHEATS TAB
