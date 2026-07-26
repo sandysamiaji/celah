@@ -878,6 +878,8 @@ createButton("Purchase Luck Boost", Color3.fromRGB(155, 89, 182), function()
     pcall(function() safeCall(getRemote("PurchaseLuckBoost")) end)
 end, miscTab)
 
+createToggle("🛡️ Anti-AFK (Anti Disconnect)", "AntiAFK", toggleAntiAFK, miscTab)
+
 createButton("Show Hacker HUD", Color3.fromRGB(26, 188, 156), function()
     pcall(function() safeCall(getRemote("ShowEventHackerHUD")) end)
 end, miscTab)
