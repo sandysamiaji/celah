@@ -163,31 +163,50 @@ end)
 local function doFishing()
     while State.AutoFish do
         pcall(function()
-            safeCall(getRemote("Inventory_EquipRod"))
-            task.wait(0.5)
-            
             local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
+            if not char then return end
+            
+            -- Cari alat pancing di tangan atau di Backpack
+            local tool = char:FindFirstChildOfClass("Tool")
+            local rodName = "Binary Edge"
+            
+            if tool then
+                rodName = tool.Name
+            else
+                local bpTool = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
+                if bpTool then
+                    rodName = bpTool.Name
+                    safeCall(getRemote("Inventory_EquipRod"), rodName)
+                    task.wait(0.5)
+                end
+            end
+            
+            if char:FindFirstChild("HumanoidRootPart") then
                 local hrp = char.HumanoidRootPart
                 local targetPos = hrp.Position + (hrp.CFrame.LookVector * 20)
                 
-                safeCall(getRemote("CastReplication"), targetPos, Vector3.new(25, 5, 0), "Binary Edge", 100)
+                -- Melempar kail (Cast)
+                safeCall(getRemote("CastReplication"), targetPos, Vector3.new(25, 5, 0), rodName, 100)
                 
                 local waitTime = State.InstantCatch and 0.1 or State.Delay
                 task.wait(waitTime)
                 
                 if not State.AutoFish then return end
                 
-                safeCall(getRemote("Inventory_GetData"))
-                task.wait(0.5)
-                
+                -- Proses Minigame "Tap Tap" dan Catch secara otomatis
+                safeCall(getRemote("FishingCatchSuccess"))
+                safeCall(getRemote("FishRollResult"))
                 safeCall(getRemote("FishCaught"), targetPos.X, targetPos.Y, targetPos.Z)
                 task.wait(0.5)
                 
-                safeCall(getRemote("GetDailyInfo"))
-                task.wait(0.5)
+                safeCall(getRemote("FishGiver"))
+                safeCall(getRemote("CleanupCast"))
                 
-                safeCall(getRemote("Inventory_GetData"))
+                -- Refresh inventory dan misi (dari log asli)
+                task.spawn(function()
+                    safeCall(getRemote("GetDailyInfo"))
+                    safeCall(getRemote("Inventory_GetData"))
+                end)
             end
         end)
         task.wait(1)
