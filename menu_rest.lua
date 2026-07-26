@@ -218,8 +218,9 @@ local function doFishing()
                                 -- Jeda lama (lebih dari 1.5 detik) biasanya adalah waktu nunggu ikan makan umpan.
                                 if waitTime > 1.5 then
                                     task.wait(waitTime)
+                                else
+                                    task.wait(0.1) -- Sisipkan jeda 0.1 detik agar server tidak menolak eksekusi 0ms!
                                 end
-                                -- Jeda pendek (spam klik minigame) akan dilewati sepenuhnya (0 detik delay)
                             else
                                 task.wait(waitTime)
                             end
