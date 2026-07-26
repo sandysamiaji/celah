@@ -54,13 +54,12 @@ local State = {
     WebhookSpy = false,
     PerfectCast = false,
     InstantCatch = false,
-    Recording = false,
     AutoLock = false,
-    AutoSell = false
+    AutoSell = false,
+    AntiAFK = false
 }
 
-_G.RecordedMacro = {}
-_G.MacroStartTime = 0
+_G.FishingSession = 0
 
 -- ==========================================
 -- WEBHOOK SPY SYSTEM
@@ -186,59 +185,68 @@ end)
 -- LOGIC FUNCTIONS
 -- ==========================================
 local function doFishing()
+    _G.FishingSession = _G.FishingSession + 1
+    local currentSession = _G.FishingSession
+
     -- Create Clones (Shadows)
     for shadowIndex = 1, State.Shadows do
         task.spawn(function()
             -- Staggered start to prevent rate-limit
             task.wait((shadowIndex - 1) * 0.2)
             
-            while State.AutoFish do
+            while State.AutoFish and _G.FishingSession == currentSession do
                 local success, err = pcall(function()
-                    if #_G.RecordedMacro == 0 then
-                        if shadowIndex == 1 then
-                            warn("[Panda AutoFish]: Tidak ada macro yang direkam! Silakan Record dulu.")
-                            State.AutoFish = false
+                    local char = LocalPlayer.Character
+                    if not char then return end
+                    
+                    local rodName = "Binary Edge"
+                    local bp = LocalPlayer:FindFirstChild("Backpack")
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    
+                    if tool then
+                        rodName = tool.Name
+                    elseif bp then
+                        local bpTool = bp:FindFirstChildOfClass("Tool")
+                        if bpTool then
+                            rodName = bpTool.Name
+                            safeCall(getRemote("Inventory_EquipRod"), rodName)
+                            task.wait(0.5)
                         end
-                        return
                     end
                     
-                    local lastTime = 0
-                    for i, entry in ipairs(_G.RecordedMacro) do
-                        if not State.AutoFish then break end
+                    if char:FindFirstChild("HumanoidRootPart") then
+                        local hrp = char.HumanoidRootPart
+                        local targetPos = hrp.Position + (hrp.CFrame.LookVector * 20)
                         
-                        -- Kalkulasi jeda waktu asli yang dilakukan user
-                        local waitTime = entry.Time - lastTime
-                        if waitTime > 0 then
-                            if State.InstantCatch then
-                                -- Jeda lama (lebih dari 1.5 detik) biasanya adalah waktu nunggu ikan makan umpan.
-                                -- Ini dikontrol oleh server dan TIDAK BOLEH dipotong, kalau tidak server akan me-reset pancingan!
-                                if waitTime > 1.5 then
-                                    task.wait(waitTime)
-                                end
-                                -- Jeda pendek (spam klik minigame) akan dilewati sepenuhnya (0 detik delay)
-                            else
-                                task.wait(waitTime)
-                            end
-                        end
-                        lastTime = entry.Time
+                        -- Melempar Kail
+                        safeCall(getRemote("CastReplication"), targetPos, Vector3.new(25, 5, 0), rodName, 100)
                         
-                        -- Eksekusi Remote secara aman
-                        pcall(function()
-                            if entry.Method == "FireServer" then
-                                entry.Remote:FireServer(unpack(entry.Args))
-                            elseif entry.Method == "InvokeServer" then
-                                task.spawn(function()
-                                    pcall(function() entry.Remote:InvokeServer(unpack(entry.Args)) end)
-                                end)
-                            end
-                        end)
+                        -- Jeda menunggu ikan (Dikontrol oleh slider UI, biasanya butuh 3-6 detik dari server)
+                        -- Jika Instant Catch menyala, potong jeda minigame saja. 
+                        task.wait(State.Delay)
+                        
+                        if not State.AutoFish or _G.FishingSession ~= currentSession then return end
+                        
+                        -- Tarik Ikan (Minigame & Catch)
+                        safeCall(getRemote("FishingCatchSuccess"))
+                        if State.InstantCatch then task.wait(0.05) else task.wait(0.3) end
+                        
+                        safeCall(getRemote("FishRollResult"))
+                        if State.InstantCatch then task.wait(0.05) else task.wait(0.3) end
+                        
+                        safeCall(getRemote("FishCaught"), targetPos.X, targetPos.Y, targetPos.Z)
+                        if State.InstantCatch then task.wait(0.05) else task.wait(0.3) end
+                        
+                        safeCall(getRemote("FishGiver"))
+                        safeCall(getRemote("CleanupCast"))
                     end
                 end)
                 
                 if not success and shadowIndex == 1 then
                     warn("[Panda AutoFish Error]:", err)
                 end
-                task.wait(1)
+                
+                task.wait(0.5)
             end
         end)
     end
@@ -387,6 +395,25 @@ local function doFly()
     local char = LocalPlayer.Character
     if char and char:FindFirstChild("Humanoid") then
         char.Humanoid.PlatformStand = false
+    end
+end
+
+local antiAfkConnection
+local function toggleAntiAFK()
+    if State.AntiAFK then
+        local VirtualUser = game:GetService("VirtualUser")
+        antiAfkConnection = LocalPlayer.Idled:Connect(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+            warn("[Panda Anti-AFK]: Berhasil mencegah game dari disconnect (Idle 20 Menit)!")
+        end)
+        warn("[Panda Anti-AFK]: Aktif! Karakter Anda kebal dari kick AFK tanpa harus bergerak.")
+    else
+        if antiAfkConnection then
+            antiAfkConnection:Disconnect()
+            antiAfkConnection = nil
+        end
+        warn("[Panda Anti-AFK]: Dimatikan.")
     end
 end
 
@@ -641,23 +668,7 @@ end
 -- ==========================================
 -- 1. FARM TAB
 -- ==========================================
-local btnRecord
-btnRecord = createButton("🔴 Record Fishing (OFF)", Color3.fromRGB(231, 76, 60), function()
-    State.Recording = not State.Recording
-    if State.Recording then
-        _G.RecordedMacro = {} -- bersihkan memori lama
-        _G.MacroStartTime = tick()
-        btnRecord.Text = "⏹️ Stop Recording (ON)"
-        btnRecord.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-        warn("[Panda Macro]: Recording dimulai! Silakan mancing manual 1 kali sampai selesai (dapat ikan).")
-    else
-        btnRecord.Text = "🔴 Record Fishing (OFF)"
-        btnRecord.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-        warn("[Panda Macro]: Recording selesai! Tersimpan " .. tostring(#_G.RecordedMacro) .. " aksi.")
-    end
-end, farmTab)
-
-createToggle("▶️ Auto Fish (Play Macro)", "AutoFish", doFishing, farmTab)
+createToggle("▶️ Auto Fish", "AutoFish", doFishing, farmTab)
 createToggle("🔒 Auto Lock Mitos/Secret", "AutoLock", doAutoLock, farmTab)
 createToggle("💰 Auto Sell Fish", "AutoSell", doAutoSell, farmTab)
 
