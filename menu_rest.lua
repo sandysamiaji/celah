@@ -50,7 +50,7 @@ local State = {
     Fly = false,
     FlySpeed = 50,
     Delay = 2.5,
-    Shadows = 10,
+    Shadows = 1,
     WebhookSpy = false,
     PerfectCast = false,
     InstantCatch = false,
@@ -718,7 +718,7 @@ delayInput.FocusLost:Connect(function()
     if num and num > 0 then State.Delay = num else delayInput.Text = tostring(State.Delay) end
 end)
 
-createInput("Jumlah Bayangan (1-20)", "Jumlah Bayangan Mancing: 10", function(text)
+createInput("Jumlah Bayangan (1-20)", "Jumlah Bayangan Mancing: 1", function(text)
     local num = tonumber(text:match("%d+"))
     if num then 
         State.Shadows = math.clamp(num, 1, 20) 
