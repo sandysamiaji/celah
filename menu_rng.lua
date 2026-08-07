@@ -477,8 +477,11 @@ local function scanForItems()
             end
         end
     end
-    for _, v in ipairs(LocalPlayer.Backpack:GetChildren()) do
-        table.insert(items, v.Name)
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if backpack then
+        for _, v in ipairs(backpack:GetChildren()) do
+            table.insert(items, v.Name)
+        end
     end
     for _, v in ipairs(LocalPlayer:GetChildren()) do
         if v:IsA("Folder") and (string.find(string.lower(v.Name), "inv") or string.find(string.lower(v.Name), "item") or string.find(string.lower(v.Name), "pet") or string.find(string.lower(v.Name), "aura")) then
